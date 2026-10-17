@@ -1,0 +1,11 @@
+region,sites,site_days,hazard_days,model,roc_auc,pr_auc,brier,hazard_rate_top10%
+Florida,60,65760,2775,national,0.884,0.31,0.0339,0.238
+Florida,60,65760,2775,region only,0.877,0.299,0.0343,0.234
+Midwest,24,17544,1237,national,0.871,0.371,0.0533,0.343
+Midwest,24,17544,1237,region only,0.871,0.374,0.0535,0.348
+Northeast,11,8041,398,national,0.905,0.344,0.0379,0.301
+Northeast,11,8041,398,region only,0.888,0.321,0.0402,0.284
+South,36,26316,1904,national,0.881,0.379,0.0538,0.359
+South,36,26316,1904,region only,0.882,0.38,0.054,0.37
+West,29,21199,788,national,0.874,0.26,0.031,0.212
+West,29,21199,788,region only,0.879,0.281,0.0307,0.217
