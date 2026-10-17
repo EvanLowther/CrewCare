@@ -1,4 +1,4 @@
-"""Apply db/migrations/*.sql in order, once each. Run: make migrate"""
+"""Apply db/migrations/*.sql in order, once each. Run: python dev.py migrate"""
 
 
 from planit.config import REPO_ROOT

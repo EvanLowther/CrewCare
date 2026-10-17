@@ -19,10 +19,9 @@ jobs:
       - run: ruff check .
       - run: pytest -q
       - name: API types are up to date
-        working-directory: .
         run: |
-          PLANIT_MOCK=1 python -c "import json; from planit.api.main import app; print(json.dumps(app.openapi(), indent=2))" > /tmp/openapi.json
-          diff -q /tmp/openapi.json docs/openapi.json || (echo "Run 'make types' and commit the result" && exit 1)
+          python scripts/export_openapi.py /tmp/openapi.json
+          diff -q /tmp/openapi.json ../docs/openapi.json || (echo "Run 'python dev.py types' and commit the result" && exit 1)
 
   frontend:
     runs-on: ubuntu-latest
@@ -43,3 +42,23 @@ jobs:
       - run: pnpm lint
       - run: pnpm exec next typegen && pnpm exec tsc --noEmit
       - run: pnpm build
+
+  # Runs the same commands a teammate on Windows runs, so setup can't silently break there.
+  windows-setup:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: python dev.py setup
+      - run: python dev.py test
+      - run: python dev.py lint

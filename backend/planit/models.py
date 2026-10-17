@@ -1,6 +1,6 @@
 """API contract: every JSON shape the frontend sees.
 
-This file is the source of truth. After changing it, run `make types` to
+This file is the source of truth. After changing it, run `python dev.py types` to
 regenerate frontend/src/lib/api-types.ts, and tell the other person.
 """
 
