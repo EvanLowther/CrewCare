@@ -27,7 +27,9 @@ That lets each person build and test their half alone.
 
 - **Worker** writes `weather`, `river_levels`, `lightning_strikes`, `nws_alerts`, `alerts`, `hazard_scores`, `briefings`.
 - **API** reads all of those and writes only `hazard_reports` and `photos` (crew uploads).
-- **Frontend** talks only to the API. Alerts update by polling `GET /api/alerts?since=` every 10 s.
+- **Frontend** talks only to the API, always through its own origin: the browser calls `/api/...` on port 3000
+  and `frontend/next.config.ts` forwards it to FastAPI on port 8000. So the site works at `localhost`, `127.0.0.1`
+  or the computer's Wi-Fi address (phones) with no CORS setup. Alerts update by polling `GET /api/alerts?since=` every 10 s.
 
 ## Database (db/migrations/001_init.sql)
 
