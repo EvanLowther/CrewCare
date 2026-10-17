@@ -32,6 +32,7 @@ python scripts/load_storm_events.py                           # NOAA Storm Event
 python scripts/backfill_weather.py 2024-01-01 2025-12-31      # hourly weather history (~70 min, Open-Meteo free tier)
 python -m planit.ml.train --version xgb-<date>                # train, test on 2025, save to planit/ml/models/
 python -m planit.ml.evaluate                                  # leave-one-year-out test bench: every table below
+python -m planit.ml.compare [--by-region]                     # model types / national vs per-region comparisons
 ```
 
 The loaders print a dry run unless told to write. The backfill paces itself to Open-Meteo's free tier (10,000 calls a
@@ -52,6 +53,7 @@ day) and `--only-missing` fetches just the sites that have no history yet.
 │   │   │   ├── train.py          XGBoost, trained on 2023-2024, tested on 2025, then refit on all
 │   │   │   ├── model.py          probability -> 0-10 score, SHAP factors, OSHA heat floor
 │   │   │   ├── evaluate.py       leave-one-year-out test bench, by region, hazard and level
+│   │   │   ├── compare.py        model types on identical inputs; national vs one model per region
 │   │   │   ├── score.py          writes both scores for every site, now + 24 h, every 5 min
 │   │   │   └── models/           trained models + their test metrics
 │   │   ├── worker/
@@ -60,8 +62,9 @@ day) and `--only-missing` fetches just the sites that have no history yet.
 │   │   └── api/                  FastAPI routes (reads the database, never calls the worker)
 │   ├── scripts/                  load_sites, load_storm_events, backfill_weather, migrate
 │   └── tests/                    pytest: rules, features, model, ingest, API contract
-├── frontend/                     Next.js 16: risk map, ranked sites, site page, alerts
-├── docs/                         architecture, API contract, workflow / to-do lists
+├── frontend/                     Next.js 16: risk map, ranked sites, site page, alerts, crew reports
+├── deploy/                       Vultr server: Caddy, systemd services, auto-deploy of main
+├── docs/                         architecture, API contract, workflow, model and region comparisons
 └── data/raw/                     downloaded EIA and NOAA files (NOT committed)
 ```
 
@@ -146,7 +149,7 @@ xychart-beta
 | # | Question | Verdict |
 |---|---|---|
 | Q1 | Can daily weather tell hazard days from normal ones on years the model never saw? | **Supported.** ROC-AUC 0.885; PR-AUC 0.328 against 0.051 for guessing |
-| Q2 | Does one national model hold up in every region? | **Supported.** ROC-AUC 0.871-0.904 in all five regions; the West catches the fewest hazard days (50%) |
+| Q2 | Does one national model hold up in every region, or does each need its own? | **One model.** ROC-AUC 0.871-0.905 in all five regions; region-only models don't beat it, except slightly in the West |
 | Q3 | Does training on all 50 states help Florida? | **Supported.** Same 60 sites: PR-AUC 0.226 -> 0.303, a "high" is right 25% of the time instead of 16% |
 | Q4 | Do the dashboard levels mean something? | **Supported.** "Extreme" days were hazard days 40% of the time, "low" days 1%; probabilities are calibrated |
 | Q5 | Do the OSHA / NWS work rules match the model? | **Partly.** Rules win on wind and hurricanes, the model on floods, winter and storms; so we show both |
@@ -211,24 +214,28 @@ xychart-beta
     bar [1.0, 7.7, 14.2, 39.8]
 ```
 
-| Level | Share of all days | Real hazard days at this level |
-|---|---|---|
-| low (0-2.4) | 70% | 1.0% |
-| moderate (2.5-4.9) | 15% | 7.7% |
-| high (5-7.4) | 11% | 14.2% |
-| extreme (7.5-10) | 4% | 39.8% |
+70% of days score low, 15% moderate, 11% high and 4% extreme. Calibration: the riskiest tenth of days were predicted at
+27% and turned out 29%.
 
-Calibration: the riskiest tenth of days were predicted at 27% and turned out 29%.
+### One national model, or one per region?
 
-### By region and by hazard
+Each region is scored on its own held-out years twice: by the national model, and by a model trained only on that
+region's sites (`python -m planit.ml.compare --by-region`, saved to
+[`docs/region_comparison.csv`](docs/region_comparison.csv)).
 
-| Region | ROC-AUC | PR-AUC | Hazard days flagged "high" |
-|---|---|---|---|
-| Florida | 0.876 | 0.293 | 61% |
-| South | 0.878 | 0.370 | 74% |
-| Midwest | 0.871 | 0.354 | 67% |
-| Northeast | 0.904 | 0.340 | 67% |
-| West | 0.873 | 0.254 | 50% |
+| Region | Sites | Hazard days | National: ROC-AUC / PR-AUC | Region only: ROC-AUC / PR-AUC |
+|---|---|---|---|---|
+| Florida | 60 | 2,775 | **0.884 / 0.310** | 0.877 / 0.299 |
+| Northeast | 11 | 398 | **0.905 / 0.344** | 0.888 / 0.321 |
+| Midwest | 24 | 1,237 | 0.871 / 0.371 | 0.871 / 0.374 |
+| South | 36 | 1,904 | 0.881 / 0.379 | 0.882 / 0.380 |
+| West | 29 | 788 | 0.874 / 0.260 | **0.879 / 0.281** |
+
+One model wins: it's better in Florida and the Northeast, even in the Midwest and South, and slightly behind only in the
+West. Small regions lose the most on their own (the Northeast has 398 hazard days), so sharing data helps. The West,
+where fire, dust and dry air matter most, is the one to re-check with more history.
+
+### By hazard
 
 | Hazard (NOAA event types) | Days | Predictive | Real-time rules |
 |---|---|---|---|
@@ -262,12 +269,6 @@ and snow depth 2% each. The national features (snowfall, wind chill, location) r
 
 ## The app
 
-```bash
-python dev.py api       # FastAPI on http://localhost:8000 (docs at /docs)
-python dev.py web       # Next.js on http://localhost:3000
-python dev.py worker    # pulls weather and alerts, runs the rules, scores every site every 5 min
-```
-
 - **Dashboard:** a risk map of all 160 sites and a ranked list, with a **Real-time / Predictive** switch. Stop-work
   lightning sites are flagged on the map.
 - **Site page:** current conditions, the next 48 hours, the score's top factors with a recommended action for each
@@ -294,6 +295,8 @@ warnings and lightning on top.
 | **NOAA Storm Events** | The labels: what actually happened, where and when |
 | **EIA-860M** | Every US power plant, with coordinates, utility and type |
 | **Vultr** | Hosts the live site: one Ubuntu server running the site, API and worker behind Caddy (HTTPS), auto-deploying `main` |
+| **Auth0** | |
+| **Gemini** | |
 
 ## What's not done yet
 
@@ -307,8 +310,8 @@ warnings and lightning on top.
 - Two years of history outside Florida, three in Florida; one site per small state.
 - NOAA offices log events more or less thoroughly, so labels are uneven; that's why the OSHA heat floor and the rules
   stay on top of the model.
-- One national baseline: stormy regions sit higher most of the time. A per-region baseline would make a 5 mean "unusual
-  for this site".
+- One national baseline: stormy regions sit higher most of the time, and quiet ones near 0. A per-region baseline would
+  make a 5 mean "unusual for this site" (a scoring change, not a new model; see the region comparison above).
 - The model can't see fires, smoke or earthquakes; wildfire days are missed unless the wind or an NWS warning flags them.
 
 ## Run it locally
@@ -338,8 +341,4 @@ migrations. Run `python dev.py test` and `python dev.py lint` before committing.
 
 </details>
 
-| Path | Owner |
-|---|---|
-| `backend/planit/worker/`, `backend/planit/ml/`, `backend/scripts/` | Person A (data + ML) |
-| `backend/planit/api/`, `frontend/` | Person B (app) |
-| `backend/planit/models.py`, `db/migrations/` | Both, heads-up first |
+Who owns which folders, and the plan: [`docs/WORKFLOW.md`](docs/WORKFLOW.md).
