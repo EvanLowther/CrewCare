@@ -13,11 +13,13 @@ const lanAddresses = Object.values(networkInterfaces())
   .map((a) => a!.address);
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // The server builds into a side folder and swaps it in (deploy/deploy.sh), so a failed build never takes the site down.
+  distDir: process.env.NEXT_DIST_DIR ?? ".next",
   cacheComponents: true,
   partialPrefetching: true,
-  // Dev only: hostnames besides localhost that may load the dev server's scripts.
-  allowedDevOrigins: ["127.0.0.1", ...lanAddresses],
+  // Dev only: hostnames besides localhost that may load the dev server's scripts. *.trycloudflare.com is the
+  // free HTTPS tunnel (`cloudflared tunnel --url http://localhost:3000`) used to test GPS and camera on a phone.
+  allowedDevOrigins: ["127.0.0.1", ...lanAddresses, "*.trycloudflare.com"],
   async rewrites() {
     return [{ source: "/api/:path*", destination: `${API_PROXY_TARGET}/api/:path*` }];
   },

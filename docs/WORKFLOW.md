@@ -38,7 +38,7 @@ Tick items in the PR that finishes them.
 
 ### Together
 - [x] Schema, API contract, repo, Tiger instance (`001_init.sql` applied)
-- [ ] `job_requests` table for the demo buttons (migration 002, API inserts, worker polls)
+- [x] `job_requests` table for the demo buttons (migration 002, API inserts, worker polls)
 - [ ] Hour 12 check: full app with `PLANIT_MOCK=0`
 - [ ] Hour 18 check: full app with `PLANIT_MOCK=0` on the deployed URL
 - [ ] Feature freeze, full demo run, bug fixes
@@ -59,13 +59,14 @@ Tick items in the PR that finishes them.
 
 ### Person B (app)
 - [x] Real `/api/sites` + `/api/sites/{id}` queries
-- [ ] Real `/api/alerts`, `/api/reports`, `/api/briefings` queries
+- [x] Real `/api/alerts` and `/api/reports` queries
+- [ ] Real `/api/briefings` queries
 - [x] Dashboard: Leaflet map + ranked list from mock data
 - [ ] `scripts/seed_demo.py` (fake weather, scores, alerts in Tiger)
 - [x] Dashboard on the real API
 - [x] Site detail page
 - [ ] Alert banner + live countdown
-- [ ] Crew report form (photo + GPS pin)
+- [x] Crew report form (photo + GPS pin)
 - [ ] Deploy to an HTTPS URL; test the report form on a phone
 - [ ] Briefings page + "Generate now"
 

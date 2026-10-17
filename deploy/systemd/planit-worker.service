@@ -1,0 +1,16 @@
+[Unit]
+Description=PlanIT Control worker (weather, alerts, scoring, briefings)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=planit
+WorkingDirectory=/opt/planit/backend
+ExecStart=/opt/planit/.venv/bin/python -m planit.worker.main
+Restart=always
+RestartSec=5
+# A stalled database connection makes the worker hang rather than crash; restart it daily as a backstop.
+RuntimeMaxSec=1d
+
+[Install]
+WantedBy=multi-user.target

@@ -24,7 +24,8 @@ from planit.models import (
     SiteSummary,
 )
 
-REPORT_RADIUS_M = 8046.7  # 5 miles: crew reports shown on a site's page
+# A site's page lists crew reports tied to it (nearest site within 10 mi, see reports_store) plus any within 5 mi.
+REPORT_RADIUS_M = 8046.7
 
 _SEVERITY_RANK = "CASE severity WHEN 'danger' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END"
 
@@ -180,7 +181,7 @@ def get_site(site_id: int, scorer: str | None = None) -> SiteDetail | None:
             "r.reporter_name, r.photo_id, r.status, r.created_at, r.expires_at "
             "FROM hazard_reports r JOIN sites s ON s.id = %s "
             "WHERE r.status = 'active' AND (r.expires_at IS NULL OR r.expires_at > now()) "
-            "AND ST_DWithin(r.geom, s.geom, %s) ORDER BY r.created_at DESC",
+            "AND (r.site_id = s.id OR ST_DWithin(r.geom, s.geom, %s)) ORDER BY r.created_at DESC",
             (site_id, REPORT_RADIUS_M),
         ).fetchall()
 

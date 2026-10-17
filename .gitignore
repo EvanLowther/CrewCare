@@ -23,3 +23,5 @@ data/raw/
 data/processed/
 
 .DS_Store
+.next-new/
+.next-old/

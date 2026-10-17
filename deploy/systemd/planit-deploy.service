@@ -1,0 +1,6 @@
+[Unit]
+Description=PlanIT Control: deploy origin/main if it changed
+
+[Service]
+Type=oneshot
+ExecStart=/opt/planit/deploy/deploy.sh
