@@ -60,7 +60,7 @@ def save(model: XGBClassifier, meta: dict, folder: Path = MODELS_DIR) -> Path:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--out", type=Path, default=MODELS_DIR)
-    parser.add_argument("--version", help="Model name (default xgb-<today>); the scorer loads the last in sort order")
+    parser.add_argument("--version", help="Model name (default xgb-<today>); the scorer loads the newest trained")
     args = parser.parse_args()
 
     from planit.db import get_pool

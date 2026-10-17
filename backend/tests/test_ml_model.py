@@ -1,5 +1,7 @@
 """planit.ml.train + planit.ml.model on synthetic data: no database, no real model file."""
 
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -84,3 +86,12 @@ def test_train_save_load_explain(frame, tmp_path):
     assert {f["key"] for f in storm_factors} & {"downpour", "wind"}
     assert all(set(f) == {"key", "label", "contribution"} and f["contribution"] > 0 for f in storm_factors)
     assert sum(f["contribution"] for f in storm_factors) <= storm_score + 0.15  # shares of the score
+
+
+def test_latest_model_is_the_newest_trained_not_the_last_name(tmp_path):
+    for version, trained_at in [("xgb-2026-10-17", "2026-10-17T05:11:16+00:00"),
+                                ("xgb-2026-10-17-us", "2026-10-17T20:57:02+00:00")]:
+        (tmp_path / f"{version}.json").write_text("{}")
+        (tmp_path / f"{version}.meta.json").write_text(json.dumps({"version": version, "trained_at": trained_at}))
+    assert sorted(p.name for p in tmp_path.glob("*.json") if "meta" not in p.name)[-1] == "xgb-2026-10-17.json"
+    assert latest_model_path(tmp_path).name == "xgb-2026-10-17-us.json"
