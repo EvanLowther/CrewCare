@@ -149,10 +149,17 @@ class HazardModel:
 
 
 def latest_model_path(folder: Path = MODELS_DIR) -> Path:
-    paths = sorted(p for p in folder.glob("xgb-*.json") if not p.name.endswith(".meta.json"))
+    """The most recently trained model, by `trained_at` in its .meta.json. Not by file name: 'xgb-2026-10-17-us.json'
+    sorts before 'xgb-2026-10-17.json' ('-' comes before '.')."""
+    paths = [p for p in folder.glob("xgb-*.json") if not p.name.endswith(".meta.json")]
     if not paths:
         raise FileNotFoundError(f"No trained model in {folder}. Run: python -m planit.ml.train")
-    return paths[-1]
+
+    def trained_at(p: Path) -> str:
+        meta = p.with_suffix(".meta.json")
+        return json.loads(meta.read_text()).get("trained_at", "") if meta.exists() else ""
+
+    return max(paths, key=lambda p: (trained_at(p), p.name))
 
 
 def load_latest() -> HazardModel:
