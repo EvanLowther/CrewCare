@@ -1,0 +1,1543 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "PlanIT Control API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/sites": {
+      "get": {
+        "tags": [
+          "sites"
+        ],
+        "summary": "List Sites",
+        "description": "All sites, highest risk first.",
+        "operationId": "list_sites_api_sites_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites/{site_id}": {
+      "get": {
+        "tags": [
+          "sites"
+        ],
+        "summary": "Get Site",
+        "operationId": "get_site_api_sites__site_id__get",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Site Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alerts": {
+      "get": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "List Alerts",
+        "description": "Active alerts. With `since`, only alerts updated after that time (includes newly cleared ones).",
+        "operationId": "list_alerts_api_alerts_get",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Site Id"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "name": "include_cleared",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Cleared"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "List Reports",
+        "operationId": "list_reports_api_reports_get",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Site Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Create Report",
+        "description": "multipart/form-data. The API picks the nearest site and resizes the photo.",
+        "operationId": "create_report_api_reports_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_create_report_api_reports_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HazardReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/photos/{photo_id}": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Get Photo",
+        "operationId": "get_photo_api_photos__photo_id__get",
+        "parameters": [
+          {
+            "name": "photo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Photo Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/briefings": {
+      "get": {
+        "tags": [
+          "briefings"
+        ],
+        "summary": "List Briefings",
+        "description": "Briefings for a work day. Defaults to tomorrow.",
+        "operationId": "list_briefings_api_briefings_get",
+        "parameters": [
+          {
+            "name": "for_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "For Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BriefingList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/briefings/generate": {
+      "post": {
+        "tags": [
+          "briefings"
+        ],
+        "summary": "Generate Now",
+        "description": "Demo button: generate tomorrow's briefings immediately instead of waiting for 6 PM.",
+        "operationId": "generate_now_api_briefings_generate_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoAck"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/demo/lightning-replay": {
+      "post": {
+        "tags": [
+          "demo"
+        ],
+        "summary": "Lightning Replay",
+        "description": "Start a storm near a site: strikes arrive every interval_seconds, each one resets the 30-min countdown.",
+        "operationId": "lightning_replay_api_demo_lightning_replay_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LightningReplayRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoAck"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health",
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Alert": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "site_id": {
+            "type": "integer",
+            "title": "Site Id"
+          },
+          "site_name": {
+            "type": "string",
+            "title": "Site Name"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "lightning",
+              "flood",
+              "heat",
+              "storm",
+              "wind",
+              "wildfire",
+              "crew_report",
+              "nws"
+            ],
+            "title": "Type"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "danger"
+            ],
+            "title": "Severity"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "examples": [
+              "STOP WORK: lightning within 10 miles"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "cleared"
+            ],
+            "title": "Status"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "all_clear_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "All Clear At",
+            "description": "Lightning only. Frontend counts down to this. Moves later with each new strike."
+          },
+          "cleared_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cleared At"
+          },
+          "meta": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Meta",
+            "examples": [
+              {
+                "last_strike_at": "2026-10-17T18:42:00Z",
+                "nearest_strike_mi": 3.2,
+                "strike_count": 4
+              }
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "site_id",
+          "site_name",
+          "type",
+          "severity",
+          "title",
+          "message",
+          "status",
+          "started_at",
+          "all_clear_at",
+          "cleared_at",
+          "updated_at"
+        ],
+        "title": "Alert"
+      },
+      "AlertList": {
+        "properties": {
+          "alerts": {
+            "items": {
+              "$ref": "#/components/schemas/Alert"
+            },
+            "type": "array",
+            "title": "Alerts"
+          },
+          "server_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Server Time",
+            "description": "Pass back as ?since= on the next poll"
+          }
+        },
+        "type": "object",
+        "required": [
+          "alerts",
+          "server_time"
+        ],
+        "title": "AlertList"
+      },
+      "Body_create_report_api_reports_post": {
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "title": "Latitude"
+          },
+          "longitude": {
+            "type": "number",
+            "title": "Longitude"
+          },
+          "hazard_type": {
+            "type": "string",
+            "enum": [
+              "wildlife",
+              "flooding",
+              "unstable_ground",
+              "downed_line",
+              "heat_illness",
+              "fire",
+              "other"
+            ],
+            "title": "Hazard Type"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Severity"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "reporter_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reporter Name"
+          },
+          "photo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "contentMediaType": "application/octet-stream"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "latitude",
+          "longitude",
+          "hazard_type",
+          "severity"
+        ],
+        "title": "Body_create_report_api_reports_post"
+      },
+      "Briefing": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "site_id": {
+            "type": "integer",
+            "title": "Site Id"
+          },
+          "site_name": {
+            "type": "string",
+            "title": "Site Name"
+          },
+          "for_date": {
+            "type": "string",
+            "format": "date",
+            "title": "For Date"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "examples": [
+              "Start before 7 AM. Heat index reaches 110\u00b0F by noon; storms likely after 2 PM."
+            ]
+          },
+          "details": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Details",
+            "examples": [
+              {
+                "peak_heat_index_f": 110,
+                "recommendations": [
+                  "Water/rest/shade every hour after 11 AM"
+                ],
+                "risk_score": 7.4,
+                "storm_window": "2 PM - 6 PM"
+              }
+            ]
+          },
+          "generated_by": {
+            "type": "string",
+            "title": "Generated By",
+            "examples": [
+              "gemini-2.5-flash",
+              "template"
+            ]
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "site_id",
+          "site_name",
+          "for_date",
+          "summary",
+          "generated_by",
+          "generated_at"
+        ],
+        "title": "Briefing"
+      },
+      "BriefingList": {
+        "properties": {
+          "for_date": {
+            "type": "string",
+            "format": "date",
+            "title": "For Date"
+          },
+          "briefings": {
+            "items": {
+              "$ref": "#/components/schemas/Briefing"
+            },
+            "type": "array",
+            "title": "Briefings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "for_date",
+          "briefings"
+        ],
+        "title": "BriefingList"
+      },
+      "Conditions": {
+        "properties": {
+          "ts": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ts"
+          },
+          "temp_f": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temp F"
+          },
+          "heat_index_f": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heat Index F"
+          },
+          "humidity_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Humidity Pct"
+          },
+          "precip_in": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Precip In"
+          },
+          "precip_prob_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Precip Prob Pct"
+          },
+          "wind_mph": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wind Mph"
+          },
+          "gust_mph": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gust Mph"
+          },
+          "cape_jkg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cape Jkg"
+          },
+          "soil_moisture": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Soil Moisture",
+            "description": "m3/m3, 0-7 cm"
+          },
+          "weather_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weather Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ts",
+          "temp_f",
+          "heat_index_f",
+          "humidity_pct",
+          "precip_in",
+          "precip_prob_pct",
+          "wind_mph",
+          "gust_mph",
+          "cape_jkg",
+          "soil_moisture",
+          "weather_code"
+        ],
+        "title": "Conditions"
+      },
+      "DemoAck": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "message"
+        ],
+        "title": "DemoAck"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HazardReport": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "site_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Id"
+          },
+          "latitude": {
+            "type": "number",
+            "title": "Latitude"
+          },
+          "longitude": {
+            "type": "number",
+            "title": "Longitude"
+          },
+          "hazard_type": {
+            "type": "string",
+            "enum": [
+              "wildlife",
+              "flooding",
+              "unstable_ground",
+              "downed_line",
+              "heat_illness",
+              "fire",
+              "other"
+            ],
+            "title": "Hazard Type"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Severity"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "reporter_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reporter Name"
+          },
+          "photo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Url",
+            "description": "Relative URL, e.g. /api/photos/{id}"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "resolved"
+            ],
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "site_id",
+          "latitude",
+          "longitude",
+          "hazard_type",
+          "severity",
+          "description",
+          "reporter_name",
+          "photo_url",
+          "status",
+          "created_at",
+          "expires_at"
+        ],
+        "title": "HazardReport"
+      },
+      "Health": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "title": "Status"
+          },
+          "mock": {
+            "type": "boolean",
+            "title": "Mock",
+            "description": "True when serving sample data instead of the database"
+          },
+          "database": {
+            "type": "string",
+            "enum": [
+              "connected",
+              "unavailable",
+              "not_configured"
+            ],
+            "title": "Database"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "mock",
+          "database"
+        ],
+        "title": "Health"
+      },
+      "Last24h": {
+        "properties": {
+          "total_precip_in": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Precip In"
+          },
+          "max_heat_index_f": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Heat Index F"
+          },
+          "max_gust_mph": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Gust Mph"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_precip_in",
+          "max_heat_index_f",
+          "max_gust_mph"
+        ],
+        "title": "Last24h"
+      },
+      "LightningReplayRequest": {
+        "properties": {
+          "site_id": {
+            "type": "integer",
+            "title": "Site Id",
+            "description": "Center the storm on this site"
+          },
+          "strikes": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Strikes",
+            "default": 6
+          },
+          "interval_seconds": {
+            "type": "integer",
+            "maximum": 300.0,
+            "minimum": 1.0,
+            "title": "Interval Seconds",
+            "description": "Time between strikes",
+            "default": 20
+          }
+        },
+        "type": "object",
+        "required": [
+          "site_id"
+        ],
+        "title": "LightningReplayRequest"
+      },
+      "ReportList": {
+        "properties": {
+          "reports": {
+            "items": {
+              "$ref": "#/components/schemas/HazardReport"
+            },
+            "type": "array",
+            "title": "Reports"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reports"
+        ],
+        "title": "ReportList"
+      },
+      "Risk": {
+        "properties": {
+          "score": {
+            "type": "number",
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Score",
+            "examples": [
+              7.8
+            ]
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "low",
+              "moderate",
+              "high",
+              "extreme"
+            ],
+            "title": "Level"
+          },
+          "factors": {
+            "items": {
+              "$ref": "#/components/schemas/RiskFactor"
+            },
+            "type": "array",
+            "title": "Factors",
+            "description": "Top contributing factors, largest first"
+          },
+          "model_version": {
+            "type": "string",
+            "title": "Model Version",
+            "examples": [
+              "rules-v1"
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "score",
+          "level",
+          "factors",
+          "model_version",
+          "updated_at"
+        ],
+        "title": "Risk"
+      },
+      "RiskFactor": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "examples": [
+              "heat_index"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "examples": [
+              "Heat index 112\u00b0F"
+            ]
+          },
+          "contribution": {
+            "type": "number",
+            "title": "Contribution",
+            "description": "Points this factor adds to the 0-10 score",
+            "examples": [
+              2.4
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "contribution"
+        ],
+        "title": "RiskFactor"
+      },
+      "RiskPoint": {
+        "properties": {
+          "ts": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ts"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "low",
+              "moderate",
+              "high",
+              "extreme"
+            ],
+            "title": "Level"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "current",
+              "forecast"
+            ],
+            "title": "Kind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ts",
+          "score",
+          "level",
+          "kind"
+        ],
+        "title": "RiskPoint"
+      },
+      "SiteDetail": {
+        "properties": {
+          "site": {
+            "$ref": "#/components/schemas/SiteSummary"
+          },
+          "conditions": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Conditions"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_24h": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Last24h"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "forecast": {
+            "items": {
+              "$ref": "#/components/schemas/Conditions"
+            },
+            "type": "array",
+            "title": "Forecast",
+            "description": "Next 48 hours, hourly"
+          },
+          "alerts": {
+            "items": {
+              "$ref": "#/components/schemas/Alert"
+            },
+            "type": "array",
+            "title": "Alerts",
+            "description": "Active alerts for this site"
+          },
+          "reports": {
+            "items": {
+              "$ref": "#/components/schemas/HazardReport"
+            },
+            "type": "array",
+            "title": "Reports",
+            "description": "Active crew reports within 5 miles"
+          },
+          "risk_history": {
+            "items": {
+              "$ref": "#/components/schemas/RiskPoint"
+            },
+            "type": "array",
+            "title": "Risk History",
+            "description": "Past 24 h + next 24 h forecast"
+          }
+        },
+        "type": "object",
+        "required": [
+          "site",
+          "conditions",
+          "last_24h",
+          "forecast",
+          "alerts",
+          "reports",
+          "risk_history"
+        ],
+        "title": "SiteDetail",
+        "description": "Everything the site page shows."
+      },
+      "SiteList": {
+        "properties": {
+          "sites": {
+            "items": {
+              "$ref": "#/components/schemas/SiteSummary"
+            },
+            "type": "array",
+            "title": "Sites",
+            "description": "Sorted by risk score, highest first"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sites",
+          "updated_at"
+        ],
+        "title": "SiteList"
+      },
+      "SiteSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "EIA plant code",
+            "examples": [
+              621
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "examples": [
+              "Turkey Point"
+            ]
+          },
+          "utility": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utility"
+          },
+          "county": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "County"
+          },
+          "plant_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plant Type"
+          },
+          "capacity_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capacity Mw"
+          },
+          "latitude": {
+            "type": "number",
+            "title": "Latitude"
+          },
+          "longitude": {
+            "type": "number",
+            "title": "Longitude"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone",
+            "examples": [
+              "America/New_York"
+            ]
+          },
+          "risk": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Risk"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null until the first score is computed"
+          },
+          "active_alert_count": {
+            "type": "integer",
+            "title": "Active Alert Count"
+          },
+          "top_alert": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "lightning",
+                  "flood",
+                  "heat",
+                  "storm",
+                  "wind",
+                  "wildfire",
+                  "crew_report",
+                  "nws"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top Alert",
+            "description": "Most severe active alert type, for the map icon"
+          },
+          "heat_index_f": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heat Index F"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "utility",
+          "county",
+          "plant_type",
+          "capacity_mw",
+          "latitude",
+          "longitude",
+          "timezone",
+          "risk",
+          "active_alert_count",
+          "top_alert",
+          "heat_index_f"
+        ],
+        "title": "SiteSummary",
+        "description": "One row on the dashboard map / ranked list."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

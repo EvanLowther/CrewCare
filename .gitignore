@@ -1,0 +1,26 @@
+# Secrets
+.env
+.env.local
+frontend/.env.local
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Node / Next
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# Data and models (download / train locally)
+data/raw/
+data/processed/
+backend/ml/models/
+
+.DS_Store

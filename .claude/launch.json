@@ -1,0 +1,7 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "api", "runtimeExecutable": "make", "runtimeArgs": ["api"], "port": 8000 },
+    { "name": "web", "runtimeExecutable": "make", "runtimeArgs": ["web"], "port": 3000 }
+  ]
+}
