@@ -97,6 +97,17 @@ def nws_heat_index(temp_f: float | None, rh: float | None) -> float | None:
     return round(hi, 1)
 
 
+def wind_chill_f(temp_f: float | None, wind_mph: float | None) -> float | None:
+    """NWS wind chill (°F), defined at or below 50°F with wind of at least 3 mph; otherwise the air temperature.
+    Same formula as features.DAILY_SQL (https://www.weather.gov/safety/cold-wind-chill-chart)."""
+    if temp_f is None or math.isnan(temp_f):
+        return None
+    if wind_mph is None or math.isnan(wind_mph) or temp_f > 50 or wind_mph < 3:
+        return round(float(temp_f), 1)
+    v = wind_mph ** 0.16
+    return round(35.74 + 0.6215 * temp_f - 35.75 * v + 0.4275 * temp_f * v, 1)
+
+
 # (at least °F, label suffix, action), highest first
 HEAT_BANDS = [
     (125, " · NWS extreme danger", "Stop outdoor work; heat stroke is likely"),

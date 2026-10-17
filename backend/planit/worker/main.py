@@ -23,7 +23,7 @@ log = logging.getLogger("planit.worker")
 
 # name -> (function, seconds between runs). Enable a job by implementing its function.
 JOBS = {
-    "open_meteo": (open_meteo.poll, 1800),  # free-tier budget: 60 sites x 48 polls/day ~ 2,900 calls
+    "open_meteo": (open_meteo.poll, 3600),  # free-tier budget: 160 sites x 24 polls/day x 1.4 ~ 5,400 calls
     "nws": (nws.poll, 300),
     "usgs": (usgs.poll, 900),
     "lightning": (lightning.evaluate, 15),

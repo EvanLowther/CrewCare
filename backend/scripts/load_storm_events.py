@@ -1,11 +1,12 @@
-"""Load NOAA Storm Events for Florida into `storm_events` (labels for the hazard model).
+"""Load NOAA Storm Events for the 50 states and DC into `storm_events` (labels for the hazard model).
 
-    python scripts/load_storm_events.py            # every data/raw/StormEvents_details-*.csv.gz
+    python scripts/load_storm_events.py            # every data/raw/**/StormEvents_details-*.csv.gz
     python scripts/load_storm_events.py FILE ...
 
 Download the yearly "details" files from
 https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/ into data/raw/ (git-ignored).
-Safe to re-run (upsert on event_id).
+Marine areas (GULF OF MEXICO, LAKE ERIE, ...) and territories are skipped. `state` keeps NOAA's spelling
+('FLORIDA'); planit.states maps it to the postal code. Safe to re-run (upsert on event_id).
 """
 
 from __future__ import annotations
@@ -18,9 +19,11 @@ from collections import Counter
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
+from planit.states import STATE_CODES
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RAW_DIR = REPO_ROOT / "data" / "raw"
-STATE = "FLORIDA"
+BATCH = 5000  # rows per transaction, so one bad year doesn't hold a transaction open for minutes
 
 _DAMAGE_UNITS = {"": 1, "K": 1_000, "M": 1_000_000, "B": 1_000_000_000}
 
@@ -73,7 +76,7 @@ def to_event(row: dict) -> dict:
 def read_events(path: Path) -> list[dict]:
     opener = gzip.open if path.suffix == ".gz" else open
     with opener(path, "rt", encoding="utf-8", errors="replace", newline="") as f:
-        return [to_event(r) for r in csv.DictReader(f) if r["STATE"] == STATE]
+        return [to_event(r) for r in csv.DictReader(f) if r["STATE"] in STATE_CODES]
 
 
 UPSERT_SQL = """
@@ -92,8 +95,9 @@ ON CONFLICT (event_id) DO UPDATE SET
 def write(events: list[dict]) -> None:
     from planit.db import connection
 
-    with connection() as conn, conn.transaction(), conn.cursor() as cur:
-        cur.executemany(UPSERT_SQL, events)
+    for i in range(0, len(events), BATCH):
+        with connection() as conn, conn.transaction(), conn.cursor() as cur:
+            cur.executemany(UPSERT_SQL, events[i:i + BATCH])
 
 
 def main() -> None:
@@ -101,14 +105,15 @@ def main() -> None:
     parser.add_argument("files", nargs="*", type=Path, help="StormEvents details CSV(.gz) files")
     args = parser.parse_args()
 
-    files = args.files or sorted(RAW_DIR.glob("StormEvents_details-*.csv*"))
+    files = args.files or sorted(RAW_DIR.glob("**/StormEvents_details-*.csv*"))
     if not files:
         raise SystemExit(f"No Storm Events files in {RAW_DIR}. See the docstring for the download URL.")
     for path in files:
         events = read_events(path)
         write(events)
         types = Counter(e["event_type"] for e in events).most_common(6)
-        print(f"{path.name}: {len(events)} Florida events. Top types: {types}")
+        states = len({e["state"] for e in events})
+        print(f"{path.name}: {len(events)} events in {states} states. Top types: {types}")
 
 
 if __name__ == "__main__":

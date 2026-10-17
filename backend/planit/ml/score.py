@@ -37,6 +37,7 @@ FORECAST_HOURS = 24
 RULES_HISTORY = timedelta(hours=72)  # rain in the last 3 days, for saturated ground
 ML_HALF_WINDOW = timedelta(hours=12)  # each hour is scored on the 24 h around it
 ML_RAIN_HISTORY = timedelta(days=3)  # precip_prev_3d_in: the 3 days before that window
+NO_SNOW_ABOVE_F = 34.0  # same as features.NO_SNOW_ABOVE_F (features needs pandas; this module mustn't)
 
 # ML scorer only: alert points on top of the model's weather score (see combine()).
 LIGHTNING_FLOOR = 8.0
@@ -166,18 +167,24 @@ def combine(weather_score: float, weather_factors: list[dict], alerts: list[dict
     return round(score, 1), factors[:3]
 
 
-def window_features(weather: list[dict], hour: datetime) -> dict | None:
-    """The ML model's features for one site-hour, from the 24 h around it (same columns as features.FEATURES)."""
+def window_features(weather: list[dict], hour: datetime, site: dict | None = None) -> dict | None:
+    """The ML model's features for one site-hour, from the 24 h around it (same columns as features.FEATURES).
+    `site` gives latitude and longitude."""
     start, end = hour - ML_HALF_WINDOW, hour + ML_HALF_WINDOW
     window = [w for w in weather if start <= w["ts"] < end]
     if not window:
         return None
 
     def values(key: str, rows: list[dict]) -> list[float]:
-        return [r[key] for r in rows if r[key] is not None]
+        return [r[key] for r in rows if r.get(key) is not None]
 
     heat, rain, soil, gust = (values(k, window) for k in ("heat_index_f", "precip_in", "soil_moisture", "gust_mph"))
+    temps, snow, depth, humidity = (values(k, window) for k in ("temp_f", "snowfall_in", "snow_depth_ft",
+                                                                "humidity_pct"))
+    chills = [c for w in window if (c := hazards.wind_chill_f(w.get("temp_f"), w.get("wind_mph"))) is not None]
     before = values("precip_in", [w for w in weather if start - ML_RAIN_HISTORY <= w["ts"] < start])
+    min_temp = min(temps, default=None)
+    no_snow = 0.0 if min_temp is not None and min_temp > NO_SNOW_ABOVE_F else None  # as features.add_features()
     return {
         "max_heat_index_f": max(heat, default=None),
         "total_precip_in": sum(rain) if rain else None,
@@ -186,6 +193,13 @@ def window_features(weather: list[dict], hour: datetime) -> dict | None:
         "max_gust_mph": max(gust, default=None),
         "max_hourly_precip_in": max(rain, default=None),
         "month": hour.month,
+        "min_temp_f": min_temp,
+        "min_wind_chill_f": min(chills, default=None),
+        "total_snowfall_in": sum(snow) if snow else no_snow,
+        "max_snow_depth_ft": max(depth) if depth else no_snow,
+        "min_humidity_pct": min(humidity, default=None),
+        "latitude": site["latitude"] if site else None,
+        "longitude": site["longitude"] if site else None,
     }
 
 
@@ -203,11 +217,12 @@ def ml_model():
         return None
 
 
-def ml_scores(model, weather: list[dict], alerts: list[dict], hours: list[datetime]) -> dict[datetime, tuple]:
+def ml_scores(model, weather: list[dict], alerts: list[dict], hours: list[datetime],
+              site: dict | None = None) -> dict[datetime, tuple]:
     """(score, factors) per hour from the ML model, plus alert points and the lightning floor."""
     import pandas as pd
 
-    rows = [(hour, f) for hour in hours if (f := window_features(weather, hour)) is not None]
+    rows = [(hour, f) for hour in hours if (f := window_features(weather, hour, site)) is not None]
     if not rows:
         return {}
     frame = pd.DataFrame([f for _, f in rows], columns=model.features).astype(float)
@@ -251,10 +266,12 @@ def compute_scores() -> list[dict]:
     with connection() as conn:
         weather = conn.execute(
             "SELECT site_id, ts, temp_f, humidity_pct, heat_index_f, precip_in, precip_prob_pct, soil_moisture, "
-            "gust_mph, cape_jkg, weather_code FROM weather WHERE ts > %s AND ts <= %s "
+            "wind_mph, gust_mph, cape_jkg, weather_code, snowfall_in, snow_depth_ft FROM weather "
+            "WHERE ts > %s AND ts <= %s "
             "AND ((NOT is_forecast AND ts <= %s) OR (is_forecast AND ts > %s)) ORDER BY site_id, ts",
             (first, last, now, now),
         ).fetchall()
+        sites = {s["id"]: s for s in conn.execute("SELECT id, latitude, longitude FROM sites").fetchall()}
         alerts = conn.execute(
             "SELECT site_id, type, severity, title, all_clear_at, meta FROM alerts WHERE status = 'active'"
         ).fetchall()
@@ -272,7 +289,8 @@ def compute_scores() -> list[dict]:
         scorers = [("rules", MODEL_VERSION,
                     {h: score_hour(x) for h, x in build_inputs(site_weather, site_alerts, hours).items()})]
         if model:
-            scorers.append(("ml", model.version, ml_scores(model, site_weather, site_alerts, hours)))
+            scorers.append(("ml", model.version, ml_scores(model, site_weather, site_alerts, hours,
+                                                           sites.get(site_id))))
         for scorer, version, scored in scorers:
             for hour, (score, factors) in scored.items():
                 rows.append({"site_id": site_id, "ts": hour, "kind": "current" if hour == current else "forecast",

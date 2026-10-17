@@ -23,6 +23,17 @@ def test_nws_heat_index_unknown_inputs():
     assert H.nws_heat_index(90, float("nan")) is None
 
 
+@pytest.mark.parametrize(("temp_f", "wind_mph", "chart"), [(30, 10, 21), (0, 15, -19), (-10, 30, -39), (5, 20, -15)])
+def test_wind_chill_matches_the_nws_chart(temp_f, wind_mph, chart):
+    assert H.wind_chill_f(temp_f, wind_mph) == pytest.approx(chart, abs=1.0)
+
+
+def test_wind_chill_is_the_temperature_when_warm_or_calm():
+    assert H.wind_chill_f(60, 20) == 60.0
+    assert H.wind_chill_f(20, 2) == 20.0
+    assert H.wind_chill_f(None, 10) is None
+
+
 def test_heat_follows_osha_bands_with_115_as_stop_strenuous_work():
     assert [round(H.heat(hi).severity, 1) for hi in (91, 103, 108, 115, 125)] == [2.5, 5.0, 6.0, 9.0, 10.0]
     assert H.heat(78) is None  # below 80°F: nothing to show

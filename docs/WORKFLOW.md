@@ -68,3 +68,41 @@ Tick items in the PR that finishes them.
 - [ ] Crew report form (photo + GPS pin)
 - [ ] Deploy to an HTTPS URL; test the report form on a phone
 - [ ] Briefings page + "Generate now"
+
+## US expansion
+
+Goal: power plant sites in every state, scored for every hazard a crew can meet anywhere in the US, not only
+Florida's. 160 sites: the 60 Florida plants plus 100 more (one per state, the rest by each state's share of
+plants ≥ 50 MW). Sized for Open-Meteo's free tier (10,000 calls/day). `a/us-sites` goes first.
+
+### Together
+- [ ] Migration `004_us_scope.sql`: `weather.snowfall_in`, `weather.snow_depth_ft`; drop `sites.state DEFAULT 'FL'`
+- [ ] New alert types for national hazards (`winter`, `cold`, `air_quality`, `earthquake`, `landslide`):
+      `AlertType` in models.py + alerts CHECK, heads-up first
+- [ ] Full app run with `PLANIT_MOCK=0` on the national site list; refresh the demo data
+
+### Person A (data + ML)
+- [ ] `a/us-sites`: 100 more plants across all states, real state codes, timezones by lat/lon (Pacific, Mountain,
+      Arizona without DST, Alaska, Hawaii); 2-year weather history; national Storm Events matched on
+      (state, county); retrain with cold/winter/wildfire/fog/dust labels and location, cold and snow features;
+      evaluate per region
+- [ ] Open-Meteo budget: soil moisture in its own request every 3 h so the 30-min poll stays at ≤ 10 variables
+      (160 sites × 48 polls ≈ 7,700 calls/day)
+- [ ] NWS alerts polled by state or nationally instead of one request per site
+- [ ] Lightning rule + countdown + replay (the existing item); then live strikes (GOES GLM)
+- [ ] Flood replay demo button, like the lightning one
+- [ ] River flood rule with NWS flood stages (replaces "USGS flood rule"); must cover the Mississippi
+- [ ] rules-v2 for national hazards: wind chill / extreme cold, snow / ice / freezing rain, active wildfire,
+      smoke / AQI, fog / dust visibility, debris flow, earthquake, coastal flood; actions for their NWS events;
+      new hazard kinds so they compound correctly
+- [ ] Score baseline per region, if "5" should mean "unusual for this site" rather than nationally
+- [ ] Later: separate models per hazard (storm, winter, flood, heat) instead of one "hazard day" model
+- [ ] 6 PM briefing job works for every US timezone
+
+### Person B (app)
+- [ ] `mock.py` sample sites across the country and timezones; contract tests still pass
+- [ ] Map opens on the whole US and fits the sites; marker clustering; Alaska/Hawaii reachable
+- [ ] `?state=` on `/api/sites` and `/api/alerts`; state and hazard filters on the ranked list
+- [ ] Icons, colours and labels for the new alert types and factor kinds
+- [ ] Crew report types for national hazards (ice, smoke, snakes/bears, sinkhole, ...)
+- [ ] Replace the "Florida" copy in the dashboard, sidebar, README and pitch

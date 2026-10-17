@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-ml = ["pandas>=2.2", "numpy>=1.26", "xgboost>=2.1", "scikit-learn>=1.5", "openpyxl>=3.1"]
+ml = ["pandas>=2.2", "numpy>=1.26", "xgboost>=2.1", "scikit-learn>=1.5", "openpyxl>=3.1", "timezonefinder>=6.5"]
 dev = ["pytest>=8.3", "ruff>=0.6"]
 
 [build-system]

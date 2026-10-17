@@ -3,8 +3,8 @@
     python -m planit.ml.train
 
 Measures on a time split (train 2023-2024, test 2025) so the numbers reflect a season the model hasn't seen,
-then fits the saved model on all three years. Writes models/xgb-<date>.json and .meta.json (features, base rate,
-test metrics).
+then fits the saved model on all three years (2023 has Florida's sites only). Writes models/xgb-<date>.json and
+.meta.json (features, base rate, test metrics); --version names it something else.
 """
 
 from __future__ import annotations
@@ -60,6 +60,7 @@ def save(model: XGBClassifier, meta: dict, folder: Path = MODELS_DIR) -> Path:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--out", type=Path, default=MODELS_DIR)
+    parser.add_argument("--version", help="Model name (default xgb-<today>); the scorer loads the last in sort order")
     args = parser.parse_args()
 
     from planit.db import get_pool
@@ -77,7 +78,7 @@ def main() -> None:
     final = fit(frame)
     today = datetime.now(UTC).date().isoformat()
     meta = {
-        "version": f"xgb-{today}",
+        "version": args.version or f"xgb-{today}",
         "trained_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "features": FEATURES,
         "base_rate": round(float(frame["label"].mean()), 5),

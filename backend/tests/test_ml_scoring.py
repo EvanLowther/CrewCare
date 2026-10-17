@@ -25,6 +25,23 @@ def test_window_features_use_24_h_around_the_hour():
     assert f["month"] == 8
 
 
+def test_window_features_cold_snow_and_location():
+    rows = [{"ts": HOUR + timedelta(hours=h), "temp_f": 10.0 - (h == 3) * 5, "wind_mph": 20.0, "humidity_pct": 60.0,
+             "snowfall_in": 0.25, "snow_depth_ft": 0.5, "precip_in": 0.02} for h in range(-12, 12)]
+    f = window_features(rows, HOUR, {"latitude": 47.4, "longitude": -101.2})
+    assert f["min_temp_f"] == 5.0
+    assert f["min_wind_chill_f"] == -15.4  # NWS chart: 5°F with 20 mph wind is -15
+    assert f["total_snowfall_in"] == 6.0 and f["max_snow_depth_ft"] == 0.5
+    assert f["latitude"] == 47.4 and f["longitude"] == -101.2
+
+
+def test_window_features_warm_day_without_snow_data_has_no_snow():
+    f = window_features(hourly(), HOUR)  # Florida-style rows: no temp, no snow columns
+    assert f["total_snowfall_in"] is None and f["latitude"] is None
+    warm = [{**r, "temp_f": 80.0} for r in hourly()]
+    assert window_features(warm, HOUR)["total_snowfall_in"] == 0.0
+
+
 def test_window_features_without_data():
     assert window_features([], HOUR) is None
     sparse = window_features(hourly(start=-12, end=-11), HOUR)  # one observed hour, no forecast yet

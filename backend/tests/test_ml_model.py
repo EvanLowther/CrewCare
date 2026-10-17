@@ -22,6 +22,13 @@ def frame():
         "max_gust_mph": rng.normal(22, 8, n).clip(5),
         "max_hourly_precip_in": rng.exponential(0.08, n),
         "month": rng.integers(1, 13, n),
+        "min_temp_f": rng.normal(60, 15, n),
+        "min_wind_chill_f": rng.normal(55, 18, n),
+        "total_snowfall_in": rng.exponential(0.05, n),
+        "max_snow_depth_ft": rng.exponential(0.05, n),
+        "min_humidity_pct": rng.uniform(10, 90, n),
+        "latitude": rng.uniform(25, 48, n),
+        "longitude": rng.uniform(-124, -70, n),
     })
     risk = -4 + 6 * df["max_hourly_precip_in"] + 0.08 * (df["max_gust_mph"] - 22)
     df["label"] = (rng.uniform(size=n) < 1 / (1 + np.exp(-risk))).astype(int)
