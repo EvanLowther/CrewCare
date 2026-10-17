@@ -17,6 +17,8 @@ AlertType = Literal["lightning", "flood", "heat", "storm", "wind", "wildfire", "
 AlertSeverity = Literal["info", "warning", "danger"]
 HazardType = Literal["wildlife", "flooding", "unstable_ground", "downed_line", "heat_illness", "fire", "other"]
 ReportSeverity = Literal["low", "medium", "high"]
+UserRole = Literal["admin", "manager", "crew"]
+SiteRole = Literal["manager", "crew"]
 
 
 # --- Risk -------------------------------------------------------------------
@@ -117,6 +119,12 @@ class SiteSummary(BaseModel):
     active_alert_count: int
     top_alert: AlertType | None = Field(description="Most severe active alert type, for the map icon")
     heat_index_f: float | None
+    is_reference: bool = Field(default=True, description="Public reference site (anyone can view); false = private "
+                               "site a manager created, visible to its members and admins")
+    description: str | None = Field(default=None, description="Manager's note about the site, shown on its page")
+    my_role: SiteRole | None = Field(default=None, description="The viewer's role on this site, if a member")
+    can_manage: bool = Field(default=False, description="Viewer may edit the site, add members, resolve reports")
+    can_delete: bool = Field(default=False, description="Viewer may delete the site")
 
 
 class SiteList(BaseModel):
@@ -152,6 +160,78 @@ class SiteDetail(BaseModel):
     alerts: list[Alert] = Field(description="Active alerts for this site")
     reports: list[HazardReport] = Field(description="Active crew reports within 5 miles")
     risk_history: list[RiskPoint] = Field(description="Past 24 h + next 24 h forecast")
+
+
+# --- Users, roles and site membership (docs/AUTH.md) --------------------------
+
+class User(BaseModel):
+    id: UUID
+    name: str | None
+    email: str | None
+    picture: str | None = None
+    role: UserRole
+
+
+class MySite(BaseModel):
+    site_id: int
+    site_name: str
+    role: SiteRole
+
+
+class Me(BaseModel):
+    user: User | None = Field(description="Null when signed out")
+    sites: list[MySite] = Field(description="Sites the user is a member of")
+    auth: Literal["auth0", "dev"] = Field(description="dev = the laptop 'Sign in as' menu (PLANIT_AUTH_DEV=1)")
+
+
+class AdminUser(User):
+    created_at: datetime
+    last_seen_at: datetime
+    site_count: int
+
+
+class AdminUserList(BaseModel):
+    users: list[AdminUser]
+
+
+class RoleUpdate(BaseModel):
+    role: UserRole
+
+
+class UserList(BaseModel):
+    users: list[User]
+
+
+class SiteMember(BaseModel):
+    user_id: UUID
+    name: str | None
+    email: str | None
+    role: SiteRole
+    added_at: datetime
+
+
+class SiteMemberList(BaseModel):
+    members: list[SiteMember]
+
+
+class MemberAdd(BaseModel):
+    user_id: UUID
+    role: SiteRole = "crew"
+
+
+class SiteCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=120, examples=["Riverside substation rebuild"])
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+    description: str | None = Field(default=None, max_length=2000,
+                                    examples=["Trenching along the east fence; crane on site Tue-Thu."])
+
+
+class SiteUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=120)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    description: str | None = Field(default=None, max_length=2000)
 
 
 # --- Briefings --------------------------------------------------------------

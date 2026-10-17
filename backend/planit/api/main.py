@@ -4,14 +4,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from planit import db
-from planit.api.routers import alerts, briefings, demo, reports, sites
+from planit.api.routers import admin, alerts, briefings, demo, me, reports, sites, users
 from planit.config import settings
 from planit.models import Health
 
 app = FastAPI(title="PlanIT Control API", version="0.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_methods=["*"], allow_headers=["*"])
 
-for r in (sites.router, alerts.router, reports.router, briefings.router, demo.router):
+for r in (sites.router, alerts.router, reports.router, briefings.router, demo.router, me.router, users.router,
+          admin.router):
     app.include_router(r)
 
 
