@@ -60,12 +60,24 @@ def apply_heat_floor(score: float, factors: list[dict], heat_index_f: float | No
 # feature -> (factor key, label for the value). Keys match rules-v1 where they mean the same thing.
 FACTOR_LABELS = {
     "max_heat_index_f": ("heat_index", lambda v: f"Heat index {v:.0f}°F"),
-    "total_precip_in": ("rain_24h", lambda v: f"{v:.1f} in of rain today"),
+    "total_precip_in": ("rain_24h", lambda v: f"{v:.1f} in of rain in 24 h"),
     "precip_prev_3d_in": ("rain_3d", lambda v: f"{v:.1f} in of rain in the last 3 days"),
     "avg_soil_moisture": ("soil_moisture", lambda v: f"Wet ground (soil moisture {v * 100:.0f}%)"),
     "max_gust_mph": ("wind", lambda v: f"Gusts {v:.0f} mph"),
     "max_hourly_precip_in": ("downpour", lambda v: f"Downpours up to {v:.1f} in/h"),
     "month": ("season", lambda v: f"Storm season ({calendar.month_name[int(v)]})"),
+}
+
+
+# Don't show a factor for an unremarkable value: SHAP rightly says a sprinkle is riskier than bone-dry, but
+# "0.1 in of rain" reads as nonsense next to an extreme score. Features not listed always show.
+FACTOR_MIN_VALUE = {
+    "max_heat_index_f": 90.0,
+    "total_precip_in": 0.25,
+    "precip_prev_3d_in": 0.25,
+    "avg_soil_moisture": 0.25,
+    "max_gust_mph": 20.0,
+    "max_hourly_precip_in": 0.2,
 }
 
 
@@ -99,10 +111,14 @@ class HazardModel:
             total = positive.sum()
             factors = []
             if total > 0 and score > 0:
-                for i in np.argsort(-positive)[:TOP_FACTORS]:
+                for i in np.argsort(-positive):
+                    if len(factors) == TOP_FACTORS:
+                        break
                     points = round(float(score * positive[i] / total), 1)
                     value = values[i]
                     if points < 0.1 or value is None or pd.isna(value):
+                        continue
+                    if value < FACTOR_MIN_VALUE.get(self.features[i], float("-inf")):
                         continue
                     key, label = FACTOR_LABELS[self.features[i]]
                     factors.append({"key": key, "label": label(value), "contribution": points})
