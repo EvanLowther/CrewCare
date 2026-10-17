@@ -19,6 +19,8 @@ export type Conditions = S["Conditions"];
 export type Health = S["Health"];
 export type HazardType = HazardReport["hazard_type"];
 export type ReportSeverity = HazardReport["severity"];
+/** Whose risk scores to show: the XGBoost model or rules-v1 (both are stored for every site-hour). */
+export type Scorer = "ml" | "rules";
 
 // Same-origin: next.config.ts forwards /api/* to FastAPI.
 export const API_URL = "";
@@ -41,7 +43,7 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
 
 export const api = {
   health: () => get<Health>("/api/health"),
-  sites: () => get<SiteList>("/api/sites"),
+  sites: (model?: Scorer) => get<SiteList>(`/api/sites${model ? `?model=${model}` : ""}`),
   site: (id: number) => get<SiteDetail>(`/api/sites/${id}`),
   alerts: (opts: { siteId?: number; since?: string } = {}) => {
     const q = new URLSearchParams();
