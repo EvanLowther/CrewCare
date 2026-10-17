@@ -65,7 +65,14 @@ FACTOR_LABELS = {
     "avg_soil_moisture": ("soil_moisture", lambda v: f"Wet ground (soil moisture {v * 100:.0f}%)"),
     "max_gust_mph": ("wind", lambda v: f"Gusts {v:.0f} mph"),
     "max_hourly_precip_in": ("downpour", lambda v: f"Downpours up to {v:.1f} in/h"),
-    "month": ("season", lambda v: f"Storm season ({calendar.month_name[int(v)]})"),
+    "month": ("season", lambda v: f"Hazard season ({calendar.month_name[int(v)]})"),
+    "min_temp_f": ("cold", lambda v: f"Low of {v:.0f}°F"),
+    "min_wind_chill_f": ("wind_chill", lambda v: f"Wind chill {v:.0f}°F"),
+    "total_snowfall_in": ("snow", lambda v: f"{v:.1f} in of snow in 24 h"),
+    "max_snow_depth_ft": ("snow_depth", lambda v: f"{v * 12:.0f} in of snow on the ground"),
+    "min_humidity_pct": ("dry_air", lambda v: f"Dry air (humidity down to {v:.0f}%)"),
+    "latitude": ("location", lambda v: "Local climate"),
+    "longitude": ("location", lambda v: "Local climate"),
 }
 
 
@@ -78,6 +85,14 @@ FACTOR_MIN_VALUE = {
     "avg_soil_moisture": 0.25,
     "max_gust_mph": 20.0,
     "max_hourly_precip_in": 0.2,
+    "total_snowfall_in": 0.5,
+    "max_snow_depth_ft": 0.25,
+}
+# The same for features where lower is worse: a factor only shows at or below these.
+FACTOR_MAX_VALUE = {
+    "min_temp_f": 32.0,
+    "min_wind_chill_f": 15.0,
+    "min_humidity_pct": 25.0,
 }
 
 
@@ -118,9 +133,15 @@ class HazardModel:
                     value = values[i]
                     if points < 0.1 or value is None or pd.isna(value):
                         continue
-                    if value < FACTOR_MIN_VALUE.get(self.features[i], float("-inf")):
+                    name = self.features[i]
+                    too_low = value < FACTOR_MIN_VALUE.get(name, float("-inf"))
+                    if too_low or value > FACTOR_MAX_VALUE.get(name, float("inf")):
                         continue
-                    key, label = FACTOR_LABELS[self.features[i]]
+                    key, label = FACTOR_LABELS[name]
+                    same = next((f for f in factors if f["key"] == key), None)
+                    if same:  # latitude and longitude are one "location" factor
+                        same["contribution"] = round(same["contribution"] + points, 1)
+                        continue
                     factors.append({"key": key, "label": label(value), "contribution": points})
             heat = values[self.features.index("max_heat_index_f")] if "max_heat_index_f" in self.features else None
             out.append(apply_heat_floor(score, factors, heat))

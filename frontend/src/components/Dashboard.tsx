@@ -43,7 +43,7 @@ export function Dashboard() {
         title="Site risk dashboard"
         subtitle={
           sitesPoll.data
-            ? `${sites.length} Florida sites · updated ${new Date(sitesPoll.data.updated_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+            ? `${sites.length} sites · updated ${new Date(sitesPoll.data.updated_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
             : "Loading sites…"
         }
         actions={<LiveIndicator label="Live · refreshes every 10 s" />}

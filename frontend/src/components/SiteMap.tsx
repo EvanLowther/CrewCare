@@ -13,7 +13,13 @@ import { HAZARD_EMOJI, HAZARD_LABELS, REPORT_SEVERITY_COLORS } from "@/lib/repor
 import { NO_SCORE_COLOR, NO_SCORE_INK, RISK_COLORS, RISK_GUIDANCE, RISK_INK, RISK_LABELS } from "@/lib/risk";
 import { ScoreChip } from "./ui";
 
-const FLORIDA_CENTER: L.LatLngTuple = [27.9, -83.2];
+const US_CENTER: L.LatLngTuple = [39.5, -98.35];
+
+/** The first view fits the lower 48; Alaska and Hawaii would zoom it out to half the Pacific, so they're a pan away. */
+function inLower48(s: SiteSummary): boolean {
+  return s.latitude >= 24 && s.latitude <= 50 && s.longitude >= -125 && s.longitude <= -66;
+}
+
 // Esri's free dark-gray canvas (no key); labels come from a separate reference layer drawn on top.
 const BASE_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}";
 const LABEL_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}";
@@ -65,7 +71,8 @@ function MapController({
 
   useEffect(() => {
     if (fitted.current || !sized || sites.length === 0) return;
-    map.fitBounds(L.latLngBounds(sites.map((s) => [s.latitude, s.longitude])), { padding: [30, 30] });
+    const shown = sites.some(inLower48) ? sites.filter(inLower48) : sites;
+    map.fitBounds(L.latLngBounds(shown.map((s) => [s.latitude, s.longitude])), { padding: [30, 30] });
     fitted.current = true;
   }, [map, sites, sized]);
 
@@ -101,7 +108,7 @@ export default function SiteMap({
 
   return (
     // Scroll-wheel zoom off so scrolling the page over the map scrolls the page; +/- and pinch still zoom.
-    <MapContainer center={FLORIDA_CENTER} zoom={6} className="h-full w-full" scrollWheelZoom={false}>
+    <MapContainer center={US_CENTER} zoom={4} className="h-full w-full" scrollWheelZoom={false}>
       <TileLayer attribution={ATTRIBUTION} url={BASE_TILES} maxZoom={16} />
       <TileLayer url={LABEL_TILES} maxZoom={16} />
       <MapController sites={sites} selectedId={selectedId} markers={markers} />

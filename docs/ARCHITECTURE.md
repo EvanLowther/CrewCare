@@ -1,7 +1,7 @@
 # Architecture
 
 ```
- Open-Meteo   NWS alerts   USGS gauges   Lightning replay / feed      Crew phones
+ Open-Meteo   NWS weather + alerts   USGS gauges   Lightning replay   Crew phones
      │            │             │                 │                        │
      └────────────┴──────┬──────┴─────────────────┘                        │
                          ▼                                                 │
@@ -25,7 +25,12 @@
 **The one rule:** the worker and the API never call each other. They only share the database.
 That lets each person build and test their half alone.
 
-- **Worker** writes `weather`, `river_levels`, `lightning_strikes`, `nws_alerts`, `alerts`, `hazard_scores`, `briefings`.
+- **Worker** writes `weather`, `nws_weather`, `river_levels`, `lightning_strikes`, `nws_alerts`, `alerts`,
+  `hazard_scores`, `briefings`.
+- **Weather sources:** the NWS API (free, no daily cap) every 30 min for the Real-time score's weather, and one
+  national alerts request every 2 min. Open-Meteo every 3 h for soil moisture, CAPE, hourly rain and the ML
+  model's inputs (the model is trained on Open-Meteo's archive, so it keeps seeing the same source), ~1,800 of its
+  10,000 free calls a day.
 - **API** reads all of those and writes only `hazard_reports` and `photos` (crew uploads), plus `job_requests`
   for the demo buttons: the worker's `jobs` poller picks those up within ~2 s (migration 002).
 - **Frontend** talks only to the API, always through its own origin: the browser calls `/api/...` on port 3000
@@ -36,9 +41,10 @@ That lets each person build and test their half alone.
 
 | Table | Kind | Written by | Purpose |
 |---|---|---|---|
-| `sites` | table | `scripts/load_sites.py` | ~60 Florida plants from EIA-860M. `geom` for distance queries, `timezone` for the 6 PM briefing (panhandle is Central). |
-| `weather` | hypertable | worker | Hourly observed + forecast per site. `is_forecast` separates them. |
+| `sites` | table | `scripts/load_sites.py` | 160 power plants from EIA-860M: 60 hand-picked in Florida plus 100 across every other state (one each, the rest by share of large plants). `geom` for distance queries, `timezone` for the 6 PM briefing. |
+| `weather` | hypertable | worker | Hourly observed + forecast per site. `is_forecast` separates them. Snowfall and snow depth since 004. |
 | `weather_daily` | continuous aggregate | Timescale | Daily max heat, total rain, soil moisture: ML features and "last 24 h". |
+| `nws_weather` | hypertable | worker (`ingest/nws_weather.py`) | NWS station observation + 72 h gridpoint forecast per site: wind chill, WBGT, visibility, ice, thunder chance. Real-time score only. 005; `sites.nws_*` hold each site's grid, station and alert zones. |
 | `river_gauges`, `river_levels` | table, hypertable | worker | USGS stage/flow for flood rules. |
 | `lightning_strikes` | hypertable | worker / replay | Every strike. `source` says replay, simulator or live. |
 | `nws_alerts` | table | worker | Raw NWS alerts matched to sites. |
@@ -46,7 +52,7 @@ That lets each person build and test their half alone.
 | `hazard_scores` | hypertable | worker (ml/score.py) | 0-10 score, level, top factors, `kind` current/forecast. |
 | `hazard_reports`, `photos` | table | API | Crew reports. Photos stored as resized JPEG bytes. |
 | `briefings` | table | worker | One per site per day, generated 6 PM site-local. |
-| `storm_events` | table | Person A loader | NOAA Storm Events, labels for ML training. |
+| `storm_events` | table | Person A loader | NOAA Storm Events, labels for ML training: Florida 2023-2025, every state 2024-2025. |
 | `job_requests` | table | API (demo buttons) | Requests the worker runs: `lightning_replay`, `generate_briefings`. 002. |
 
 Changing the schema: add `db/migrations/002_<name>.sql`. Never edit a migration that has been applied.
@@ -57,8 +63,10 @@ Two scorers write `hazard_scores` side by side (`scorer` column, migration 003),
 (`?model=rules|ml`, default `ml`):
 
 - **Real-time** (`scorer='rules'`, rules-v2): measured conditions against work rules, described below.
-- **Predictive** (`scorer='ml'`, e.g. `xgb-2026-10-17`): the XGBoost model's storm-day likelihood, plus the OSHA heat
-  floor, alert points and the lightning floor (`backend/planit/ml/score.py`, `ml/model.py`).
+- **Predictive** (`scorer='ml'`, e.g. `xgb-2026-10-17-us`): one national XGBoost model's hazard-day likelihood
+  (storms, floods, heat, wind, cold, winter weather, wildfire and dust; latitude and longitude tell it what's
+  normal where), plus the OSHA heat floor, alert points and the lightning floor (`backend/planit/ml/score.py`,
+  `ml/model.py`).
 
 | Score | Level | Meaning for the crew |
 |---|---|---|

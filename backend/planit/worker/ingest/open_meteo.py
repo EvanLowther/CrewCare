@@ -1,11 +1,13 @@
 """Owner: Person A. Hourly weather for every site -> `weather` table (Open-Meteo, no key).
 
 - backfill_history(): years of observed weather for ML training (archive API).
-- poll(): last 24 h + 3-day forecast (forecast API), every 30 minutes from the worker.
+- poll(): last 24 h + 3-day forecast (forecast API), every 3 hours from the worker. Real-time weather comes from
+  the NWS (nws_weather.py); this poll supplies soil moisture, CAPE, hourly rain and the ML model's inputs.
 
-Free-tier budget: 10,000 "calls" a day, where one location x two weeks of data counts as one
-call. The 3-year backfill for 60 sites costs ~4,700; a 60-site poll costs 60, so poll every
-30 minutes, not every few.
+Free-tier budget: 10,000 "calls" a day and 5,000 an hour, where one location x two weeks x up to 10
+variables counts as one call (call_weight()). Two years of history for 100 sites costs ~5,200, so
+backfill_history() paces itself to the hourly budget. A 160-site poll with 14 variables costs ~220,
+so every 3 hours is ~1,800 a day.
 """
 
 from __future__ import annotations
@@ -38,10 +40,13 @@ ARCHIVE_VARS = {
     "wind_gusts_10m": "gust_mph",
     "weather_code": "weather_code",
     "soil_moisture_0_to_7cm": "soil_moisture",
+    "snowfall": "snowfall_in",  # inches with precipitation_unit=inch
+    "snow_depth": "snow_depth_ft",  # feet with precipitation_unit=inch
 }
 
 WEATHER_COLUMNS = ["site_id", "ts", "is_forecast", "temp_f", "heat_index_f", "humidity_pct", "precip_in",
-                   "precip_prob_pct", "wind_mph", "gust_mph", "cape_jkg", "soil_moisture", "weather_code"]
+                   "precip_prob_pct", "wind_mph", "gust_mph", "cape_jkg", "soil_moisture", "weather_code",
+                   "snowfall_in", "snow_depth_ft"]
 
 # The forecast API has CAPE and rain probability, and soil in 0-1 / 1-3 / 3-9 cm layers instead of the
 # archive's 0-7 cm; blend_soil_moisture() combines them so live and historical values are comparable.
@@ -55,6 +60,12 @@ FORECAST_SOIL_LAYERS = {"soil_moisture_0_to_1cm": 1, "soil_moisture_1_to_3cm": 2
 SITES_PER_REQUEST = 5  # keeps each archive request well under the per-minute budget
 FORECAST_SITES_PER_REQUEST = 20
 MAX_RETRIES = 6
+HOURLY_CALL_BUDGET = 4500  # Open-Meteo allows 5,000 weighted calls an hour; leave room for the live poll
+
+
+def call_weight(locations: int, days: int, variables: int) -> float:
+    """Open-Meteo's weighted call count: each location counts once per 14 days and per 10 variables."""
+    return locations * max(1.0, days / 14) * max(1.0, variables / 10)
 
 
 def chunks(items: list, size: int) -> Iterator[list]:
@@ -93,8 +104,12 @@ def fetch(client: httpx.Client, url: str, params: dict) -> list[dict]:
     for attempt in range(MAX_RETRIES):
         resp = client.get(url, params=params, timeout=120)
         if resp.status_code == 429 or resp.status_code >= 500:
-            wait = 60 if resp.status_code == 429 else 10 * (attempt + 1)
-            log.warning("Open-Meteo %s (%s); retrying in %ss", resp.status_code, resp.text[:120], wait)
+            reason = resp.text[:120]
+            if resp.status_code == 429 and "Daily" in reason:
+                raise RuntimeError(f"Open-Meteo daily limit reached, try again tomorrow: {reason}")
+            # The hourly limit takes minutes to clear, the per-minute limit seconds.
+            wait = (300 if "Hourly" in reason else 60) if resp.status_code == 429 else 10 * (attempt + 1)
+            log.warning("Open-Meteo %s (%s); retrying in %ss", resp.status_code, reason, wait)
             time.sleep(wait)
             continue
         resp.raise_for_status()
@@ -124,9 +139,24 @@ def load_sites() -> list[dict]:
         return conn.execute("SELECT id, latitude, longitude FROM sites ORDER BY id").fetchall()
 
 
-def backfill_history(start: str, end: str) -> int:
-    """Observed hourly weather for every site between two ISO dates, for ML training."""
-    sites = load_sites()
+# Sites with no observed weather on the first day of the range, i.e. never backfilled for it.
+MISSING_HISTORY_SQL = """
+SELECT s.id, s.latitude, s.longitude FROM sites s
+WHERE NOT EXISTS (SELECT 1 FROM weather w WHERE w.site_id = s.id AND NOT w.is_forecast
+                  AND w.ts >= %(start)s AND w.ts < %(start)s::date + 1)
+ORDER BY s.id
+"""
+
+
+def backfill_history(start: str, end: str, only_missing: bool = False) -> int:
+    """Observed hourly weather between two ISO dates, for ML training: every site, or with only_missing just the
+    sites that have none yet (e.g. newly added ones). Paced to HOURLY_CALL_BUDGET."""
+    if only_missing:
+        with connection() as conn:
+            sites = conn.execute(MISSING_HISTORY_SQL, {"start": start}).fetchall()
+    else:
+        sites = load_sites()
+    log.info("backfilling %d sites, %s..%s", len(sites), start, end)
     total = 0
     with httpx.Client() as client:
         for first, last in year_ranges(date.fromisoformat(start), date.fromisoformat(end)):
@@ -145,7 +175,8 @@ def backfill_history(start: str, end: str) -> int:
                 total += upsert_weather(rows)
                 log.info("history %s..%s sites %s: %d rows (total %d)", first, last,
                          [s["id"] for s in batch], len(rows), total)
-                time.sleep(15)  # stay under the per-minute budget
+                calls = call_weight(len(batch), (last - first).days + 1, len(ARCHIVE_VARS))
+                time.sleep(calls * 3600 / HOURLY_CALL_BUDGET)  # stay under the hourly (and per-minute) budget
     return total
 
 
