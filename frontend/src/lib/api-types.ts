@@ -652,7 +652,10 @@ export type $defs = Record<string, never>;
 export interface operations {
     list_sites_api_sites_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Whose risk scores: 'ml' (XGBoost) or 'rules' (rules-v1). Default: ml. */
+                model?: ("ml" | "rules") | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -668,11 +671,23 @@ export interface operations {
                     "application/json": components["schemas"]["SiteList"];
                 };
             };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
     };
     get_site_api_sites__site_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Whose risk scores: 'ml' (XGBoost) or 'rules' (rules-v1). Default: ml. */
+                model?: ("ml" | "rules") | null;
+            };
             header?: never;
             path: {
                 site_id: number;
