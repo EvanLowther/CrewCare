@@ -1,0 +1,399 @@
+"use client";
+
+import {
+  ArrowRight,
+  Camera,
+  CheckCircle2,
+  Crosshair,
+  Flame,
+  HeartPulse,
+  ImagePlus,
+  Loader2,
+  MapPin,
+  Mountain,
+  PawPrint,
+  TriangleAlert,
+  Waves,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
+import dynamic from "next/dynamic";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { api, type HazardReport, type HazardType, type ReportSeverity, type SiteSummary } from "@/lib/api";
+import type { LatLng } from "./ReportPinMap";
+import { Card, CardHeader } from "./ui";
+
+const ReportPinMap = dynamic(() => import("./ReportPinMap"), {
+  ssr: false,
+  loading: () => <div className="flex h-full items-center justify-center text-sm text-muted">Loading map…</div>,
+});
+
+const HAZARDS: { value: HazardType; label: string; icon: LucideIcon }[] = [
+  { value: "wildlife", label: "Wildlife", icon: PawPrint },
+  { value: "flooding", label: "Flooding", icon: Waves },
+  { value: "unstable_ground", label: "Soft ground", icon: Mountain },
+  { value: "downed_line", label: "Downed line", icon: Zap },
+  { value: "heat_illness", label: "Heat illness", icon: HeartPulse },
+  { value: "fire", label: "Fire", icon: Flame },
+  { value: "other", label: "Other", icon: TriangleAlert },
+];
+
+const SEVERITIES: { value: ReportSeverity; label: string; hint: string; color: string }[] = [
+  { value: "low", label: "Low", hint: "Heads-up", color: "#0ca30c" },
+  { value: "medium", label: "Medium", hint: "Work around it", color: "#fab219" },
+  { value: "high", label: "High", hint: "Stop / keep clear", color: "#d03b3b" },
+];
+
+const NAME_KEY = "planit.reporterName";
+const SITE_RADIUS_MI = 10; // same as the API's NEAREST_SITE_MI
+
+function miles(a: LatLng, b: { latitude: number; longitude: number }): number {
+  const rad = Math.PI / 180;
+  const dLat = (b.latitude - a.lat) * rad;
+  const dLng = (b.longitude - a.lng) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.latitude * rad) * Math.sin(dLng / 2) ** 2;
+  return 3958.8 * 2 * Math.asin(Math.sqrt(h));
+}
+
+function readName(): string {
+  try {
+    return localStorage.getItem(NAME_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function saveName(name: string) {
+  try {
+    localStorage.setItem(NAME_KEY, name);
+  } catch {
+    /* private mode: just don't remember it */
+  }
+}
+
+type Gps = { status: "idle" | "locating" | "ok" | "denied" | "unavailable" | "insecure"; accuracyM: number | null };
+
+/** Where GPS stands before we ask: HTTP pages and browsers without geolocation can't give a fix at all. */
+function initialGps(): Gps {
+  if (typeof window === "undefined") return { status: "idle", accuracyM: null };
+  if (!window.isSecureContext) return { status: "insecure", accuracyM: null };
+  if (!navigator.geolocation) return { status: "unavailable", accuracyM: null };
+  return { status: "locating", accuracyM: null };
+}
+
+export function ReportForm() {
+  const [sites, setSites] = useState<SiteSummary[]>([]);
+  const [gps, setGps] = useState<Gps>(initialGps);
+  const [gpsFix, setGpsFix] = useState<LatLng | null>(null);
+  const [pin, setPin] = useState<LatLng | null>(null);
+  const [recenterKey, setRecenterKey] = useState(0);
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [hazard, setHazard] = useState<HazardType | null>(null);
+  const [severity, setSeverity] = useState<ReportSeverity | null>(null);
+  const [description, setDescription] = useState("");
+  const [name, setName] = useState(readName);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [created, setCreated] = useState<HazardReport | null>(null);
+
+  useEffect(() => {
+    api.sites("rules").then((r) => setSites(r.sites)).catch(() => setSites([]));
+  }, []);
+
+  /** Ask the browser for a fix; state only changes in its callbacks. */
+  const requestFix = useCallback(() => {
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        const fix = { lat: p.coords.latitude, lng: p.coords.longitude };
+        setGpsFix(fix);
+        setPin(fix);
+        setGps({ status: "ok", accuracyM: Math.round(p.coords.accuracy) });
+        setRecenterKey((k) => k + 1);
+      },
+      (e) => setGps({ status: e.code === e.PERMISSION_DENIED ? "denied" : "unavailable", accuracyM: null }),
+      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 30_000 },
+    );
+  }, []);
+
+  /** "My location" button: same request, after showing the spinner. */
+  const locate = useCallback(() => {
+    const start = initialGps();
+    setGps(start);
+    if (start.status === "locating") requestFix();
+  }, [requestFix]);
+
+  // Ask for the location as soon as the form opens: crews report where they stand.
+  useEffect(() => {
+    if (initialGps().status === "locating") requestFix();
+  }, [requestFix]);
+
+  const preview = useMemo(() => (photo ? URL.createObjectURL(photo) : null), [photo]);
+  useEffect(() => () => {
+    if (preview) URL.revokeObjectURL(preview);
+  }, [preview]);
+
+  const nearest = useMemo(() => {
+    if (!pin || sites.length === 0) return null;
+    let best: { site: SiteSummary; mi: number } | null = null;
+    for (const site of sites) {
+      const mi = miles(pin, site);
+      if (!best || mi < best.mi) best = { site, mi };
+    }
+    return best;
+  }, [pin, sites]);
+
+  const moved = pin && gpsFix ? miles(gpsFix, { latitude: pin.lat, longitude: pin.lng }) * 5280 : 0; // feet
+  const ready = pin !== null && hazard !== null && severity !== null && !submitting;
+
+  async function submit() {
+    if (!pin || !hazard || !severity) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      if (name.trim()) saveName(name.trim());
+      const report = await api.createReport({
+        latitude: pin.lat,
+        longitude: pin.lng,
+        hazard_type: hazard,
+        severity,
+        description: description.trim() || undefined,
+        reporter_name: name.trim() || undefined,
+        photo: photo ?? undefined,
+      });
+      setCreated(report);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't send the report");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function reset() {
+    setCreated(null);
+    setPhoto(null);
+    setHazard(null);
+    setSeverity(null);
+    setDescription("");
+    setPin(gpsFix);
+  }
+
+  if (created) {
+    const site = sites.find((s) => s.id === created.site_id);
+    return (
+      <Card className="mx-auto max-w-xl">
+        <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
+          <CheckCircle2 className="h-12 w-12 text-risk-low" aria-hidden />
+          <h2 className="text-lg font-semibold text-ink">Report shared</h2>
+          <p className="text-sm text-ink-2">
+            {site ? `Pinned near ${site.name}. ` : "Pinned on the map. "}Crews and supervisors can see it now.
+          </p>
+          {created.photo_url && (
+            // eslint-disable-next-line @next/next/no-img-element -- our own resized upload
+            <img src={api.photoUrl(created.photo_url)} alt="" className="max-h-48 rounded-lg border border-line" />
+          )}
+          <div className="mt-2 flex flex-wrap justify-center gap-2">
+            {site && (
+              <Link
+                href={`/sites/${site.id}?model=rules`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-line px-4 py-2 text-sm text-ink hover:bg-raised"
+              >
+                View {site.name} <ArrowRight className="h-4 w-4" aria-hidden />
+              </Link>
+            )}
+            <button
+              type="button"
+              onClick={reset}
+              className="rounded-lg bg-accent-strong px-4 py-2 text-sm font-medium text-white hover:bg-accent"
+            >
+              Report another
+            </button>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <Card className="flex flex-col overflow-hidden">
+        <CardHeader
+          title="1. Where is it?"
+          icon={MapPin}
+          subtitle="Drag the pin onto the hazard, or tap the map"
+          actions={
+            <button
+              type="button"
+              onClick={locate}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs text-ink-2 hover:text-ink"
+            >
+              {gps.status === "locating" ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+              ) : (
+                <Crosshair className="h-3.5 w-3.5" aria-hidden />
+              )}
+              My location
+            </button>
+          }
+        />
+        <div className="h-72 border-y border-line sm:h-80 lg:h-[420px]">
+          <ReportPinMap
+            position={pin}
+            gps={gpsFix}
+            accuracyM={gps.accuracyM}
+            recenterKey={recenterKey}
+            sites={sites}
+            onMove={setPin}
+          />
+        </div>
+        <div className="space-y-1 px-5 py-3 text-xs">
+          <GpsStatus gps={gps} hasPin={pin !== null} movedFt={moved} />
+          {nearest && (
+            <p className={nearest.mi <= SITE_RADIUS_MI ? "text-ink-2" : "text-[#fcc954]"}>
+              {nearest.mi <= SITE_RADIUS_MI
+                ? `Nearest site: ${nearest.site.name} · ${nearest.mi < 0.1 ? `${Math.round(nearest.mi * 5280)} ft` : `${nearest.mi.toFixed(1)} mi`}`
+                : `No site within ${SITE_RADIUS_MI} miles (nearest: ${nearest.site.name}, ${nearest.mi.toFixed(0)} mi). The report still goes on the map.`}
+            </p>
+          )}
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader title="2. What is it?" icon={TriangleAlert} subtitle="A photo helps the next crew recognize it" />
+        <div className="space-y-5 px-5 pb-5">
+          <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-line bg-raised/50 p-3 hover:border-accent">
+            {preview ? (
+              // eslint-disable-next-line @next/next/no-img-element -- local preview of the chosen photo
+              <img src={preview} alt="Selected hazard photo" className="h-16 w-16 rounded-md object-cover" />
+            ) : (
+              <span className="flex h-16 w-16 items-center justify-center rounded-md bg-accent-soft text-accent">
+                <Camera className="h-6 w-6" aria-hidden />
+              </span>
+            )}
+            <span className="text-sm">
+              <span className="block font-medium text-ink">{photo ? "Change photo" : "Take or choose a photo"}</span>
+              <span className="text-xs text-muted">{photo ? photo.name : "Optional · location data is removed before it's shared"}</span>
+            </span>
+            <ImagePlus className="ml-auto h-4 w-4 text-muted" aria-hidden />
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="sr-only"
+              onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+            />
+          </label>
+
+          <fieldset>
+            <legend className="mb-2 text-xs font-medium text-muted">Hazard</legend>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4">
+              {HAZARDS.map(({ value, label, icon: Icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={hazard === value}
+                  onClick={() => setHazard(value)}
+                  className={`flex flex-col items-center gap-1.5 rounded-lg border px-2 py-3 text-xs transition-colors ${
+                    hazard === value ? "border-accent bg-accent-soft text-ink" : "border-line text-ink-2 hover:bg-raised"
+                  }`}
+                >
+                  <Icon className={`h-5 w-5 ${hazard === value ? "text-accent" : ""}`} aria-hidden />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend className="mb-2 text-xs font-medium text-muted">Severity</legend>
+            <div className="grid grid-cols-3 gap-2">
+              {SEVERITIES.map((s) => (
+                <button
+                  key={s.value}
+                  type="button"
+                  aria-pressed={severity === s.value}
+                  onClick={() => setSeverity(s.value)}
+                  className={`rounded-lg border px-2 py-2.5 text-left transition-colors ${
+                    severity === s.value ? "border-accent bg-accent-soft" : "border-line hover:bg-raised"
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-ink">
+                    <span className="h-2 w-2 rounded-full" style={{ background: s.color }} aria-hidden />
+                    {s.label}
+                  </span>
+                  <span className="text-xs text-muted">{s.hint}</span>
+                </button>
+              ))}
+            </div>
+          </fieldset>
+
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-medium text-muted">What did you see? (optional)</span>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              maxLength={500}
+              placeholder="e.g. 8 ft gator in the canal next to the laydown yard"
+              className="w-full rounded-lg border border-line bg-raised px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+            />
+          </label>
+
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-medium text-muted">Your name (optional, remembered on this device)</span>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={80}
+              placeholder="e.g. J. Ramirez"
+              className="w-full rounded-lg border border-line bg-raised px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+            />
+          </label>
+
+          {error && <p className="rounded-lg bg-[rgb(208_59_59/0.12)] px-3 py-2 text-sm text-[#ff9b9b]">{error}</p>}
+
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!ready}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent-strong px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {submitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+            {submitting ? "Sharing…" : "Share hazard"}
+          </button>
+          {!ready && !submitting && (
+            <p className="text-center text-xs text-muted">
+              {!pin ? "Set the location first" : !hazard ? "Pick a hazard type" : "Pick a severity"}
+            </p>
+          )}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function GpsStatus({ gps, hasPin, movedFt }: { gps: Gps; hasPin: boolean; movedFt: number }) {
+  switch (gps.status) {
+    case "locating":
+      return <p className="text-muted">Finding your location…</p>;
+    case "ok":
+      return (
+        <p className="text-ink-2">
+          GPS fix ±{gps.accuracyM} m
+          {movedFt > 30 && ` · pin moved ${movedFt < 5280 ? `${Math.round(movedFt)} ft` : `${(movedFt / 5280).toFixed(1)} mi`} from you`}
+        </p>
+      );
+    case "denied":
+      return <p className="text-[#fcc954]">Location permission is off. Tap the map where the hazard is.</p>;
+    case "insecure":
+      return (
+        <p className="text-[#fcc954]">
+          GPS needs an https:// address (or localhost). Tap the map where the hazard is.
+        </p>
+      );
+    case "unavailable":
+      return <p className="text-[#fcc954]">Couldn&apos;t get a GPS fix. Tap the map where the hazard is.</p>;
+    default:
+      return hasPin ? null : <p className="text-muted">Tap the map where the hazard is.</p>;
+  }
+}

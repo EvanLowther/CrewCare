@@ -6,8 +6,10 @@ import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
-import type { Scorer, SiteSummary } from "@/lib/api";
+import { api, type HazardReport, type Scorer, type SiteSummary } from "@/lib/api";
 import { ALERT_EMOJI, ALERT_ICONS, ALERT_LABELS } from "@/lib/alerts";
+import { relativeTime } from "@/lib/format";
+import { HAZARD_EMOJI, HAZARD_LABELS, REPORT_SEVERITY_COLORS } from "@/lib/reports";
 import { NO_SCORE_COLOR, NO_SCORE_INK, RISK_COLORS, RISK_GUIDANCE, RISK_INK, RISK_LABELS } from "@/lib/risk";
 import { ScoreChip } from "./ui";
 
@@ -85,11 +87,13 @@ export default function SiteMap({
   selectedId,
   onSelect,
   model,
+  reports = [],
 }: {
   sites: SiteSummary[];
   selectedId: number | null;
   onSelect: (id: number) => void;
   model?: Scorer;
+  reports?: HazardReport[];
 }) {
   const markers = useRef(new Map<number, L.Marker>());
   // Draw the riskiest sites on top when pins overlap.
@@ -115,6 +119,13 @@ export default function SiteMap({
         >
           <Popup minWidth={240}>
             <SitePopup site={site} model={model} />
+          </Popup>
+        </Marker>
+      ))}
+      {reports.map((r) => (
+        <Marker key={r.id} position={[r.latitude, r.longitude]} icon={reportIcon(r)} zIndexOffset={2000}>
+          <Popup minWidth={220}>
+            <ReportPopup report={r} />
           </Popup>
         </Marker>
       ))}
@@ -165,6 +176,36 @@ function SitePopup({ site, model }: { site: SiteSummary; model?: Scorer }) {
       >
         View site <ArrowRight className="h-3.5 w-3.5" aria-hidden />
       </Link>
+    </div>
+  );
+}
+
+function reportIcon(r: HazardReport): L.DivIcon {
+  return L.divIcon({
+    className: "site-pin-wrap",
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+    popupAnchor: [0, -13],
+    html: `<div class="report-pin" style="--report-color:${REPORT_SEVERITY_COLORS[r.severity]}">${HAZARD_EMOJI[r.hazard_type]}</div>`,
+  });
+}
+
+function ReportPopup({ report }: { report: HazardReport }) {
+  return (
+    <div className="space-y-2 text-sm">
+      <div className="flex items-center gap-2">
+        <span className="h-2.5 w-2.5 rounded-full" style={{ background: REPORT_SEVERITY_COLORS[report.severity] }} aria-hidden />
+        <span className="font-semibold text-ink">{HAZARD_LABELS[report.hazard_type]}</span>
+        <span className="text-xs text-muted">{report.severity} severity</span>
+      </div>
+      {report.photo_url && (
+        // eslint-disable-next-line @next/next/no-img-element -- our own resized upload
+        <img src={api.photoUrl(report.photo_url)} alt="" className="max-h-40 w-full rounded-md object-cover" />
+      )}
+      {report.description && <p className="text-ink-2">{report.description}</p>}
+      <p className="text-xs text-muted">
+        Crew report · {report.reporter_name ?? "Crew member"} · {relativeTime(report.created_at)}
+      </p>
     </div>
   );
 }

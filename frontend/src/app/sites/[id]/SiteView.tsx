@@ -26,7 +26,8 @@ import { Card, CardHeader, EmptyState, ErrorBanner, LiveIndicator, ScoreChip, Se
 import { ModelSwitch } from "@/components/ModelSwitch";
 import { api, type Alert, type Scorer, type SiteDetail } from "@/lib/api";
 import { ALERT_ICONS, ALERT_LABELS, SEVERITY_RANK } from "@/lib/alerts";
-import { relativeTime, round, siteTime, titleCase } from "@/lib/format";
+import { relativeTime, round, siteTime } from "@/lib/format";
+import { HAZARD_LABELS } from "@/lib/reports";
 import { levelFor, RISK_COLORS } from "@/lib/risk";
 import { useNow } from "@/lib/useNow";
 import { usePolling } from "@/lib/usePolling";
@@ -199,7 +200,7 @@ function SiteDetailView({
           <SiteAlerts alerts={alerts} timeZone={tz} />
         </Card>
         <Card>
-          <CardHeader title="Crew reports within 5 miles" icon={MapPin} subtitle="Hazards pinned by field crews" />
+          <CardHeader title="Crew reports" icon={MapPin} subtitle="Pinned by field crews at this site or within 5 miles" />
           {reports.length === 0 ? (
             <EmptyState icon={MapPin} title="No crew reports nearby" detail="Reports from the field show up here with their photo." />
           ) : (
@@ -216,11 +217,11 @@ function SiteDetailView({
                   )}
                   <div className="min-w-0 text-sm">
                     <p className="font-medium text-ink">
-                      {titleCase(r.hazard_type.replace("_", " "))} · <span className="text-ink-2">{r.severity} severity</span>
+                      {HAZARD_LABELS[r.hazard_type]} · <span className="text-ink-2">{r.severity} severity</span>
                     </p>
                     {r.description && <p className="mt-0.5 text-ink-2">{r.description}</p>}
                     <p className="mt-1 text-xs text-muted">
-                      {r.reporter_name ?? "Crew member"} · {relativeTime(r.created_at)}
+                      {r.reporter_name ?? "Crew member"} · {relativeTime(r.created_at)} · {distanceLabel(site, r)}
                     </p>
                   </div>
                 </li>
@@ -310,4 +311,14 @@ function StopWorkBanner({ alert, timeZone }: { alert: Alert; timeZone: string })
       </div>
     </div>
   );
+}
+
+/** "0.4 mi from the site" / "800 ft from the site", great-circle distance from the site to the report pin. */
+function distanceLabel(site: { latitude: number; longitude: number }, r: { latitude: number; longitude: number }) {
+  const rad = Math.PI / 180;
+  const dLat = (r.latitude - site.latitude) * rad;
+  const dLng = (r.longitude - site.longitude) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(site.latitude * rad) * Math.cos(r.latitude * rad) * Math.sin(dLng / 2) ** 2;
+  const mi = 3958.8 * 2 * Math.asin(Math.sqrt(h));
+  return mi < 0.2 ? `${Math.round(mi * 5280)} ft from the site` : `${mi.toFixed(1)} mi from the site`;
 }

@@ -47,43 +47,44 @@ body {
 
 /* ---- Map (components/SiteMap.tsx) --------------------------------------------------------- */
 
-/* Esri's dark-gray basemap, tinted navy with a filter (tiles only; pins are in another pane). */
-.leaflet-container {
+/* Esri's dark-gray basemap, tinted navy with a filter (tiles only; pins are in another pane).
+   Every rule starts with `html` so it beats leaflet.css whatever order the two stylesheets load in. */
+html .leaflet-container {
   background: #0a1029;
   font-family: inherit;
 }
-.leaflet-tile-pane {
+html .leaflet-tile-pane {
   filter: sepia(1) hue-rotate(190deg) saturate(1.8) brightness(0.8);
 }
 /* `.leaflet-container` prefix beats leaflet.css (incl. its .leaflet-touch rules on phones). */
-.leaflet-container .leaflet-control-zoom a,
-.leaflet-container .leaflet-control-zoom a:hover {
+html .leaflet-container .leaflet-control-zoom a,
+html .leaflet-container .leaflet-control-zoom a:hover {
   background: var(--color-raised);
   color: var(--color-ink);
   border-color: var(--color-line) !important;
 }
-.leaflet-container .leaflet-bar {
+html .leaflet-container .leaflet-bar {
   border: 1px solid var(--color-line) !important;
   box-shadow: none !important;
 }
-.leaflet-control-attribution {
+html .leaflet-container .leaflet-control-attribution {
   background: rgb(11 17 48 / 0.75) !important;
   color: var(--color-muted);
 }
-.leaflet-control-attribution a {
+html .leaflet-container .leaflet-control-attribution a {
   color: var(--color-ink-2);
 }
-.leaflet-popup-content-wrapper,
-.leaflet-popup-tip {
+html .leaflet-container .leaflet-popup-content-wrapper,
+html .leaflet-container .leaflet-popup-tip {
   background: var(--color-raised);
   color: var(--color-ink);
   border: 1px solid var(--color-line);
   box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
 }
-.leaflet-popup-content {
+html .leaflet-container .leaflet-popup-content {
   margin: 14px 16px;
 }
-.leaflet-container a.leaflet-popup-close-button {
+html .leaflet-container a.leaflet-popup-close-button {
   color: var(--color-muted);
 }
 
@@ -132,7 +133,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .site-pin.alerting::after { animation: none; }
 }
-.leaflet-div-icon.site-pin-wrap {
+html .leaflet-div-icon.site-pin-wrap {
   background: none;
   border: none;
 }
@@ -153,4 +154,19 @@ body {
   border-radius: 9999px;
   background: var(--color-risk-low);
   animation: pin-pulse 2s ease-out infinite;
+}
+
+/* Crew report markers on the dashboard map (components/SiteMap.tsx) */
+.report-pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--color-raised);
+  border: 2px solid var(--report-color);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.5);
+  font-size: 14px;
+  line-height: 1;
 }
