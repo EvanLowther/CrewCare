@@ -18,9 +18,8 @@ out/
 next-env.d.ts
 *.tsbuildinfo
 
-# Data and models (download / train locally)
+# Downloaded data (trained models in backend/planit/ml/models/ are committed so every machine has them)
 data/raw/
 data/processed/
-backend/ml/models/
 
 .DS_Store
