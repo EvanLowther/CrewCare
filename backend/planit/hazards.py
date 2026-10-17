@@ -24,7 +24,11 @@ Each hazard's severity is linear between anchors:
     rain, 24 h        1 in 2 · 3 5 · 5 7.5 · 8 9
     saturated ground  soil 25% 0 · 35% 3 · 45% 6, or 3-day rain 2 in 2.5 · 4 in 5 (max 6)   stuck vehicles;
                       same kind as rain, so it shows up when the ground stays soft after the rain stops
-    NWS alerts        by event (NWS_EVENTS), e.g. Tornado Warning 10, Wind Advisory 4.5
+    snow              24 h: 1 in 2 · 3 4 · 6 6.5 · 12 8.5 · 24 9.5; rate 0.5 in/h 3 · 1 5 · 2 7.5   NWS Winter
+                      Storm Warning ~6 in; heavy snow >= 1 in/h
+    ice, 24 h         0.05 in 3 · 0.1 4.5 · 0.25 7.5 · 0.5 9.5           NWS Ice Storm Warning ~1/4 in: lines and
+                      limbs break; same kind as snow (one winter storm)
+    NWS alerts       by event (NWS_EVENTS), e.g. Tornado Warning 10, Wind Advisory 4.5
 
 Site score = worst hazard + 0.25 x second + 0.10 x third, capped at 10 (combine()); the second and third only add
 when they're high (>= 5) on their own. Compounding is across kinds of hazard (heat, wind, storms, water): a Wind
@@ -271,6 +275,47 @@ def ground(soil_moisture: float | None, rain_72h_in: float | None) -> Hazard | N
     return _hazard("soil_moisture", severity, label, action)
 
 
+# --- Snow and ice -------------------------------------------------------------------------------------------
+
+# Snow in 24 h (inches): NWS Winter Storm Warnings are typically issued for about 6 in or more in 12-24 h.
+SNOW_24H_ANCHORS = [(0.5, 0.0), (1.0, 2.0), (3.0, 4.0), (6.0, 6.5), (12.0, 8.5), (24.0, 9.5)]
+# Snowfall rate (in/h): 1 in/h or more is "heavy" and quickly blocks access roads.
+SNOW_RATE_ANCHORS = [(0.25, 0.0), (0.5, 3.0), (1.0, 5.0), (2.0, 7.5), (3.0, 9.0)]
+# Ice accumulation in 24 h (inches): 1/4 in is a common NWS Ice Storm Warning criterion, where lines and limbs break.
+ICE_24H_ANCHORS = [(0.0, 0.0), (0.05, 3.0), (0.1, 4.5), (0.25, 7.5), (0.5, 9.5)]
+
+
+def snow(rate_in_h: float | None, total_24h_in: float | None) -> Hazard | None:
+    rate = piecewise(rate_in_h, SNOW_RATE_ANCHORS) if rate_in_h is not None else 0.0
+    total = piecewise(total_24h_in, SNOW_24H_ANCHORS) if total_24h_in is not None else 0.0
+    severity = max(rate, total)
+    if severity < MIN_SEVERITY:
+        return None
+    if rate > total:
+        label = f"Heavy snow {rate_in_h:.1f} in/h"
+    else:
+        label = f"{total_24h_in:.0f} in of snow in 24 h" if total_24h_in >= 1 else f"{total_24h_in:.1f} in of snow"
+    if severity >= 6:
+        action = "Postpone mobilization; plow and sand access roads; snow loads on structures"
+    elif severity >= 2.5:
+        action = "Chains or 4x4 on access roads; clear walking surfaces"
+    else:
+        action = None
+    return _hazard("snow", severity, label, action)
+
+
+def ice(total_24h_in: float | None) -> Hazard | None:
+    if total_24h_in is None:
+        return None
+    if total_24h_in >= 0.25:
+        action = "Stop work under lines and trees (ice loading); no travel on untreated roads"
+    elif total_24h_in >= 0.05:
+        action = "Ice cleats and de-icer; three points of contact on equipment"
+    else:
+        action = None
+    return _hazard("ice", piecewise(total_24h_in, ICE_24H_ANCHORS), f"{total_24h_in:.2f} in of ice in 24 h", action)
+
+
 # --- Alerts -------------------------------------------------------------------------------------------------
 
 # NWS event (lowercase) -> (severity, action). Anything not listed falls back to NWS_SEVERITY_FALLBACK.
@@ -371,6 +416,8 @@ KINDS = {
     # Wet ground comes from the same rain, so it only matters when it's worse than the rain itself (days after).
     "downpour": "water", "rain_24h": "water", "alert_flood": "water", "soil_moisture": "water",
     "cold": "cold", "visibility": "visibility",
+    # Snow and ice come from the same winter storm.
+    "snow": "winter", "ice": "winter",
 }
 
 

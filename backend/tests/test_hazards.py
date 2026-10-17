@@ -12,6 +12,21 @@ def test_national_nws_events_have_their_own_severity():
     assert "ice loading" in H.nws_event("Ice Storm Warning")[1]
 
 
+def test_snow_by_rate_or_24h_total():
+    assert H.snow(0.0, 0.2) is None
+    assert H.snow(0.1, 6.0).severity == 6.5 and H.snow(0.1, 6.0).label == "6 in of snow in 24 h"
+    heavy = H.snow(2.0, 2.0)
+    assert heavy.severity == 7.5 and heavy.label == "Heavy snow 2.0 in/h" and "Postpone" in heavy.action
+    assert H.snow(None, None) is None
+
+
+def test_ice_quarter_inch_is_ice_storm_territory():
+    assert H.ice(0.0) is None
+    assert H.ice(0.25).severity == 7.5 and "ice loading" in H.ice(0.25).action
+    assert H.ice(0.1).severity == 4.5
+    assert H.KINDS["snow"] == H.KINDS["ice"] == "winter"
+
+
 def test_cold_follows_the_wind_chill_chart():
     assert H.cold(40) is None
     assert H.cold(20).severity == 2.5 and "cold stress" in H.cold(20).action
