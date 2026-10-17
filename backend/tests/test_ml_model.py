@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from planit.ml.features import FEATURES
-from planit.ml.model import HazardModel, latest_model_path, score_from_probability
+from planit.ml.model import HazardModel, apply_heat_floor, heat_floor, latest_model_path, score_from_probability
 from planit.ml.train import evaluate, fit, save
 
 
@@ -35,6 +35,24 @@ def test_score_scale():
     assert score_from_probability(0.10, base) >= 5  # 2.5x normal is high
     assert score_from_probability(0.40, base) == 10.0
     assert score_from_probability(0.99, base) == 10.0
+
+
+def test_heat_floor_bands():
+    assert heat_floor(102.9) == (0.0, None)
+    assert heat_floor(103.0) == (5.0, "high")
+    assert heat_floor(115.0) == (7.5, "extreme")
+    assert heat_floor(None) == (0.0, None)
+    assert heat_floor(float("nan")) == (0.0, None)
+
+
+def test_apply_heat_floor_raises_score_and_factors_still_add_up():
+    rain = {"key": "rain_24h", "label": "0.3 in of rain today", "contribution": 0.8}
+    score, factors = apply_heat_floor(2.0, [rain], 106.4)
+    assert score == 5.0
+    assert factors[0] == {"key": "heat_index", "label": "Heat index 106°F (OSHA high risk)", "contribution": 4.2}
+    assert round(sum(f["contribution"] for f in factors), 1) == score
+    assert apply_heat_floor(6.0, [rain], 106.4) == (6.0, [rain])  # already above the floor: unchanged
+    assert apply_heat_floor(2.0, [rain], 95.0) == (2.0, [rain])
 
 
 def test_train_save_load_explain(frame, tmp_path):
