@@ -19,7 +19,8 @@ export type Health = S["Health"];
 export type HazardType = HazardReport["hazard_type"];
 export type ReportSeverity = HazardReport["severity"];
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+// Same-origin: next.config.ts forwards /api/* to FastAPI.
+export const API_URL = "";
 
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, { cache: "no-store" });
