@@ -9,7 +9,6 @@ import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
 import type { SiteSummary } from "@/lib/api";
 import { ALERT_EMOJI, ALERT_ICONS, ALERT_LABELS } from "@/lib/alerts";
 import { NO_SCORE_COLOR, NO_SCORE_INK, RISK_COLORS, RISK_INK, RISK_LABELS } from "@/lib/risk";
-import { REVEAL_SPREAD_MS } from "@/lib/useModelSwitch";
 import { ScoreChip } from "./ui";
 
 const FLORIDA_CENTER: L.LatLngTuple = [27.9, -83.2];
@@ -18,26 +17,19 @@ const BASE_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/
 const LABEL_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}";
 const ATTRIBUTION = "Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors";
 
-/** `revealDelayMs` (while the model switch replays the pins) drops the pin in after that delay. */
-function pinIcon(site: SiteSummary, selected: boolean, revealDelayMs: number | null): L.DivIcon {
+function pinIcon(site: SiteSummary, selected: boolean): L.DivIcon {
   const level = site.risk?.level;
   const color = level ? RISK_COLORS[level] : NO_SCORE_COLOR;
   const ink = level ? RISK_INK[level] : NO_SCORE_INK;
   const size = site.risk && site.risk.score >= 7.5 ? 38 : 32;
-  const classes = [
-    "site-pin",
-    site.top_alert ? "alerting" : "",
-    selected ? "selected" : "",
-    revealDelayMs !== null ? "reveal" : "",
-  ].join(" ");
-  const delay = revealDelayMs !== null ? `animation-delay:${Math.round(revealDelayMs)}ms;` : "";
+  const classes = ["site-pin", site.top_alert ? "alerting" : "", selected ? "selected" : ""].join(" ");
   const badge = site.top_alert === "lightning" ? `<span class="badge">${ALERT_EMOJI.lightning}</span>` : "";
   return L.divIcon({
     className: "site-pin-wrap",
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
     popupAnchor: [0, -size / 2],
-    html: `<div class="${classes}" style="${delay}width:${size}px;height:${size}px;background:${color};color:${ink};--pin-color:${color}">
+    html: `<div class="${classes}" style="width:${size}px;height:${size}px;background:${color};color:${ink};--pin-color:${color}">
              ${site.risk ? site.risk.score.toFixed(1) : "–"}${badge}
            </div>`,
   });
@@ -79,60 +71,39 @@ export default function SiteMap({
   sites,
   selectedId,
   onSelect,
-  hidden = false,
-  revealKey = null,
 }: {
   sites: SiteSummary[];
   selectedId: number | null;
   onSelect: (id: number) => void;
-  /** Fade every pin out (the model switch is loading the other scorer). */
-  hidden?: boolean;
-  /** Set while the model switch reveals pins: they drop in from north to south over REVEAL_SPREAD_MS. */
-  revealKey?: number | null;
 }) {
   const markers = useRef(new Map<number, L.Marker>());
   // Draw the riskiest sites on top when pins overlap.
   const ordered = useMemo(() => [...sites].reverse(), [sites]);
-  const revealDelays = useMemo(() => {
-    if (revealKey === null || sites.length === 0) return null;
-    const lats = sites.map((s) => s.latitude);
-    const north = Math.max(...lats);
-    const span = north - Math.min(...lats) || 1;
-    return new Map(sites.map((s) => [s.id, ((north - s.latitude) / span) * REVEAL_SPREAD_MS]));
-  }, [sites, revealKey]);
-  // Stable icon objects: a new icon makes Leaflet replace the pin, which would restart its reveal animation.
-  const icons = useMemo(
-    () => new Map(sites.map((s) => [s.id, pinIcon(s, s.id === selectedId, revealDelays?.get(s.id) ?? null)])),
-    [sites, selectedId, revealDelays],
-  );
 
   return (
-    // The fade-out class goes on a wrapper: Leaflet adds its own classes to the map element itself.
-    <div className={`h-full w-full ${hidden ? "pins-hidden" : ""}`}>
-      {/* Scroll-wheel zoom off so scrolling the page over the map scrolls the page; +/- and pinch still zoom. */}
-      <MapContainer center={FLORIDA_CENTER} zoom={6} className="h-full w-full" scrollWheelZoom={false}>
-        <TileLayer attribution={ATTRIBUTION} url={BASE_TILES} maxZoom={16} />
-        <TileLayer url={LABEL_TILES} maxZoom={16} />
-        <MapController sites={sites} selectedId={selectedId} markers={markers} />
-        {ordered.map((site, i) => (
-          <Marker
-            key={site.id}
-            position={[site.latitude, site.longitude]}
-            icon={icons.get(site.id)!}
-            zIndexOffset={i * 10}
-            eventHandlers={{ click: () => onSelect(site.id) }}
-            ref={(m) => {
-              if (m) markers.current.set(site.id, m);
-              else markers.current.delete(site.id);
-            }}
-          >
-            <Popup minWidth={240}>
-              <SitePopup site={site} />
-            </Popup>
-          </Marker>
-        ))}
-      </MapContainer>
-    </div>
+    // Scroll-wheel zoom off so scrolling the page over the map scrolls the page; +/- and pinch still zoom.
+    <MapContainer center={FLORIDA_CENTER} zoom={6} className="h-full w-full" scrollWheelZoom={false}>
+      <TileLayer attribution={ATTRIBUTION} url={BASE_TILES} maxZoom={16} />
+      <TileLayer url={LABEL_TILES} maxZoom={16} />
+      <MapController sites={sites} selectedId={selectedId} markers={markers} />
+      {ordered.map((site, i) => (
+        <Marker
+          key={site.id}
+          position={[site.latitude, site.longitude]}
+          icon={pinIcon(site, site.id === selectedId)}
+          zIndexOffset={i * 10}
+          eventHandlers={{ click: () => onSelect(site.id) }}
+          ref={(m) => {
+            if (m) markers.current.set(site.id, m);
+            else markers.current.delete(site.id);
+          }}
+        >
+          <Popup minWidth={240}>
+            <SitePopup site={site} />
+          </Popup>
+        </Marker>
+      ))}
+    </MapContainer>
   );
 }
 

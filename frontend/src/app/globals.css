@@ -137,34 +137,6 @@ body {
   border: none;
 }
 
-/* Rules <-> ML model switch: everything fades out, then pins drop in north to south and the ranked list
-   fills top to bottom (each item's animation-delay is set inline). */
-.site-pin {
-  transition: opacity 250ms ease, transform 250ms ease;
-}
-.pins-hidden .site-pin {
-  opacity: 0;
-  transform: scale(0.5);
-}
-.site-pin.reveal {
-  animation: pin-reveal 450ms cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
-}
-@keyframes pin-reveal {
-  from { opacity: 0; transform: translateY(-14px) scale(0.4); }
-  to { opacity: 1; transform: none; }
-}
-.reveal-row {
-  animation: row-reveal 400ms ease-out both;
-}
-@keyframes row-reveal {
-  from { opacity: 0; transform: translateY(-6px); }
-  to { opacity: 1; transform: none; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .site-pin.reveal, .reveal-row { animation: none; }
-  .site-pin { transition: none; }
-}
-
 /* Live dot used in headers */
 .live-dot {
   position: relative;
