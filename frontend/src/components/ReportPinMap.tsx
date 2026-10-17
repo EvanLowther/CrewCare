@@ -8,7 +8,7 @@ import type { SiteSummary } from "@/lib/api";
 
 const BASE_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}";
 const LABEL_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}";
-const FLORIDA_CENTER: L.LatLngTuple = [27.9, -83.2];
+const US_CENTER: L.LatLngTuple = [39.5, -98.35];
 
 export type LatLng = { lat: number; lng: number };
 
@@ -77,8 +77,8 @@ export default function ReportPinMap({
 
   return (
     <MapContainer
-      center={position ? [position.lat, position.lng] : FLORIDA_CENTER}
-      zoom={position ? 16 : 6}
+      center={position ? [position.lat, position.lng] : US_CENTER}
+      zoom={position ? 16 : 4}
       className="h-full w-full"
       scrollWheelZoom={false}
     >
