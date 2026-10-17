@@ -58,7 +58,9 @@ CFG
 chown planit:planit /home/planit/.ssh/config
 
 if [[ ! -d $APP/.git ]]; then
-  if ! runuser -u planit -- ssh -o BatchMode=yes -T git@github.com 2>&1 | grep -q "successfully authenticated"; then
+  # GitHub's test login always exits 1, so check its message instead of the exit code.
+  github_reply=$(runuser -u planit -- ssh -o BatchMode=yes -T git@github.com 2>&1 || true)
+  if ! grep -q "successfully authenticated" <<<"$github_reply"; then
     echo
     echo "Add this read-only deploy key to the GitHub repo, then run bootstrap.sh again:"
     cat /home/planit/.ssh/github_deploy.pub
