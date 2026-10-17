@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-2.5-flash"
     nws_user_agent: str = "PlanIT Control (hackathon project)"
 
+    # Hazard score: "xgb" uses the trained model in planit/ml/models/ (falls back to rules-v1 without one),
+    # "rules" forces rules-v1.
+    score_model: str = "xgb"
+
     # Hazard rules
     lightning_radius_mi: float = 10.0
     lightning_all_clear_min: int = 30
