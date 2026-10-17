@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Scorer, SiteList } from "./api";
 
-export const MODEL_LABELS: Record<Scorer, string> = { ml: "ML model (XGBoost)", rules: "Rules-v1" };
+export const MODEL_LABELS: Record<Scorer, string> = { ml: "Predictive (ML model)", rules: "Real-time (rules-v1)" };
 
 /** Fade-out before the switch, and the window the reveal is spread over (plus one item's animation ≈ 3 s). */
 export const HIDE_MS = 300;

@@ -3,8 +3,8 @@
 import type { Scorer } from "@/lib/api";
 
 const OPTIONS: { value: Scorer; label: string; title: string }[] = [
-  { value: "rules", label: "Rules", title: "Rules-v1: hand-set thresholds for heat, rain, wind and alerts" },
-  { value: "ml", label: "ML model", title: "XGBoost trained on 2023-2025 weather and NOAA storm records" },
+  { value: "rules", label: "Real-time", title: "Rules-v1: hand-set thresholds on current heat, rain, wind and alerts" },
+  { value: "ml", label: "Predictive", title: "ML model: XGBoost trained on 2023-2025 weather and NOAA storm records" },
 ];
 
 /** Pill that switches the map and ranked list between scorers. Sits over the map's top-right corner. */
