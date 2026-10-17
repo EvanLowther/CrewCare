@@ -26,7 +26,8 @@ import { Card, CardHeader, EmptyState, ErrorBanner, LiveIndicator, ScoreChip, Se
 import { ModelSwitch } from "@/components/ModelSwitch";
 import { api, type Alert, type Scorer, type SiteDetail } from "@/lib/api";
 import { ALERT_ICONS, ALERT_LABELS, SEVERITY_RANK } from "@/lib/alerts";
-import { relativeTime, round, siteTime, titleCase } from "@/lib/format";
+import { relativeTime, round, siteTime } from "@/lib/format";
+import { HAZARD_LABELS } from "@/lib/reports";
 import { levelFor, RISK_COLORS } from "@/lib/risk";
 import { useNow } from "@/lib/useNow";
 import { usePolling } from "@/lib/usePolling";
@@ -216,7 +217,7 @@ function SiteDetailView({
                   )}
                   <div className="min-w-0 text-sm">
                     <p className="font-medium text-ink">
-                      {titleCase(r.hazard_type.replace("_", " "))} · <span className="text-ink-2">{r.severity} severity</span>
+                      {HAZARD_LABELS[r.hazard_type]} · <span className="text-ink-2">{r.severity} severity</span>
                     </p>
                     {r.description && <p className="mt-0.5 text-ink-2">{r.description}</p>}
                     <p className="mt-1 text-xs text-muted">
