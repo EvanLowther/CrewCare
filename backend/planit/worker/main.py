@@ -1,6 +1,6 @@
 """Owner: Person A. Background jobs: poll data sources, run hazard rules, score, brief.
 
-Run: make worker
+Run: python dev.py worker
 Each job is a plain function, so it can also be run once by hand:
     python -m planit.worker.main --once open_meteo
 """

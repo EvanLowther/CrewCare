@@ -1,5 +1,5 @@
 // Typed client for the PlanIT API. Types come from src/lib/api-types.ts,
-// which is generated from backend/planit/models.py (run `make types`, never edit it by hand).
+// which is generated from backend/planit/models.py (run `python dev.py types`, never edit it by hand).
 import type { components } from "./api-types";
 
 type S = components["schemas"];

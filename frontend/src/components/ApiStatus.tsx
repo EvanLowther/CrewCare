@@ -14,7 +14,7 @@ export function ApiStatus() {
     api.sites().then((r) => setSiteCount(r.sites.length)).catch(() => setSiteCount(null));
   }, []);
 
-  if (error) return <p className="text-sm text-red-600">API unreachable: {error}. Is `make api` running?</p>;
+  if (error) return <p className="text-sm text-red-600">API unreachable: {error}. Is `python dev.py api` running?</p>;
   if (!health) return <p className="text-sm text-neutral-500">Checking API…</p>;
   return (
     <p className="text-sm text-neutral-600">

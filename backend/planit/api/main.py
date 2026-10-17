@@ -1,4 +1,4 @@
-"""FastAPI app. Run: make api  (http://localhost:8000/docs)"""
+"""FastAPI app. Run: python dev.py api  (http://localhost:8000/docs)"""
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

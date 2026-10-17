@@ -1,0 +1,7 @@
+# Keep LF line endings in the repo and in checkouts on every OS, so generated
+# files (docs/openapi.json, frontend/src/lib/api-types.ts) match exactly.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.xlsx binary
