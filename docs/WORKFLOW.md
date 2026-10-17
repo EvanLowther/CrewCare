@@ -95,7 +95,8 @@ plants ≥ 50 MW). Sized for Open-Meteo's free tier (10,000 calls/day). `a/us-si
 - [ ] River flood rule with NWS flood stages (replaces "USGS flood rule"); must cover the Mississippi
 - [x] rules-v2: wind chill (cold) and visibility (fog) from NWS weather; severities and actions for the national
       NWS events (winter storm, ice storm, blizzard, extreme cold, dust, smoke, coastal flood, tsunami, ...)
-- [ ] rules-v2 for the rest: snow / ice accumulation, active wildfire, smoke / AQI, debris flow, earthquake
+- [x] `a/winter`: rules-v2 snow (rate and 24 h total) and ice accumulation, one "winter" kind
+- [ ] rules-v2 for the rest: active wildfire, smoke / AQI, debris flow, earthquake
 - [ ] Score baseline per region, if "5" should mean "unusual for this site" rather than nationally
 - [ ] Later: separate models per hazard (storm, winter, flood, heat) instead of one "hazard day" model
 - [ ] 6 PM briefing job works for every US timezone
