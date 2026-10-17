@@ -9,12 +9,12 @@ const LINKS = [
 export function Nav() {
   return (
     <header className="border-b border-neutral-200 bg-white">
-      <nav className="mx-auto flex max-w-6xl items-center gap-6 px-4 py-3">
-        <Link href="/" className="font-semibold">
+      <nav className="mx-auto flex max-w-6xl items-center gap-4 overflow-x-auto px-4 py-3 sm:gap-6">
+        <Link href="/" className="whitespace-nowrap font-semibold">
           PlanIT Control
         </Link>
         {LINKS.map((l) => (
-          <Link key={l.href} href={l.href} className="text-sm text-neutral-600 hover:text-neutral-900">
+          <Link key={l.href} href={l.href} className="whitespace-nowrap text-sm text-neutral-600 hover:text-neutral-900">
             {l.label}
           </Link>
         ))}
