@@ -72,6 +72,9 @@ class HourInputs:
     weather_code: int | None = None
     wind_chill_f: float | None = None
     visibility_m: float | None = None
+    snow_1h_in: float | None = None
+    snow_24h_in: float | None = None
+    ice_24h_in: float | None = None
     is_forecast: bool = False
     alerts: list[dict] = field(default_factory=list)  # see alerts_at()
 
@@ -81,6 +84,8 @@ def rule_hazards(x: HourInputs) -> list[hazards.Hazard | None]:
         hazards.heat(x.heat_index_f),
         hazards.cold(x.wind_chill_f),
         hazards.visibility(x.visibility_m),
+        hazards.snow(x.snow_1h_in, x.snow_24h_in),
+        hazards.ice(x.ice_24h_in),
         hazards.thunderstorm(x.weather_code, x.is_forecast) or hazards.storm_potential(x.cape_jkg, x.precip_prob_pct),
         hazards.wind(x.gust_mph),
         hazards.rain_rate(x.rain_1h_in),
@@ -123,16 +128,18 @@ def alerts_at(alerts: list[dict], hour: datetime) -> list[dict]:
 
 
 def _total(rows: list[dict], key: str) -> float | None:
-    values = [r[key] for r in rows if r[key] is not None]
+    values = [r[key] for r in rows if r.get(key) is not None]
     return sum(values) if values else None
 
 
-# NWS values that replace Open-Meteo's for the same hour in rules-v2. Rain stays Open-Meteo's when it has the hour:
-# NWS gives 6-hour totals, which would smear a 1 in/h downpour into a drizzle.
+# NWS values that replace Open-Meteo's for the same hour in rules-v2. Rain and snow stay Open-Meteo's when it has the
+# hour: NWS gives 6-hour totals, which would smear a 1 in/h downpour into a drizzle. Ice only NWS forecasts.
 NWS_OVERRIDES = ("temp_f", "humidity_pct", "wind_mph", "gust_mph", "precip_prob_pct", "weather_code",
-                 "wind_chill_f", "visibility_m")
+                 "wind_chill_f", "visibility_m", "ice_in")
+NWS_FALLBACKS = ("precip_in", "snowfall_in")
 WEATHER_KEYS = ("temp_f", "humidity_pct", "heat_index_f", "precip_in", "precip_prob_pct", "soil_moisture",
-                "wind_mph", "gust_mph", "cape_jkg", "weather_code", "wind_chill_f", "visibility_m")
+                "wind_mph", "gust_mph", "cape_jkg", "weather_code", "wind_chill_f", "visibility_m", "snowfall_in",
+                "ice_in")
 
 
 def merge_weather(open_meteo: list[dict], nws: list[dict]) -> list[dict]:
@@ -144,8 +151,9 @@ def merge_weather(open_meteo: list[dict], nws: list[dict]) -> list[dict]:
         for key in NWS_OVERRIDES:
             if n.get(key) is not None:
                 row[key] = n[key]
-        if row["precip_in"] is None:
-            row["precip_in"] = n.get("precip_in")
+        for key in NWS_FALLBACKS:
+            if row[key] is None:
+                row[key] = n.get(key)
     rows = sorted(by_ts.values(), key=lambda r: r["ts"])
     soil = None
     for r in rows:
@@ -165,16 +173,20 @@ def build_inputs(weather: list[dict], alerts: list[dict], hours: list[datetime])
             row = earlier[-1] if earlier else None
         if row is None:
             continue
+        last_24h = [w for w in weather if hour - timedelta(hours=24) < w["ts"] <= hour]
         out[hour] = HourInputs(
             heat_index_f=hazards.nws_heat_index(row["temp_f"], row["humidity_pct"]),
             rain_1h_in=row["precip_in"],
-            rain_24h_in=_total([w for w in weather if hour - timedelta(hours=24) < w["ts"] <= hour], "precip_in"),
+            rain_24h_in=_total(last_24h, "precip_in"),
             rain_72h_in=_total([w for w in weather if hour - RULES_HISTORY < w["ts"] <= hour], "precip_in"),
             soil_moisture=row["soil_moisture"], gust_mph=row["gust_mph"], cape_jkg=row["cape_jkg"],
             precip_prob_pct=row["precip_prob_pct"], weather_code=row["weather_code"],
             wind_chill_f=(row["wind_chill_f"] if row.get("wind_chill_f") is not None
                           else hazards.wind_chill_f(row["temp_f"], row.get("wind_mph"))),
             visibility_m=row.get("visibility_m"),
+            snow_1h_in=row.get("snowfall_in"),
+            snow_24h_in=_total(last_24h, "snowfall_in"),
+            ice_24h_in=_total(last_24h, "ice_in"),
             is_forecast=hour > hours[0], alerts=alerts_at(alerts, hour),
         )
     return out
@@ -309,7 +321,7 @@ def compute_scores() -> list[dict]:
         sites = {s["id"]: s for s in conn.execute("SELECT id, latitude, longitude FROM sites").fetchall()}
         nws = conn.execute(
             "SELECT site_id, ts, temp_f, humidity_pct, precip_in, precip_prob_pct, wind_mph, gust_mph, weather_code, "
-            "wind_chill_f, visibility_m FROM nws_weather WHERE ts > %s AND ts <= %s "
+            "wind_chill_f, visibility_m, snowfall_in, ice_in FROM nws_weather WHERE ts > %s AND ts <= %s "
             "AND ((NOT is_forecast AND ts <= %s) OR (is_forecast AND ts > %s)) ORDER BY site_id, ts",
             (current - RULES_HISTORY, hours[-1], now, now),
         ).fetchall()

@@ -281,7 +281,8 @@ the API and the worker, and deploys `main` automatically (see [`deploy/README.md
 
 **Real-time** (`hazards.py`) scores what's happening now against published rules: OSHA's heat-index bands, lift wind
 limits, the NWS wind chill chart (frostbite in 30 min at -18°F), Dense Fog Advisory visibility, rain rate, saturated
-ground, and about 50 NWS warning types (Tornado Warning 10, Blizzard Warning 9, Wind Advisory 4.5). A site's score is its
+ground, snow (Winter Storm Warning criteria, about 6 in in 24 h or 1 in/h), ice (Ice Storm Warning criteria, ¼ in), and
+about 50 NWS warning types (Tornado Warning 10, Blizzard Warning 9, Wind Advisory 4.5). A site's score is its
 worst hazard plus a little for other serious ones. **Predictive** is the model above, with the OSHA heat floor, NWS
 warnings and lightning on top.
 
@@ -296,8 +297,8 @@ warnings and lightning on top.
 
 ## What's not done yet
 
-- **On branches, not merged:** the lightning stop-work rule with its 30-minute countdown, the snow and ice rules, and a
-  `simulate` script for demos (lightning, hurricane, flood, blizzard). Demo buttons in the app come later.
+- **On a branch, not merged:** the lightning stop-work rule with its 30-minute countdown, and a `simulate` script for
+  demos (lightning, hurricane, flood, blizzard). Demo buttons in the app come later.
 - **Not built:** the 6 PM next-day briefing (Gemini, with a template fallback), crew reports raising the score, the
   river flood rule with NWS flood stages, and fire detections.
 

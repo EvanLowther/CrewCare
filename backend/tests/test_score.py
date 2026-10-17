@@ -21,6 +21,25 @@ def test_merge_weather_prefers_nws_readings_but_keeps_open_meteo_rain_and_soil()
     assert second["soil_moisture"] == 0.4 and second["wind_chill_f"] == -20.0
 
 
+def test_build_inputs_totals_snow_and_ice_over_24_h():
+    base = dict.fromkeys(("temp_f", "humidity_pct", "precip_in", "soil_moisture", "gust_mph", "cape_jkg",
+                          "precip_prob_pct", "weather_code"))
+    rows = [{**base, "ts": T0 - timedelta(hours=h), "temp_f": 25.0, "snowfall_in": 0.5, "ice_in": 0.02}
+            for h in range(30)]
+    x = build_inputs(sorted(rows, key=lambda r: r["ts"]), [], [T0])[T0]
+    assert x.snow_24h_in == 12.0 and x.snow_1h_in == 0.5 and x.ice_24h_in == pytest.approx(0.48)
+    score, factors = score_hour(x)
+    assert score >= 9 and {f["key"] for f in factors} >= {"ice", "snow"}
+
+
+def test_merge_weather_snow_from_open_meteo_ice_from_nws():
+    om = [{"ts": T0, "temp_f": 20.0, "snowfall_in": 1.2}]
+    nws = [{"ts": T0, "snowfall_in": 0.3, "ice_in": 0.04}, {"ts": T0 + timedelta(hours=1), "snowfall_in": 0.3}]
+    first, second = merge_weather(om, nws)
+    assert first["snowfall_in"] == 1.2 and first["ice_in"] == 0.04
+    assert second["snowfall_in"] == 0.3
+
+
 def test_bitter_wind_chill_and_dense_fog_score():
     assert score_hour(HourInputs(wind_chill_f=-25))[0] >= 7.5
     score, factors = score_hour(HourInputs(visibility_m=300))
