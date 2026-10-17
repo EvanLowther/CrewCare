@@ -26,7 +26,8 @@
 That lets each person build and test their half alone.
 
 - **Worker** writes `weather`, `river_levels`, `lightning_strikes`, `nws_alerts`, `alerts`, `hazard_scores`, `briefings`.
-- **API** reads all of those and writes only `hazard_reports` and `photos` (crew uploads).
+- **API** reads all of those and writes only `hazard_reports` and `photos` (crew uploads), plus `job_requests`
+  for the demo buttons: the worker's `jobs` poller picks those up within ~2 s (migration 002).
 - **Frontend** talks only to the API, always through its own origin: the browser calls `/api/...` on port 3000
   and `frontend/next.config.ts` forwards it to FastAPI on port 8000. So the site works at `localhost`, `127.0.0.1`
   or the computer's Wi-Fi address (phones) with no CORS setup. Alerts update by polling `GET /api/alerts?since=` every 10 s.
@@ -46,6 +47,7 @@ That lets each person build and test their half alone.
 | `hazard_reports`, `photos` | table | API | Crew reports. Photos stored as resized JPEG bytes. |
 | `briefings` | table | worker | One per site per day, generated 6 PM site-local. |
 | `storm_events` | table | Person A loader | NOAA Storm Events, labels for ML training. |
+| `job_requests` | table | API (demo buttons) | Requests the worker runs: `lightning_replay`, `generate_briefings`. 002. |
 
 Changing the schema: add `db/migrations/002_<name>.sql`. Never edit a migration that has been applied.
 
