@@ -57,11 +57,11 @@ Tick items in the PR that finishes them.
 - [ ] 6 PM briefing job (Gemini + template fallback)
 
 ### Person B (app)
-- [ ] Real `/api/sites` + `/api/sites/{id}` queries
+- [x] Real `/api/sites` + `/api/sites/{id}` queries
 - [ ] Real `/api/alerts`, `/api/reports`, `/api/briefings` queries
 - [x] Dashboard: Leaflet map + ranked list from mock data
 - [ ] `scripts/seed_demo.py` (fake weather, scores, alerts in Tiger)
-- [ ] Dashboard on the real API
+- [x] Dashboard on the real API
 - [ ] Site detail page
 - [ ] Alert banner + live countdown
 - [ ] Crew report form (photo + GPS pin)
