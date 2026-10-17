@@ -28,3 +28,19 @@ export const RISK_LABELS: Record<RiskLevel, string> = {
 };
 
 export const RISK_LEVELS: RiskLevel[] = ["low", "moderate", "high", "extreme"];
+
+/** What each level means for a crew (matches backend/planit/hazards.py LEVEL_GUIDANCE). */
+export const RISK_GUIDANCE: Record<RiskLevel, string> = {
+  low: "Normal operations",
+  moderate: "Work with precautions",
+  high: "Restricted work",
+  extreme: "Stop non-essential work",
+};
+
+/** Same bands as backend level_for(): low < 2.5 <= moderate < 5 <= high < 7.5 <= extreme. */
+export function levelFor(score: number): RiskLevel {
+  if (score >= 7.5) return "extreme";
+  if (score >= 5) return "high";
+  if (score >= 2.5) return "moderate";
+  return "low";
+}

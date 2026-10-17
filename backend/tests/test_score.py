@@ -1,8 +1,14 @@
-"""Tests for the rules-v1 hazard score (pure functions, no database)."""
+"""rules-v2 site scores for real-world scenarios (pure functions, no database)."""
 
 from datetime import UTC, datetime, timedelta
 
-from planit.ml.score import HourInputs, build_inputs, heat_points, level_for, score_hour, storm_points
+import pytest
+
+from planit.ml.score import HourInputs, build_inputs, level_for, score_hour
+
+
+def nws(event: str, alert_type: str = "nws", severity: str = "warning") -> dict:
+    return {"type": alert_type, "severity": severity, "title": f"{event} issued ...", "nws_event": event}
 
 
 def test_level_bands():
@@ -10,64 +16,79 @@ def test_level_bands():
         "low", "low", "moderate", "moderate", "high", "high", "extreme", "extreme"]
 
 
-def test_heat_points_follow_osha_bands():
-    assert heat_points(85) == 0
-    assert heat_points(103) == 1.5
-    assert heat_points(115) == 3.5
-    assert 1.5 < heat_points(110) < 3.0
+def test_calm_october_night_is_low():
+    score, factors = score_hour(HourInputs(heat_index_f=74, rain_1h_in=0, rain_24h_in=0, rain_72h_in=0.1,
+                                           soil_moisture=0.18, gust_mph=8, cape_jkg=300, precip_prob_pct=5,
+                                           weather_code=1))
+    assert level_for(score) == "low" and factors == []
 
 
-def test_storm_points():
-    assert storm_points(95, None, None) == 2.5
-    assert storm_points(3, 500, 80) == 0
-    assert storm_points(3, 3000, 100) == 2.0
-    assert storm_points(3, 2000, 50) == 0.5
+def test_heat_alone_follows_osha():
+    assert score_hour(HourInputs(heat_index_f=91))[0] == 2.5
+    assert score_hour(HourInputs(heat_index_f=103))[0] == 5.0
+    assert score_hour(HourInputs(heat_index_f=115))[0] == 9.0  # no strenuous work: stop-work territory
+    assert score_hour(HourInputs(heat_index_f=125))[0] == 10.0
 
 
-def test_calm_day_is_low():
-    score, factors = score_hour(HourInputs(heat_index_f=84, rain_24h_in=0, soil_moisture=0.15, gust_mph=10,
-                                           cape_jkg=300, precip_prob_pct=10, weather_code=1))
-    assert score < 1 and level_for(score) == "low"
-
-
-def test_hot_wet_stormy_day_is_high_with_true_labels():
-    score, factors = score_hour(HourInputs(heat_index_f=112, rain_24h_in=2.4, soil_moisture=0.41, gust_mph=30,
-                                           cape_jkg=2600, precip_prob_pct=70, weather_code=95))
-    assert level_for(score) in ("high", "extreme")
-    assert [f["key"] for f in factors] == ["heat_index", "thunderstorm", "rain_24h"]
-    assert factors[0]["label"] == "Heat index 112°F"
-    assert factors[2]["label"] == "2.4 in of rain in 24 h"
-
-
-def test_lightning_floors_score_at_8_and_tops_factors():
-    alerts = [{"type": "lightning", "severity": "danger", "title": "STOP WORK"},
-              {"type": "nws", "severity": "danger", "title": "Wind Advisory"},
-              {"type": "heat", "severity": "warning", "title": "Heat Advisory"}]
-    score, factors = score_hour(HourInputs(heat_index_f=88, alerts=alerts))
-    assert score >= 8.0
-    assert factors[0]["label"] == "Lightning within 10 miles"
-    assert len([f for f in factors if f["key"].startswith("alert_")]) == 2  # strongest + next only
-
-
-def test_score_is_capped_at_10():
-    score, _ = score_hour(HourInputs(heat_index_f=120, rain_24h_in=5, soil_moisture=0.5, gust_mph=60,
-                                     weather_code=95,
-                                     alerts=[{"type": "lightning", "severity": "danger", "title": "x"}]))
+def test_lightning_is_always_10():
+    score, factors = score_hour(HourInputs(heat_index_f=88, alerts=[
+        {"type": "lightning", "severity": "danger", "title": "STOP WORK", "nearest_mi": 3.2}]))
     assert score == 10.0
+    assert factors[0]["key"] == "lightning" and "30 min" in factors[0]["action"]
 
 
-def test_build_inputs_rain_window_and_alert_expiry():
+def test_forecast_thunderstorm_is_extreme():
+    score, factors = score_hour(HourInputs(heat_index_f=96, weather_code=95, is_forecast=True))
+    assert score >= 8.0 and factors[0]["label"] == "Thunderstorms forecast"
+
+
+def test_gusts_over_the_aerial_lift_limit_are_high():
+    score, factors = score_hour(HourInputs(gust_mph=30))
+    assert level_for(score) == "high"
+    assert factors[0]["action"] == "Ground aerial lifts and bucket trucks"
+
+
+def test_wind_advisory_with_strong_gusts_is_high_not_doubled():
+    score, factors = score_hour(HourInputs(gust_mph=38, alerts=[nws("Wind Advisory", "wind")]))
+    assert level_for(score) == "high"
+    assert {f["key"] for f in factors} == {"wind", "alert_wind"}
+
+
+def test_flash_flood_warning_is_extreme():
+    score, factors = score_hour(HourInputs(alerts=[nws("Flash Flood Warning", "flood", "danger")]))
+    assert score >= 9.0 and factors[0]["label"] == "Flash Flood Warning"
+
+
+def test_heat_with_modest_storm_energy_stays_high():
+    heat_only = score_hour(HourInputs(heat_index_f=108))[0]
+    score, _ = score_hour(HourInputs(heat_index_f=108, cape_jkg=2600, precip_prob_pct=60))
+    assert score == heat_only == 6.0  # storm energy 1.9 isn't serious enough to compound
+    assert score_hour(HourInputs(heat_index_f=108, weather_code=95))[0] == 9.5
+
+
+def test_heavy_rain_on_saturated_ground():
+    score, factors = score_hour(HourInputs(rain_24h_in=2.4, rain_72h_in=2.6, soil_moisture=0.41))
+    assert score == 4.8 and level_for(score) == "moderate"  # same rain, counted once: soil 41% is the worse of the two
+    assert factors[0]["key"] == "soil_moisture" and factors[0]["action"]
+    assert level_for(score_hour(HourInputs(rain_24h_in=3.5, soil_moisture=0.45))[0]) == "high"
+
+
+def test_build_inputs_windows_heat_index_and_alert_expiry():
     now = datetime(2026, 8, 1, 15, tzinfo=UTC)
-    weather = [{"ts": now + timedelta(hours=h), "heat_index_f": 100.0, "precip_in": 0.5, "precip_prob_pct": 40.0,
-                "soil_moisture": 0.3, "gust_mph": 20.0, "cape_jkg": 1500.0, "weather_code": 3}
-               for h in range(-30, 5)]
+    weather = [{"ts": now + timedelta(hours=h), "temp_f": 95.0, "humidity_pct": 55.0, "heat_index_f": 120.0,
+                "precip_in": 0.5, "precip_prob_pct": 40.0, "soil_moisture": 0.3, "gust_mph": 20.0,
+                "cape_jkg": 1500.0, "weather_code": 3} for h in range(-80, 5)]
     alerts = [{"type": "lightning", "severity": "danger", "title": "STOP", "all_clear_at": now + timedelta(minutes=20),
-               "meta": {}},
-              {"type": "wind", "severity": "warning", "title": "Wind Advisory", "all_clear_at": None,
+               "meta": {"nearest_strike_mi": 2.5}},
+              {"type": "wind", "severity": "warning", "title": "Wind Advisory issued ...", "all_clear_at": None,
                "meta": {"nws_event": "Wind Advisory", "ends": (now + timedelta(hours=3)).isoformat()}}]
     inputs = build_inputs(weather, alerts, [now, now + timedelta(hours=2), now + timedelta(hours=4)])
-    assert inputs[now].rain_24h_in == 12.0  # 24 hourly rows x 0.5 in
-    assert {a["type"] for a in inputs[now].alerts} == {"lightning", "wind"}
+    x = inputs[now]
+    # NWS heat index from 95°F / 55% (chart: 106 at 94°F, 112 at 96°F), not the stored "feels like" 120
+    assert x.heat_index_f == pytest.approx(109, abs=1)
+    assert x.rain_1h_in == 0.5 and x.rain_24h_in == 12.0 and x.rain_72h_in == 36.0
+    assert not x.is_forecast and inputs[now + timedelta(hours=2)].is_forecast
+    assert {a["type"] for a in x.alerts} == {"lightning", "wind"}
+    assert x.alerts[0]["nearest_mi"] == 2.5 and x.alerts[1]["nws_event"] == "Wind Advisory"
     assert [a["type"] for a in inputs[now + timedelta(hours=2)].alerts] == ["wind"]  # lightning cleared
     assert inputs[now + timedelta(hours=4)].alerts == []  # advisory ended
-    assert inputs[now].alerts[1]["title"] == "Wind Advisory"

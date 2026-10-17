@@ -3,6 +3,7 @@
 import {
   ArrowLeft,
   Bell,
+  ClipboardCheck,
   CloudRain,
   CloudSun,
   Droplets,
@@ -18,19 +19,21 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { RainChanceChart, HeatIndexChart, RiskHistoryChart } from "@/components/charts";
 import { RiskGauge } from "@/components/RiskGauge";
 import { Card, CardHeader, EmptyState, ErrorBanner, LiveIndicator, ScoreChip, SeverityBadge } from "@/components/ui";
-import { api, type Alert, type SiteDetail } from "@/lib/api";
+import { ModelSwitch } from "@/components/ModelSwitch";
+import { api, type Alert, type Scorer, type SiteDetail } from "@/lib/api";
 import { ALERT_ICONS, ALERT_LABELS, SEVERITY_RANK } from "@/lib/alerts";
 import { relativeTime, round, siteTime, titleCase } from "@/lib/format";
-import { RISK_COLORS } from "@/lib/risk";
+import { levelFor, RISK_COLORS } from "@/lib/risk";
 import { useNow } from "@/lib/useNow";
 import { usePolling } from "@/lib/usePolling";
 
-export function SiteView({ id }: { id: string }) {
-  const fetchSite = useCallback(() => api.site(Number(id)), [id]);
+export function SiteView({ id, initialModel }: { id: string; initialModel: Scorer }) {
+  const [model, setModel] = useState<Scorer>(initialModel);
+  const fetchSite = useCallback(() => api.site(Number(id), model), [id, model]);
   const { data, error } = usePolling(fetchSite, 30_000);
 
   if (error?.startsWith("404")) {
@@ -48,15 +51,25 @@ export function SiteView({ id }: { id: string }) {
   if (!data) {
     return error ? <ErrorBanner message={error} /> : <p className="text-sm text-muted">Loading site…</p>;
   }
-  return <SiteDetailView detail={data} error={error} />;
+  return <SiteDetailView detail={data} error={error} model={model} onModelChange={setModel} />;
 }
 
-function SiteDetailView({ detail, error }: { detail: SiteDetail; error: string | null }) {
+function SiteDetailView({
+  detail,
+  error,
+  model,
+  onModelChange,
+}: {
+  detail: SiteDetail;
+  error: string | null;
+  model: Scorer;
+  onModelChange: (next: Scorer) => void;
+}) {
   const { site, conditions, last_24h: last24, forecast, alerts, reports, risk_history: history } = detail;
   const tz = site.timezone;
   const lightning = alerts.find((a) => a.type === "lightning" && a.all_clear_at);
   const factors = site.risk?.factors ?? [];
-  const maxContribution = Math.max(1, ...factors.map((f) => f.contribution));
+  const topAction = factors.find((f) => f.action)?.action ?? null;
   const now = useNow();
 
   return (
@@ -75,6 +88,7 @@ function SiteDetailView({ detail, error }: { detail: SiteDetail; error: string |
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <ModelSwitch value={model} onChange={onModelChange} />
             <LiveIndicator label={`Local time ${siteTime(new Date(now).toISOString(), tz)}`} />
             <ScoreChip score={site.risk?.score ?? null} level={site.risk?.level ?? null} size="lg" />
           </div>
@@ -93,26 +107,40 @@ function SiteDetailView({ detail, error }: { detail: SiteDetail; error: string |
           />
           <div className="px-5 pb-5">
             <RiskGauge score={site.risk?.score ?? null} level={site.risk?.level ?? null} />
-            <h3 className="mt-5 text-xs font-medium text-muted">What&apos;s driving the score</h3>
+            {topAction && (
+              <div className="mt-4 flex gap-2.5 rounded-lg border border-line bg-raised px-3.5 py-3 text-sm">
+                <ClipboardCheck className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
+                <div>
+                  <p className="text-xs text-muted">Recommended action</p>
+                  <p className="text-ink">{topAction}</p>
+                </div>
+              </div>
+            )}
+            <h3 className="mt-5 text-xs font-medium text-muted">
+              {model === "rules"
+                ? "What's driving the score (each hazard out of 10)"
+                : "What's driving the score (share of the model's score)"}
+            </h3>
             {factors.length === 0 ? (
               <p className="mt-2 text-sm text-ink-2">Nothing notable right now.</p>
             ) : (
               <ul className="mt-2 divide-y divide-line">
                 {factors.map((f) => (
                   <li key={f.key} className="py-2.5">
-                    <div className="flex items-center justify-between gap-3 text-sm">
+                    <div className="flex items-start justify-between gap-3 text-sm">
                       <span className="text-ink">{f.label}</span>
-                      <span className="tabular text-ink-2">+{f.contribution.toFixed(1)}</span>
+                      <span className="tabular shrink-0 text-ink-2">{f.contribution.toFixed(1)}</span>
                     </div>
                     <div className="mt-1.5 h-1.5 rounded-full bg-accent-soft">
                       <div
                         className="h-1.5 rounded-full"
                         style={{
-                          width: `${(f.contribution / maxContribution) * 100}%`,
-                          background: site.risk ? RISK_COLORS[site.risk.level] : "#6e7bff",
+                          width: `${Math.min(100, f.contribution * 10)}%`,
+                          background: RISK_COLORS[levelFor(f.contribution)],
                         }}
                       />
                     </div>
+                    {f.action && <p className="mt-1.5 text-xs text-muted">{f.action}</p>}
                   </li>
                 ))}
               </ul>

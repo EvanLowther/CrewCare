@@ -49,6 +49,7 @@ Tick items in the PR that finishes them.
 - [x] Start Storm Events + Open-Meteo history downloads
 - [x] Open-Meteo + NWS polling worker
 - [x] `rules-v1` scoring job
+- [x] rules-v2: hazards on one 0-10 scale from OSHA/NWS work rules, with recommended actions
 - [ ] Lightning rule + countdown + replay
 - [x] Training set + XGBoost
 - [ ] USGS flood rule

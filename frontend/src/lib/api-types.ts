@@ -493,7 +493,7 @@ export interface components {
             factors: components["schemas"]["RiskFactor"][];
             /**
              * Model Version
-             * @example rules-v1
+             * @example rules-v2+xgb-2026-10-17
              */
             model_version: string;
             /**
@@ -511,15 +511,21 @@ export interface components {
             key: string;
             /**
              * Label
-             * @example Heat index 112°F
+             * @example Heat index 108°F · OSHA high risk
              */
             label: string;
             /**
              * Contribution
-             * @description Points this factor adds to the 0-10 score
-             * @example 2.4
+             * @description This hazard's own severity on the 0-10 scale (rules-v2); the worst one sets the score
+             * @example 6
              */
             contribution: number;
+            /**
+             * Action
+             * @description What a supervisor should do about it, from the work rule behind the threshold
+             * @example Limit exertion; enforce work/rest cycles; watch crews at all times
+             */
+            action?: string | null;
         };
         /** RiskPoint */
         RiskPoint: {
@@ -653,7 +659,7 @@ export interface operations {
     list_sites_api_sites_get: {
         parameters: {
             query?: {
-                /** @description Whose risk scores: 'ml' (XGBoost) or 'rules' (rules-v1). Default: ml. */
+                /** @description Whose risk scores: 'ml' (XGBoost, Predictive) or 'rules' (rules-v2, Real-time). Default: ml. */
                 model?: ("ml" | "rules") | null;
             };
             header?: never;
@@ -685,7 +691,7 @@ export interface operations {
     get_site_api_sites__site_id__get: {
         parameters: {
             query?: {
-                /** @description Whose risk scores: 'ml' (XGBoost) or 'rules' (rules-v1). Default: ml. */
+                /** @description Whose risk scores: 'ml' (XGBoost, Predictive) or 'rules' (rules-v2, Real-time). Default: ml. */
                 model?: ("ml" | "rules") | null;
             };
             header?: never;
