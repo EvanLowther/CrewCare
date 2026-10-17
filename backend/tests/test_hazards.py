@@ -5,6 +5,31 @@ import pytest
 from planit import hazards as H
 
 
+def test_national_nws_events_have_their_own_severity():
+    assert H.nws_event("Freeze Warning", "Severe")[0] == 1.5  # crop frost, not the generic "Severe" 6.0
+    assert H.nws_event("Blizzard Warning", "Severe")[0] == 9.0
+    assert H.nws_event("Extreme Cold Warning", "Severe")[0] == 8.0
+    assert "ice loading" in H.nws_event("Ice Storm Warning")[1]
+
+
+def test_cold_follows_the_wind_chill_chart():
+    assert H.cold(40) is None
+    assert H.cold(20).severity == 2.5 and "cold stress" in H.cold(20).action
+    assert H.cold(0).severity == 5.0
+    assert H.cold(-18).severity == 7.5 and "frostbite in 30 min" in H.cold(-18).label
+    assert H.cold(-40).severity == 10.0
+    assert H.cold(None) is None
+
+
+def test_visibility_dense_fog_at_a_quarter_mile():
+    assert H.visibility(16093) is None  # 10 mi
+    assert H.visibility(1609.344).severity == 2.5 and "Headlights" in H.visibility(1609.344).action
+    quarter = H.visibility(402.336)
+    assert quarter.severity == 6.0 and "crane" in quarter.action and quarter.label == "Visibility 0.25 mi"
+    assert H.visibility(100).severity == 7.5
+    assert H.visibility(None) is None
+
+
 def test_piecewise_interpolates_and_is_flat_beyond_the_ends():
     anchors = [(10, 0.0), (20, 5.0), (30, 6.0)]
     assert H.piecewise(5, anchors) == 0.0
@@ -21,6 +46,17 @@ def test_nws_heat_index_matches_the_published_chart(temp_f, rh, chart):
 def test_nws_heat_index_unknown_inputs():
     assert H.nws_heat_index(None, 50) is None
     assert H.nws_heat_index(90, float("nan")) is None
+
+
+@pytest.mark.parametrize(("temp_f", "wind_mph", "chart"), [(30, 10, 21), (0, 15, -19), (-10, 30, -39), (5, 20, -15)])
+def test_wind_chill_matches_the_nws_chart(temp_f, wind_mph, chart):
+    assert H.wind_chill_f(temp_f, wind_mph) == pytest.approx(chart, abs=1.0)
+
+
+def test_wind_chill_is_the_temperature_when_warm_or_calm():
+    assert H.wind_chill_f(60, 20) == 60.0
+    assert H.wind_chill_f(20, 2) == 20.0
+    assert H.wind_chill_f(None, 10) is None
 
 
 def test_heat_follows_osha_bands_with_115_as_stop_strenuous_work():

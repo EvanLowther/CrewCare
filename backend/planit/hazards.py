@@ -17,7 +17,10 @@ Each hazard's severity is linear between anchors:
     storm potential   CAPE 1000 0 -> 3500 5, x rain chance (max 5)
     wind gusts        <15 mph 0 · 20 2.5 · 28 5 · 40 7.5 · 58 10        OSHA 1926.1431(k)(8) 20 mph personnel
                       lifts; MEWP outdoor rating 28 mph; NWS severe / high-wind criteria 58 mph
-    rain rate         0.1 in/h 1 · 0.3 3 · 1.0 7 · 2.0 9                heavy >=0.3 in/h; flash floods >=1 in/h
+    wind chill        32°F 0 · 20 2.5 · 0 5 · -18 7.5 · -35 10           NWS chart: frostbite in 30 min at -18°F,
+                      in 10 min at -35°F; OSHA cold stress
+    visibility        3 mi 0 · 1 2.5 · 0.5 4 · 0.25 6 · 0.1 7.5           NWS Dense Fog Advisory at <= 1/4 mi
+    rain rate        0.1 in/h 1 · 0.3 3 · 1.0 7 · 2.0 9                heavy >=0.3 in/h; flash floods >=1 in/h
     rain, 24 h        1 in 2 · 3 5 · 5 7.5 · 8 9
     saturated ground  soil 25% 0 · 35% 3 · 45% 6, or 3-day rain 2 in 2.5 · 4 in 5 (max 6)   stuck vehicles;
                       same kind as rain, so it shows up when the ground stays soft after the rain stops
@@ -97,6 +100,17 @@ def nws_heat_index(temp_f: float | None, rh: float | None) -> float | None:
     return round(hi, 1)
 
 
+def wind_chill_f(temp_f: float | None, wind_mph: float | None) -> float | None:
+    """NWS wind chill (°F), defined at or below 50°F with wind of at least 3 mph; otherwise the air temperature.
+    Same formula as features.DAILY_SQL (https://www.weather.gov/safety/cold-wind-chill-chart)."""
+    if temp_f is None or math.isnan(temp_f):
+        return None
+    if wind_mph is None or math.isnan(wind_mph) or temp_f > 50 or wind_mph < 3:
+        return round(float(temp_f), 1)
+    v = wind_mph ** 0.16
+    return round(35.74 + 0.6215 * temp_f - 35.75 * v + 0.4275 * temp_f * v, 1)
+
+
 # (at least °F, label suffix, action), highest first
 HEAT_BANDS = [
     (125, " · NWS extreme danger", "Stop outdoor work; heat stroke is likely"),
@@ -164,6 +178,47 @@ def wind(gust_mph: float | None) -> Hazard | None:
         return None
     _, suffix, action = _band(gust_mph, WIND_BANDS)
     return _hazard("wind", piecewise(gust_mph, WIND_ANCHORS), f"Gusts {round(gust_mph)} mph{suffix}", action)
+
+
+# --- Cold ---------------------------------------------------------------------------------------------------
+
+# Wind chill (°F) -> severity. NWS wind chill chart: frostbite in 30 min at about -18°F, in 10 min at about -35°F.
+COLD_ANCHORS = [(-35, 10.0), (-18, 7.5), (0, 5.0), (20, 2.5), (32, 0.0)]
+
+
+def cold(wind_chill: float | None) -> Hazard | None:
+    if wind_chill is None:
+        return None
+    if wind_chill <= -18:
+        label, action = " · frostbite in 30 min", "Postpone non-essential outdoor work; heated shelter on site"
+    elif wind_chill <= 0:
+        label, action = "", "Limit exposure time; buddy system; cover all skin"
+    elif wind_chill <= 20:
+        label, action = "", "Warm-up breaks and layered PPE; watch for cold stress (OSHA)"
+    else:
+        label, action = "", None
+    return _hazard("cold", piecewise(wind_chill, COLD_ANCHORS), f"Wind chill {round(wind_chill)}°F{label}", action)
+
+
+# --- Visibility ---------------------------------------------------------------------------------------------
+
+METERS_PER_MILE = 1609.344
+# Miles -> severity. NWS issues a Dense Fog Advisory at 1/4 mile or less.
+VISIBILITY_ANCHORS = [(0.1, 7.5), (0.25, 6.0), (0.5, 4.0), (1.0, 2.5), (3.0, 0.0)]
+
+
+def visibility(visibility_m: float | None) -> Hazard | None:
+    if visibility_m is None:
+        return None
+    miles = visibility_m / METERS_PER_MILE
+    if miles <= 0.25:
+        action = "Delay crane lifts and equipment moves until visibility improves; spotters for vehicles"
+    elif miles <= 1:
+        action = "Headlights on; slow equipment moves"
+    else:
+        action = None
+    shown = f"{miles:.2f}" if miles < 1 else f"{miles:.1f}"
+    return _hazard("visibility", piecewise(miles, VISIBILITY_ANCHORS), f"Visibility {shown} mi", action)
 
 
 # --- Rain, flooding, ground ---------------------------------------------------------------------------------
@@ -244,6 +299,32 @@ NWS_EVENTS: dict[str, tuple[float, str]] = {
     "red flag warning": (4.0, "No hot work or open flames; keep extinguishers ready"),
     "dense fog advisory": (3.0, "Delay equipment moves until visibility improves"),
     "fire weather watch": (2.5, "Limit hot work"),
+    # National: winter, cold, dust and smoke, coastal and geologic hazards Florida never sees.
+    "tsunami warning": (10.0, "Move crews to high ground inland immediately"),
+    "blizzard warning": (9.0, "Stop outdoor work and travel; whiteout and drifting snow"),
+    "ice storm warning": (9.0, "Stop work under lines and trees (ice loading); no travel on untreated roads"),
+    "extreme cold warning": (8.0, "Postpone non-essential outdoor work; frostbite in minutes"),
+    "wind chill warning": (8.0, "Postpone non-essential outdoor work; frostbite in minutes"),
+    "dust storm warning": (8.0, "Stop equipment moves and driving; shelter until visibility returns"),
+    "winter storm warning": (7.5, "Postpone mobilization; plan for blocked access roads and downed lines"),
+    "lake effect snow warning": (7.5, "Postpone mobilization; whiteout bands can hit suddenly"),
+    "avalanche warning": (7.0, "Keep crews out of avalanche terrain and runout zones"),
+    "ashfall warning": (7.0, "Respirators and eye protection; stop equipment that ingests air"),
+    "coastal flood warning": (6.0, "Move equipment off low coastal ground; avoid flooded roads"),
+    "lakeshore flood warning": (6.0, "Move equipment off low shoreline ground; avoid flooded roads"),
+    "winter storm watch": (4.5, "Prepare for snow and ice: chains, de-icer, warm shelter"),
+    "winter weather advisory": (4.5, "Slow down on access roads; ice cleats for walking surfaces"),
+    "cold weather advisory": (4.5, "Warm-up breaks and layered PPE; watch for cold stress"),
+    "wind chill advisory": (4.5, "Warm-up breaks and layered PPE; watch for cold stress"),
+    "extreme cold watch": (4.0, "Plan short exposures and heated shelter"),
+    "dense smoke advisory": (4.0, "N95 respirators for outdoor work; slow equipment moves"),
+    "blowing dust advisory": (4.0, "Slow equipment moves; eye protection"),
+    "air quality alert": (3.5, "Limit strenuous outdoor work; N95s for sensitive workers"),
+    "coastal flood advisory": (3.0, "Expect water on low coastal roads at high tide"),
+    "lakeshore flood advisory": (3.0, "Expect water on low shoreline roads"),
+    "hard freeze warning": (2.0, "Protect water lines and equipment; watch for ice on surfaces"),
+    "freeze warning": (1.5, "Watch for frost on walking and work surfaces"),
+    "frost advisory": (1.0, "Watch for frost on walking and work surfaces"),
 }
 NWS_SEVERITY_FALLBACK = {"Extreme": 8.0, "Severe": 6.0, "Moderate": 4.0, "Minor": 2.0}
 OTHER_ALERT_SEVERITY = {"danger": 8.0, "warning": 5.0, "info": 2.0}  # crew reports, future USGS rule, ...
@@ -289,6 +370,7 @@ KINDS = {
     "lightning": "storm", "thunderstorm": "storm", "alert_storm": "storm",
     # Wet ground comes from the same rain, so it only matters when it's worse than the rain itself (days after).
     "downpour": "water", "rain_24h": "water", "alert_flood": "water", "soil_moisture": "water",
+    "cold": "cold", "visibility": "visibility",
 }
 
 

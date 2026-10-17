@@ -1,0 +1,61 @@
+{
+  "version": "xgb-2026-10-17-us",
+  "trained_at": "2026-10-17T20:57:10+00:00",
+  "features": [
+    "max_heat_index_f",
+    "total_precip_in",
+    "precip_prev_3d_in",
+    "avg_soil_moisture",
+    "max_gust_mph",
+    "max_hourly_precip_in",
+    "month",
+    "min_temp_f",
+    "min_wind_chill_f",
+    "total_snowfall_in",
+    "max_snow_depth_ft",
+    "min_humidity_pct",
+    "latitude",
+    "longitude"
+  ],
+  "base_rate": 0.05115,
+  "rows": 138860,
+  "days": [
+    "2023-01-01",
+    "2025-12-31"
+  ],
+  "params": {
+    "n_estimators": 300,
+    "max_depth": 4,
+    "learning_rate": 0.05,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "min_child_weight": 5,
+    "eval_metric": "aucpr"
+  },
+  "test_metrics": {
+    "test_rows": 58400,
+    "test_hazard_rate": 0.0503,
+    "roc_auc": 0.883,
+    "pr_auc": 0.313,
+    "pr_auc_baseline": 0.05,
+    "brier": 0.04,
+    "brier_baseline": 0.0478,
+    "hazard_rate_top_10pct": 0.274
+  },
+  "importance": {
+    "max_heat_index_f": 0.0618,
+    "total_precip_in": 0.1829,
+    "precip_prev_3d_in": 0.0232,
+    "avg_soil_moisture": 0.019,
+    "max_gust_mph": 0.0595,
+    "max_hourly_precip_in": 0.3158,
+    "month": 0.0418,
+    "min_temp_f": 0.0387,
+    "min_wind_chill_f": 0.0604,
+    "total_snowfall_in": 0.0788,
+    "max_snow_depth_ft": 0.015,
+    "min_humidity_pct": 0.0183,
+    "latitude": 0.0534,
+    "longitude": 0.0312
+  }
+}

@@ -16,15 +16,17 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from planit.ml import score
 from planit.worker import jobs
 from planit.worker.briefing import generate
-from planit.worker.ingest import nws, open_meteo, usgs
+from planit.worker.ingest import nws, nws_weather, open_meteo, usgs
 from planit.worker.rules import flood, lightning
 
 log = logging.getLogger("planit.worker")
 
 # name -> (function, seconds between runs). Enable a job by implementing its function.
 JOBS = {
-    "open_meteo": (open_meteo.poll, 1800),  # free-tier budget: 60 sites x 48 polls/day ~ 2,900 calls
-    "nws": (nws.poll, 300),
+    # Soil moisture, CAPE and the ML model's inputs: 160 sites x 8 polls/day x 1.4 ~ 1,800 of the 10,000 free calls
+    "open_meteo": (open_meteo.poll, 10800),
+    "nws_weather": (nws_weather.poll, 1800),  # Real-time weather: NWS forecast + station observations, no daily cap
+    "nws": (nws.poll, 120),  # one national alerts request
     "usgs": (usgs.poll, 900),
     "lightning": (lightning.evaluate, 15),
     "flood": (flood.evaluate, 900),

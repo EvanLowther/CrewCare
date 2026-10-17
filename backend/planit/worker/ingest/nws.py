@@ -1,6 +1,10 @@
 """Owner: Person A. Active NWS alerts per site -> `nws_alerts`, mirrored into app `alerts`.
 
-API: https://api.weather.gov/alerts/active?point={lat},{lon} (a User-Agent header is required).
+API: https://api.weather.gov/alerts/active (a User-Agent header is required). One national request per poll,
+matched to sites by the alert's polygon when it has one (warnings drawn around a storm), otherwise by the site's
+forecast zone or county zone (sites.nws_zone / nws_county_zone, set by nws_weather.link_sites()). Sites without
+zones yet fall back to one ?point= request each.
+
 App alerts made here carry meta.source = 'nws' and dedupe_key = the NWS alert id. They clear when
 NWS stops listing them, but only for sites whose request succeeded this round, so a network blip
 never clears a real warning. Cancellations, tests and marine/beach products (irrelevant to crews on
@@ -73,6 +77,31 @@ def short_message(description: str | None, instruction: str | None) -> str:
     return text or "See NWS for details."
 
 
+def _in_ring(lon: float, lat: float, ring: list) -> bool:
+    """Ray casting: is the point inside this polygon ring of [lon, lat] pairs?"""
+    inside = False
+    for (x1, y1), (x2, y2) in zip(ring, ring[1:] + ring[:1], strict=True):
+        if (y1 > lat) != (y2 > lat) and lon < x1 + (lat - y1) * (x2 - x1) / (y2 - y1):
+            inside = not inside
+    return inside
+
+
+def in_geometry(lon: float, lat: float, geometry: dict) -> bool:
+    """Point in a GeoJSON Polygon or MultiPolygon (holes respected)."""
+    polygons = [geometry["coordinates"]] if geometry["type"] == "Polygon" else geometry["coordinates"]
+    return any(_in_ring(lon, lat, rings[0]) and not any(_in_ring(lon, lat, hole) for hole in rings[1:])
+               for rings in polygons)
+
+
+def affects(site: dict, feature: dict) -> bool:
+    """Does this alert cover the site? Its polygon if it has one, else its zones (UGC codes)."""
+    geometry = feature.get("geometry")
+    if geometry and geometry.get("type") in ("Polygon", "MultiPolygon"):
+        return in_geometry(site["longitude"], site["latitude"], geometry)
+    zones = set((feature["properties"].get("geocode") or {}).get("UGC") or [])
+    return bool(zones & {site.get("nws_zone"), site.get("nws_county_zone")} - {None})
+
+
 def _ts(value: str | None) -> datetime | None:
     return datetime.fromisoformat(value) if value else None
 
@@ -128,12 +157,24 @@ WHERE status = 'active' AND meta->>'source' = 'nws' AND site_id = %s AND NOT (de
 def poll() -> int:
     """Fetch active alerts for every site; returns the number of active NWS alerts matched to sites."""
     with connection() as conn:
-        sites = conn.execute("SELECT id, latitude, longitude FROM sites ORDER BY id").fetchall()
+        sites = conn.execute("SELECT id, latitude, longitude, nws_zone, nws_county_zone FROM sites ORDER BY id"
+                             ).fetchall()
+    zoned = [s for s in sites if s["nws_zone"] or s["nws_county_zone"]]
+    unzoned = [s for s in sites if not (s["nws_zone"] or s["nws_county_zone"])]
 
     per_site: dict[int, list[dict]] = {}
     headers = {"User-Agent": settings.nws_user_agent, "Accept": "application/geo+json"}
-    with httpx.Client(headers=headers, timeout=30) as client:
-        for site in sites:
+    with httpx.Client(headers=headers, timeout=60) as client:
+        if zoned:
+            try:
+                resp = client.get(ALERTS_URL, params={"status": "actual"})
+                resp.raise_for_status()
+                features = resp.json().get("features", [])
+                for site in zoned:
+                    per_site[site["id"]] = [f for f in features if affects(site, f)]
+            except httpx.HTTPError as exc:
+                log.warning("NWS national alerts request failed: %s", exc)
+        for site in unzoned:
             try:
                 resp = client.get(ALERTS_URL, params={"point": f"{site['latitude']:.4f},{site['longitude']:.4f}"})
                 resp.raise_for_status()

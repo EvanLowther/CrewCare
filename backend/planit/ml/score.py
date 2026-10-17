@@ -3,9 +3,11 @@
 Every run writes two scorers side by side, so the dashboard's Real-time / Predictive switch can show either:
 
 - scorer 'rules' (Real-time), rules-v2 (planit/hazards.py): every hazard on one 0-10 scale anchored to published
-  work rules (the NWS heat index on OSHA's bands, lightning, forecast thunderstorms and storm energy, wind gusts
-  against lift limits, rain rate, 24 h rain, saturated ground, NWS alerts by event). The site score is the worst
-  kind of hazard plus a little for other serious ones; each factor carries a recommended action.
+  work rules (the NWS heat index on OSHA's bands, wind chill, visibility, lightning, forecast thunderstorms and
+  storm energy, wind gusts against lift limits, rain rate, 24 h rain, saturated ground, NWS alerts by event). The
+  site score is the worst kind of hazard plus a little for other serious ones; each factor carries a recommended
+  action. Its weather is the NWS forecast and station observations (`nws_weather`, every 30 min) laid over
+  Open-Meteo (merge_weather()), which still supplies soil moisture, CAPE and hourly rain.
 - scorer 'ml' (Predictive), with a trained model in ml/models/ and PLANIT_SCORE_MODEL=xgb (the default): the XGBoost
   model scores each hour on the 24 hours around it (the "day" it learned from), with the OSHA heat floor from
   ml/model.py, plus alert points and the lightning floor (combine()).
@@ -37,6 +39,7 @@ FORECAST_HOURS = 24
 RULES_HISTORY = timedelta(hours=72)  # rain in the last 3 days, for saturated ground
 ML_HALF_WINDOW = timedelta(hours=12)  # each hour is scored on the 24 h around it
 ML_RAIN_HISTORY = timedelta(days=3)  # precip_prev_3d_in: the 3 days before that window
+NO_SNOW_ABOVE_F = 34.0  # same as features.NO_SNOW_ABOVE_F (features needs pandas; this module mustn't)
 
 # ML scorer only: alert points on top of the model's weather score (see combine()).
 LIGHTNING_FLOOR = 8.0
@@ -67,6 +70,8 @@ class HourInputs:
     cape_jkg: float | None = None
     precip_prob_pct: float | None = None
     weather_code: int | None = None
+    wind_chill_f: float | None = None
+    visibility_m: float | None = None
     is_forecast: bool = False
     alerts: list[dict] = field(default_factory=list)  # see alerts_at()
 
@@ -74,6 +79,8 @@ class HourInputs:
 def rule_hazards(x: HourInputs) -> list[hazards.Hazard | None]:
     return [
         hazards.heat(x.heat_index_f),
+        hazards.cold(x.wind_chill_f),
+        hazards.visibility(x.visibility_m),
         hazards.thunderstorm(x.weather_code, x.is_forecast) or hazards.storm_potential(x.cape_jkg, x.precip_prob_pct),
         hazards.wind(x.gust_mph),
         hazards.rain_rate(x.rain_1h_in),
@@ -120,6 +127,32 @@ def _total(rows: list[dict], key: str) -> float | None:
     return sum(values) if values else None
 
 
+# NWS values that replace Open-Meteo's for the same hour in rules-v2. Rain stays Open-Meteo's when it has the hour:
+# NWS gives 6-hour totals, which would smear a 1 in/h downpour into a drizzle.
+NWS_OVERRIDES = ("temp_f", "humidity_pct", "wind_mph", "gust_mph", "precip_prob_pct", "weather_code",
+                 "wind_chill_f", "visibility_m")
+WEATHER_KEYS = ("temp_f", "humidity_pct", "heat_index_f", "precip_in", "precip_prob_pct", "soil_moisture",
+                "wind_mph", "gust_mph", "cape_jkg", "weather_code", "wind_chill_f", "visibility_m")
+
+
+def merge_weather(open_meteo: list[dict], nws: list[dict]) -> list[dict]:
+    """rules-v2 weather for one site: Open-Meteo rows with NWS readings laid over them hour by hour (an NWS value
+    wins when it isn't null). Hours only NWS has take its rain and Open-Meteo's latest soil moisture before them."""
+    by_ts = {w["ts"]: {k: w.get(k) for k in WEATHER_KEYS} | {"ts": w["ts"]} for w in open_meteo}
+    for n in nws:
+        row = by_ts.setdefault(n["ts"], dict.fromkeys(WEATHER_KEYS) | {"ts": n["ts"]})
+        for key in NWS_OVERRIDES:
+            if n.get(key) is not None:
+                row[key] = n[key]
+        if row["precip_in"] is None:
+            row["precip_in"] = n.get("precip_in")
+    rows = sorted(by_ts.values(), key=lambda r: r["ts"])
+    soil = None
+    for r in rows:
+        soil = r["soil_moisture"] = r["soil_moisture"] if r["soil_moisture"] is not None else soil
+    return rows
+
+
 def build_inputs(weather: list[dict], alerts: list[dict], hours: list[datetime]) -> dict[datetime, HourInputs]:
     """Per-hour rules-v2 inputs for one site. `weather` rows are observed up to now and forecast after; hours[0]
     is now."""
@@ -139,6 +172,9 @@ def build_inputs(weather: list[dict], alerts: list[dict], hours: list[datetime])
             rain_72h_in=_total([w for w in weather if hour - RULES_HISTORY < w["ts"] <= hour], "precip_in"),
             soil_moisture=row["soil_moisture"], gust_mph=row["gust_mph"], cape_jkg=row["cape_jkg"],
             precip_prob_pct=row["precip_prob_pct"], weather_code=row["weather_code"],
+            wind_chill_f=(row["wind_chill_f"] if row.get("wind_chill_f") is not None
+                          else hazards.wind_chill_f(row["temp_f"], row.get("wind_mph"))),
+            visibility_m=row.get("visibility_m"),
             is_forecast=hour > hours[0], alerts=alerts_at(alerts, hour),
         )
     return out
@@ -166,18 +202,24 @@ def combine(weather_score: float, weather_factors: list[dict], alerts: list[dict
     return round(score, 1), factors[:3]
 
 
-def window_features(weather: list[dict], hour: datetime) -> dict | None:
-    """The ML model's features for one site-hour, from the 24 h around it (same columns as features.FEATURES)."""
+def window_features(weather: list[dict], hour: datetime, site: dict | None = None) -> dict | None:
+    """The ML model's features for one site-hour, from the 24 h around it (same columns as features.FEATURES).
+    `site` gives latitude and longitude."""
     start, end = hour - ML_HALF_WINDOW, hour + ML_HALF_WINDOW
     window = [w for w in weather if start <= w["ts"] < end]
     if not window:
         return None
 
     def values(key: str, rows: list[dict]) -> list[float]:
-        return [r[key] for r in rows if r[key] is not None]
+        return [r[key] for r in rows if r.get(key) is not None]
 
     heat, rain, soil, gust = (values(k, window) for k in ("heat_index_f", "precip_in", "soil_moisture", "gust_mph"))
+    temps, snow, depth, humidity = (values(k, window) for k in ("temp_f", "snowfall_in", "snow_depth_ft",
+                                                                "humidity_pct"))
+    chills = [c for w in window if (c := hazards.wind_chill_f(w.get("temp_f"), w.get("wind_mph"))) is not None]
     before = values("precip_in", [w for w in weather if start - ML_RAIN_HISTORY <= w["ts"] < start])
+    min_temp = min(temps, default=None)
+    no_snow = 0.0 if min_temp is not None and min_temp > NO_SNOW_ABOVE_F else None  # as features.add_features()
     return {
         "max_heat_index_f": max(heat, default=None),
         "total_precip_in": sum(rain) if rain else None,
@@ -186,6 +228,13 @@ def window_features(weather: list[dict], hour: datetime) -> dict | None:
         "max_gust_mph": max(gust, default=None),
         "max_hourly_precip_in": max(rain, default=None),
         "month": hour.month,
+        "min_temp_f": min_temp,
+        "min_wind_chill_f": min(chills, default=None),
+        "total_snowfall_in": sum(snow) if snow else no_snow,
+        "max_snow_depth_ft": max(depth) if depth else no_snow,
+        "min_humidity_pct": min(humidity, default=None),
+        "latitude": site["latitude"] if site else None,
+        "longitude": site["longitude"] if site else None,
     }
 
 
@@ -203,11 +252,12 @@ def ml_model():
         return None
 
 
-def ml_scores(model, weather: list[dict], alerts: list[dict], hours: list[datetime]) -> dict[datetime, tuple]:
+def ml_scores(model, weather: list[dict], alerts: list[dict], hours: list[datetime],
+              site: dict | None = None) -> dict[datetime, tuple]:
     """(score, factors) per hour from the ML model, plus alert points and the lightning floor."""
     import pandas as pd
 
-    rows = [(hour, f) for hour in hours if (f := window_features(weather, hour)) is not None]
+    rows = [(hour, f) for hour in hours if (f := window_features(weather, hour, site)) is not None]
     if not rows:
         return {}
     frame = pd.DataFrame([f for _, f in rows], columns=model.features).astype(float)
@@ -251,9 +301,17 @@ def compute_scores() -> list[dict]:
     with connection() as conn:
         weather = conn.execute(
             "SELECT site_id, ts, temp_f, humidity_pct, heat_index_f, precip_in, precip_prob_pct, soil_moisture, "
-            "gust_mph, cape_jkg, weather_code FROM weather WHERE ts > %s AND ts <= %s "
+            "wind_mph, gust_mph, cape_jkg, weather_code, snowfall_in, snow_depth_ft FROM weather "
+            "WHERE ts > %s AND ts <= %s "
             "AND ((NOT is_forecast AND ts <= %s) OR (is_forecast AND ts > %s)) ORDER BY site_id, ts",
             (first, last, now, now),
+        ).fetchall()
+        sites = {s["id"]: s for s in conn.execute("SELECT id, latitude, longitude FROM sites").fetchall()}
+        nws = conn.execute(
+            "SELECT site_id, ts, temp_f, humidity_pct, precip_in, precip_prob_pct, wind_mph, gust_mph, weather_code, "
+            "wind_chill_f, visibility_m FROM nws_weather WHERE ts > %s AND ts <= %s "
+            "AND ((NOT is_forecast AND ts <= %s) OR (is_forecast AND ts > %s)) ORDER BY site_id, ts",
+            (current - RULES_HISTORY, hours[-1], now, now),
         ).fetchall()
         alerts = conn.execute(
             "SELECT site_id, type, severity, title, all_clear_at, meta FROM alerts WHERE status = 'active'"
@@ -262,17 +320,23 @@ def compute_scores() -> list[dict]:
     weather_by_site: dict[int, list[dict]] = defaultdict(list)
     for w in weather:
         weather_by_site[w["site_id"]].append(w)
+    nws_by_site: dict[int, list[dict]] = defaultdict(list)
+    for n in nws:
+        nws_by_site[n["site_id"]].append(n)
     alerts_by_site: dict[int, list[dict]] = defaultdict(list)
     for a in alerts:
         alerts_by_site[a["site_id"]].append(a)
 
     rows = []
-    for site_id, site_weather in weather_by_site.items():
-        site_alerts = alerts_by_site[site_id]
+    for site_id in weather_by_site.keys() | nws_by_site.keys():
+        site_weather, site_alerts = weather_by_site[site_id], alerts_by_site[site_id]
+        # Real-time: NWS readings over Open-Meteo. Predictive: Open-Meteo only, the source the model was trained on.
+        rules_weather = merge_weather(site_weather, nws_by_site[site_id])
         scorers = [("rules", MODEL_VERSION,
-                    {h: score_hour(x) for h, x in build_inputs(site_weather, site_alerts, hours).items()})]
+                    {h: score_hour(x) for h, x in build_inputs(rules_weather, site_alerts, hours).items()})]
         if model:
-            scorers.append(("ml", model.version, ml_scores(model, site_weather, site_alerts, hours)))
+            scorers.append(("ml", model.version, ml_scores(model, site_weather, site_alerts, hours,
+                                                           sites.get(site_id))))
         for scorer, version, scored in scorers:
             for hour, (score, factors) in scored.items():
                 rows.append({"site_id": site_id, "ts": hour, "kind": "current" if hour == current else "forecast",

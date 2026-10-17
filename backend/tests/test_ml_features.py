@@ -4,16 +4,18 @@ import pandas as pd
 
 from planit.ml.features import add_features, label_days, normalize_county
 
-SITE = {"id": 1, "county": "Miami Dade", "latitude": 25.44, "longitude": -80.33}  # Turkey Point
+SITE = {"id": 1, "state": "FL", "county": "Miami Dade", "latitude": 25.44, "longitude": -80.33}  # Turkey Point
 
 
-def event(event_type="Thunderstorm Wind", begin="2024-06-01 18:00", end=None, cz="MONROE", lat=None, lon=None):
+def event(event_type="Thunderstorm Wind", begin="2024-06-01 18:00", end=None, cz="MONROE", lat=None, lon=None,
+          state="FLORIDA"):
     return {"event_type": event_type, "begin_ts": pd.Timestamp(begin, tz="UTC"),
-            "end_ts": pd.Timestamp(end, tz="UTC") if end else None, "cz_name": cz, "latitude": lat, "longitude": lon}
+            "end_ts": pd.Timestamp(end, tz="UTC") if end else None, "state": state, "cz_name": cz,
+            "latitude": lat, "longitude": lon}
 
 
-def labelled(*events):
-    out = label_days(pd.DataFrame([SITE]), pd.DataFrame(list(events)))
+def labelled(*events, site=SITE):
+    out = label_days(pd.DataFrame([site]), pd.DataFrame(list(events)))
     return [d.strftime("%Y-%m-%d") for d in out["day"]]
 
 
@@ -67,3 +69,20 @@ def test_multi_day_event_labels_at_most_three_days():
 
 def test_duplicate_events_give_one_label():
     assert labelled(event(lat=25.5, lon=-80.4), event("Hail", cz="MIAMI-DADE")) == ["2024-06-01"]
+
+
+def test_same_county_name_in_another_state_does_not_label():
+    brownlee = {"id": 2, "state": "ID", "county": "Washington", "latitude": 44.84, "longitude": -116.9}
+    assert labelled(event("Winter Storm", cz="WASHINGTON", state="ALABAMA"), site=brownlee) == []
+    assert labelled(event("Winter Storm", cz="WASHINGTON", state="IDAHO"), site=brownlee) == ["2024-06-01"]
+
+
+def test_add_features_treats_missing_snow_on_warm_days_as_none():
+    daily = pd.DataFrame({
+        "site_id": [1, 1], "day": pd.date_range("2023-07-01", periods=2, freq="D", tz="UTC"),
+        "total_precip_in": [0.0, 0.0], "min_temp_f": [75.0, 20.0],
+        "total_snowfall_in": [None, None], "max_snow_depth_ft": [None, None],
+    })
+    out = add_features(daily)
+    assert out["total_snowfall_in"].iloc[0] == 0.0 and out["max_snow_depth_ft"].iloc[0] == 0.0
+    assert pd.isna(out["total_snowfall_in"].iloc[1])  # a freezing day without data stays unknown

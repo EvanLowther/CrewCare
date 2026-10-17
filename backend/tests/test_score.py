@@ -4,7 +4,34 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from planit.ml.score import HourInputs, build_inputs, level_for, score_hour
+from planit.ml.score import HourInputs, build_inputs, level_for, merge_weather, score_hour
+
+T0 = datetime(2026, 1, 15, 12, tzinfo=UTC)
+
+
+def test_merge_weather_prefers_nws_readings_but_keeps_open_meteo_rain_and_soil():
+    om = [{"ts": T0, "temp_f": 30.0, "humidity_pct": 70, "precip_in": 0.8, "soil_moisture": 0.4, "gust_mph": 10,
+           "cape_jkg": 0, "precip_prob_pct": 20, "weather_code": 3, "wind_mph": 5}]
+    nws = [{"ts": T0, "temp_f": 5.0, "gust_mph": 35.0, "precip_in": 0.1, "visibility_m": None, "weather_code": None},
+           {"ts": T0 + timedelta(hours=1), "temp_f": 4.0, "precip_in": 0.05, "wind_chill_f": -20.0}]
+    first, second = merge_weather(om, nws)
+    assert first["temp_f"] == 5.0 and first["gust_mph"] == 35.0  # NWS wins
+    assert first["precip_in"] == 0.8 and first["weather_code"] == 3  # Open-Meteo kept where NWS has nothing better
+    assert second["ts"] == T0 + timedelta(hours=1) and second["precip_in"] == 0.05  # NWS-only hour
+    assert second["soil_moisture"] == 0.4 and second["wind_chill_f"] == -20.0
+
+
+def test_bitter_wind_chill_and_dense_fog_score():
+    assert score_hour(HourInputs(wind_chill_f=-25))[0] >= 7.5
+    score, factors = score_hour(HourInputs(visibility_m=300))
+    assert score >= 6 and factors[0]["key"] == "visibility"
+
+
+def test_build_inputs_computes_wind_chill_when_nws_has_none():
+    rows = [{"ts": T0, "temp_f": 0.0, "humidity_pct": 60, "precip_in": 0, "soil_moisture": None, "gust_mph": 20,
+             "cape_jkg": None, "precip_prob_pct": None, "weather_code": None, "wind_mph": 15}]
+    x = build_inputs(rows, [], [T0])[T0]
+    assert x.wind_chill_f == pytest.approx(-19, abs=1)  # NWS chart: 0°F with 15 mph
 
 
 def nws(event: str, alert_type: str = "nws", severity: str = "warning") -> dict:

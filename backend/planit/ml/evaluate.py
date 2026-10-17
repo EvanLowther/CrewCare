@@ -2,8 +2,9 @@
 
     python -m planit.ml.evaluate
 
-Leave-one-year-out over 2023-2025: each year is scored by a model trained on the other two, so every number is
-out of sample. For each year the model is compared with rules-v2 run on the same daily weather, on what the
+Leave-one-year-out over 2023-2025 (2023 is Florida only; every state from 2024): each year is scored by a model
+trained on the other two, so every number is out of sample. Results are also split by region. For each year the
+model is compared with rules-v2 run on the same daily weather, on what the
 dashboard shows: how often "high"/"extreme" days were real hazard days (precision), how many real hazard days
 were flagged high or above (recall), recall per hazard group, calibration, and named case studies. Finally it
 compares live forecast weather with observed weather for the same days (train/serve skew).
@@ -24,6 +25,7 @@ from planit.ml.features import FEATURES, build_frame, label_days, load_inputs, u
 from planit.ml.model import heat_floor, score_from_probability
 from planit.ml.score import HourInputs, level_for, score_hour
 from planit.ml.train import fit
+from planit.states import REGION_OF
 
 LEVELS = ["low", "moderate", "high", "extreme"]
 SCORERS = ["model", "model_heat", "rules"]  # ML alone, ML + OSHA heat floor (Predictive), rules-v2 (Real-time)
@@ -35,6 +37,9 @@ HAZARD_GROUPS = {
     "heat": {"Excessive Heat", "Heat"},
     "tropical": {"Tropical Storm", "Tropical Depression", "Hurricane (Typhoon)", "Storm Surge/Tide"},
     "wind": {"Strong Wind", "High Wind"},
+    "cold": {"Extreme Cold/Wind Chill", "Cold/Wind Chill"},
+    "winter": {"Winter Storm", "Winter Weather", "Heavy Snow", "Blizzard", "Ice Storm", "Lake-Effect Snow", "Sleet"},
+    "fire_dust": {"Wildfire", "Dust Storm"},
 }
 
 # (name, site id, UTC day, expectation): "high" = scores >= 5, "low" = scores < 2.5
@@ -44,6 +49,10 @@ CASES = [
     ("Hurricane Helene, Crystal River", 628, "2024-09-26", "high"),
     ("Hurricane Milton landfall, Bayside (Tampa)", 7873, "2024-10-09", "high"),
     ("Calm January day, Bayside (Tampa)", 7873, "2024-01-15", "low"),
+    ("Arctic outbreak, Coal Creek (ND)", 6030, "2024-01-14", "high"),
+    ("Gulf Coast snowstorm, Nine Mile Point (New Orleans)", 1403, "2025-01-21", "high"),
+    ("Hughes Fire, Castaic (CA)", 392, "2025-01-22", "high"),
+    ("Mild spring day, Diablo Canyon (CA)", 6099, "2024-05-01", "low"),
 ]
 
 SKEW_SQL = """
@@ -220,6 +229,15 @@ def main() -> None:
     for name in SCORERS:
         rows.append({"year": "all", "scorer": name, **summary(y_all, scored[name].to_numpy())})
     print("== Summary (flagged = score >= 5, high or extreme)")
+    print(pd.DataFrame(rows).to_string(index=False), "\n")
+
+    region = scored["site_id"].map(dict(zip(sites["id"], sites["state"].map(REGION_OF), strict=True)))
+    rows = []
+    for name_, part in scored.groupby(region):
+        y = part["label"].to_numpy()
+        for name in SCORERS:
+            rows.append({"region": name_, "scorer": name, **summary(y, part[name].to_numpy())})
+    print("== By region (all years)")
     print(pd.DataFrame(rows).to_string(index=False), "\n")
 
     for name in SCORERS:

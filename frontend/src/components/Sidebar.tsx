@@ -176,8 +176,8 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
       <NavLinks onNavigate={onNavigate} />
       <div className="mt-auto space-y-3">
         <div className="rounded-lg border border-line bg-card px-3 py-3 text-xs text-ink-2">
-          <p className="font-medium text-ink">Florida field operations</p>
-          <p className="mt-0.5 text-muted">Weather every 30 min · NWS alerts every 5 min</p>
+          <p className="font-medium text-ink">US field operations</p>
+          <p className="mt-0.5 text-muted">Weather every 30 min · NWS alerts every 2 min</p>
         </div>
         <Link
           href="/report"
