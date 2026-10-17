@@ -6,6 +6,7 @@ from fastapi import APIRouter
 
 from planit.api import mock
 from planit.api.deps import not_built, use_mock
+from planit.auth import AdminUser
 from planit.models import BriefingList, DemoAck
 
 router = APIRouter(prefix="/api/briefings", tags=["briefings"])
@@ -21,8 +22,8 @@ def list_briefings(for_date: date | None = None) -> BriefingList:
 
 
 @router.post("/generate", response_model=DemoAck)
-def generate_now() -> DemoAck:
-    """Demo button: generate tomorrow's briefings immediately instead of waiting for 6 PM."""
+def generate_now(admin: AdminUser) -> DemoAck:
+    """Demo button (admins only): generate tomorrow's briefings immediately instead of waiting for 6 PM."""
     if use_mock():
         return DemoAck(ok=True, message="Mock mode: briefings are always available")
     # TODO (hours 19-21): call planit.worker.briefing.generate.generate_all()

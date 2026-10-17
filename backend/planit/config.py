@@ -23,9 +23,24 @@ class Settings(BaseSettings):
     # "rules" forces rules-v1.
     score_model: str = "xgb"
 
+    # Login (docs/AUTH.md). The API checks Auth0 access tokens issued for this audience.
+    auth0_domain: str | None = None  # e.g. planit-control.us.auth0.com
+    auth0_audience: str | None = None  # the Auth0 API identifier, e.g. https://api.planit-control
+    # Comma-separated emails that are always admin once Auth0 has verified them.
+    admin_emails: str = ""
+    # Laptops and CI only: accept "Authorization: Dev <admin|manager|crew|...>" from the "Sign in as" menu.
+    # Never set on the server.
+    auth_dev: bool = False
+    # Signs photo URLs so <img> tags (which can't send a token) only load photos the viewer may see.
+    photo_signing_key: str = "dev-only-photo-key"
+
     # Hazard rules
     lightning_radius_mi: float = 10.0
     lightning_all_clear_min: int = 30
 
 
 settings = Settings()
+
+
+def admin_email_set() -> set[str]:
+    return {e.strip().lower() for e in settings.admin_emails.split(",") if e.strip()}
