@@ -1,0 +1,40 @@
+[project]
+name = "planit"
+version = "0.1.0"
+description = "PlanIT Control backend: API, data worker, and hazard model"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.8",
+    "pydantic-settings>=2.4",
+    "psycopg[binary,pool]>=3.2",
+    "python-multipart>=0.0.9",
+    "httpx>=0.27",
+    "apscheduler>=3.10,<4",
+    "pillow>=10.4",
+    "google-genai>=1.0",
+]
+
+[project.optional-dependencies]
+ml = ["pandas>=2.2", "numpy>=1.26", "xgboost>=2.1", "scikit-learn>=1.5", "openpyxl>=3.1"]
+dev = ["pytest>=8.3", "ruff>=0.6"]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["planit*"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "B", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+"planit/api/mock.py" = ["E501"]
