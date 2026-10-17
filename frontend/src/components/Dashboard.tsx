@@ -1,73 +1,112 @@
 "use client";
 
+import { Bell, Map as MapIcon, OctagonAlert, Siren, TrendingUp } from "lucide-react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useState } from "react";
 import { api } from "@/lib/api";
-import { RISK_COLORS, RISK_LABELS } from "@/lib/risk";
 import { usePolling } from "@/lib/usePolling";
+import { AlertsFeed } from "./AlertsFeed";
 import { SiteList } from "./SiteList";
+import { Card, CardHeader, ErrorBanner, LiveIndicator, PageHeader, RiskLegend, StatTile } from "./ui";
 
 // Leaflet needs `window`, so the map only renders in the browser.
 const SiteMap = dynamic(() => import("./SiteMap"), {
   ssr: false,
-  loading: () => <div className="flex h-full items-center justify-center text-neutral-400">Loading map…</div>,
+  loading: () => <div className="flex h-full items-center justify-center text-sm text-muted">Loading map…</div>,
 });
 
 const POLL_MS = 10_000;
+const fetchSites = () => api.sites();
+const fetchAlerts = () => api.alerts();
 
 export function Dashboard() {
-  const { data, error } = usePolling(api.sites, POLL_MS);
+  const sitesPoll = usePolling(fetchSites, POLL_MS);
+  const alertsPoll = usePolling(fetchAlerts, POLL_MS);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const sites = data?.sites ?? [];
-  const alerting = sites.filter((s) => s.active_alert_count > 0).length;
+
+  const sites = sitesPoll.data?.sites ?? [];
+  const alerts = alertsPoll.data?.alerts ?? [];
   const anyScored = sites.some((s) => s.risk !== null);
+  const danger = alerts.filter((a) => a.severity === "danger").length;
+  const warning = alerts.filter((a) => a.severity === "warning").length;
+  const stopWork = [...new Map(alerts.filter((a) => a.type === "lightning").map((a) => [a.site_id, a])).values()];
+  const error = sitesPoll.error ?? alertsPoll.error;
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-semibold">Site risk dashboard</h1>
-          <p className="text-sm text-neutral-500">
-            {data
-              ? `${sites.length} sites · ${alerting} with active alerts · updated ${new Date(data.updated_at).toLocaleTimeString()}`
-              : "Loading sites…"}
-          </p>
-        </div>
-        <Legend />
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Site risk dashboard"
+        subtitle={
+          sitesPoll.data
+            ? `${sites.length} Florida sites · updated ${new Date(sitesPoll.data.updated_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+            : "Loading sites…"
+        }
+        actions={<LiveIndicator label="Live · refreshes every 10 s" />}
+      />
+
+      {error && <ErrorBanner message={error} />}
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <StatTile
+          label="Active alerts"
+          icon={Bell}
+          value={alertsPoll.data ? alerts.length : "–"}
+          detail={alertsPoll.data ? `${danger} danger · ${warning} warning · ${alerts.length - danger - warning} info` : " "}
+        />
+        <StatTile
+          label="Stop-work sites"
+          icon={OctagonAlert}
+          tone={stopWork.length ? "danger" : "default"}
+          value={alertsPoll.data ? stopWork.length : "–"}
+          detail={
+            stopWork.length ? (
+              <span className="flex flex-wrap gap-x-2">
+                {stopWork.map((a) => (
+                  <Link key={a.site_id} href={`/sites/${a.site_id}`} className="text-[#ff9b9b] hover:underline">
+                    {a.site_name}
+                  </Link>
+                ))}
+              </span>
+            ) : (
+              "No lightning within 10 miles of any site"
+            )
+          }
+        />
       </div>
 
-      {error && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-          Can&apos;t reach the API ({error}). Is <code>python dev.py api</code> running? Retrying every 10 s.
-        </p>
-      )}
-
-      <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
-        <div className="h-[55vh] overflow-hidden rounded-lg border border-neutral-200 bg-white lg:h-[calc(100vh-11rem)]">
-          <SiteMap sites={sites} selectedId={selectedId} onSelect={setSelectedId} />
-        </div>
-        <aside className="overflow-hidden rounded-lg border border-neutral-200 bg-white lg:h-[calc(100vh-11rem)]">
-          <h2 className="border-b border-neutral-200 px-3 py-2 text-sm font-semibold">
-            {anyScored || !data ? "Highest risk first" : "Largest plants first · no risk scores yet"}
-          </h2>
-          <div className="lg:h-[calc(100%-2.3rem)] lg:overflow-y-auto">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <Card className="flex flex-col overflow-hidden">
+          <CardHeader title="Site map" icon={MapIcon} subtitle="Pins show the 0-10 risk score; pulsing pins have an active alert" actions={<RiskLegend />} />
+          <div className="h-[55vh] min-h-[360px] border-t border-line xl:h-[calc(100vh-24rem)] xl:min-h-[520px]">
+            <SiteMap sites={sites} selectedId={selectedId} onSelect={setSelectedId} />
+          </div>
+        </Card>
+        <Card className="flex flex-col overflow-hidden">
+          <CardHeader
+            title={anyScored || !sitesPoll.data ? "Highest risk first" : "Largest plants first"}
+            icon={TrendingUp}
+            subtitle={anyScored || !sitesPoll.data ? "Current score, updated every 5 minutes" : "No risk scores yet"}
+          />
+          <div className="max-h-[420px] overflow-y-auto border-t border-line xl:h-[calc(100vh-24rem)] xl:max-h-none xl:min-h-[520px]">
             <SiteList sites={sites} selectedId={selectedId} onSelect={setSelectedId} />
           </div>
-        </aside>
+        </Card>
       </div>
-    </div>
-  );
-}
 
-function Legend() {
-  return (
-    <ul className="flex flex-wrap gap-3 text-xs text-neutral-600">
-      {(Object.keys(RISK_COLORS) as (keyof typeof RISK_COLORS)[]).map((level) => (
-        <li key={level} className="flex items-center gap-1.5">
-          <span className="h-3 w-3 rounded-full" style={{ background: RISK_COLORS[level] }} />
-          {RISK_LABELS[level]}
-        </li>
-      ))}
-    </ul>
+      <Card className="overflow-hidden">
+        <CardHeader
+          title="Live alerts"
+          icon={Siren}
+          subtitle="NWS warnings and stop-work alerts across all sites, most severe first"
+          actions={
+            <Link href="/alerts" className="text-xs font-medium text-accent hover:underline">
+              View all
+            </Link>
+          }
+        />
+        <AlertsFeed alerts={alerts} limit={8} />
+      </Card>
+    </div>
   );
 }

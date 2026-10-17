@@ -62,7 +62,7 @@ Tick items in the PR that finishes them.
 - [x] Dashboard: Leaflet map + ranked list from mock data
 - [ ] `scripts/seed_demo.py` (fake weather, scores, alerts in Tiger)
 - [x] Dashboard on the real API
-- [ ] Site detail page
+- [x] Site detail page
 - [ ] Alert banner + live countdown
 - [ ] Crew report form (photo + GPS pin)
 - [ ] Deploy to an HTTPS URL; test the report form on a phone
