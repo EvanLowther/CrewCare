@@ -19,12 +19,14 @@ const SiteMap = dynamic(() => import("./SiteMap"), {
 
 const POLL_MS = 10_000;
 const fetchAlerts = () => api.alerts();
+const fetchReports = () => api.reports();
 
 export function Dashboard() {
   const [model, setModel] = useState<Scorer>("ml");
   const fetchSites = useCallback(() => api.sites(model), [model]);
   const sitesPoll = usePolling(fetchSites, POLL_MS);
   const alertsPoll = usePolling(fetchAlerts, POLL_MS);
+  const reportsPoll = usePolling(fetchReports, POLL_MS);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const sites = sitesPoll.data?.sites ?? [];
@@ -86,7 +88,13 @@ export function Dashboard() {
             actions={<RiskLegend />}
           />
           <div className="relative h-[55vh] min-h-[360px] border-t border-line xl:h-[calc(100vh-24rem)] xl:min-h-[520px]">
-            <SiteMap sites={sites} selectedId={selectedId} onSelect={setSelectedId} model={model} />
+            <SiteMap
+              sites={sites}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              model={model}
+              reports={reportsPoll.data?.reports ?? []}
+            />
             {/* Above Leaflet's panes and controls (z-index up to 1000). */}
             <div className="absolute right-3 top-3 z-1001">
               <ModelSwitch value={model} onChange={setModel} />

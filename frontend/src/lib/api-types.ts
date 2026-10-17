@@ -73,7 +73,7 @@ export interface paths {
         put?: never;
         /**
          * Create Report
-         * @description multipart/form-data. The API picks the nearest site and resizes the photo.
+         * @description multipart/form-data. The API ties it to the nearest site and resizes the photo (dropping its metadata).
          */
         post: operations["create_report_api_reports_post"];
         delete?: never;
