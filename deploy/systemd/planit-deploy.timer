@@ -1,0 +1,9 @@
+[Unit]
+Description=Check GitHub main for a new commit every minute
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+
+[Install]
+WantedBy=timers.target

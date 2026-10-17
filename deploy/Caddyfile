@@ -1,0 +1,17 @@
+# Installed to /etc/caddy/Caddyfile by deploy/bootstrap.sh, with PLANIT_HOST replaced by the real hostname.
+# Caddy gets and renews the HTTPS certificate on its own.
+PLANIT_HOST {
+	encode zstd gzip
+
+	# FastAPI directly, so photo uploads don't pass through the Next.js proxy.
+	handle /api/* {
+		request_body {
+			max_size 20MB
+		}
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:3000
+	}
+}
