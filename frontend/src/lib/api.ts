@@ -13,6 +13,7 @@ export type ReportList = S["ReportList"];
 export type Briefing = S["Briefing"];
 export type BriefingList = S["BriefingList"];
 export type Risk = S["Risk"];
+export type RiskPoint = S["RiskPoint"];
 export type RiskLevel = Risk["level"];
 export type Conditions = S["Conditions"];
 export type Health = S["Health"];

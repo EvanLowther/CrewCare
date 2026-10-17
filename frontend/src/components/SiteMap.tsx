@@ -2,27 +2,34 @@
 
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef } from "react";
 import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
 import type { SiteSummary } from "@/lib/api";
-import { ALERT_ICONS, ALERT_LABELS } from "@/lib/alerts";
-import { RISK_COLORS, RISK_LABELS } from "@/lib/risk";
+import { ALERT_EMOJI, ALERT_ICONS, ALERT_LABELS } from "@/lib/alerts";
+import { NO_SCORE_COLOR, NO_SCORE_INK, RISK_COLORS, RISK_INK, RISK_LABELS } from "@/lib/risk";
+import { ScoreChip } from "./ui";
 
 const FLORIDA_CENTER: L.LatLngTuple = [27.9, -83.2];
-const NO_SCORE_COLOR = "#6b7280";
+// Esri's free dark-gray canvas (no key); labels come from a separate reference layer drawn on top.
+const BASE_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}";
+const LABEL_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}";
+const ATTRIBUTION = "Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors";
 
 function pinIcon(site: SiteSummary, selected: boolean): L.DivIcon {
-  const color = site.risk ? RISK_COLORS[site.risk.level] : NO_SCORE_COLOR;
+  const level = site.risk?.level;
+  const color = level ? RISK_COLORS[level] : NO_SCORE_COLOR;
+  const ink = level ? RISK_INK[level] : NO_SCORE_INK;
   const size = site.risk && site.risk.score >= 7.5 ? 38 : 32;
   const classes = ["site-pin", site.top_alert ? "alerting" : "", selected ? "selected" : ""].join(" ");
-  const badge = site.top_alert === "lightning" ? `<span class="badge">${ALERT_ICONS.lightning}</span>` : "";
+  const badge = site.top_alert === "lightning" ? `<span class="badge">${ALERT_EMOJI.lightning}</span>` : "";
   return L.divIcon({
     className: "site-pin-wrap",
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
     popupAnchor: [0, -size / 2],
-    html: `<div class="${classes}" style="width:${size}px;height:${size}px;background:${color};--pin-color:${color}">
+    html: `<div class="${classes}" style="width:${size}px;height:${size}px;background:${color};color:${ink};--pin-color:${color}">
              ${site.risk ? site.risk.score.toFixed(1) : "–"}${badge}
            </div>`,
   });
@@ -74,11 +81,10 @@ export default function SiteMap({
   const ordered = useMemo(() => [...sites].reverse(), [sites]);
 
   return (
-    <MapContainer center={FLORIDA_CENTER} zoom={6} className="h-full w-full" scrollWheelZoom>
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+    // Scroll-wheel zoom off so scrolling the page over the map scrolls the page; +/- and pinch still zoom.
+    <MapContainer center={FLORIDA_CENTER} zoom={6} className="h-full w-full" scrollWheelZoom={false}>
+      <TileLayer attribution={ATTRIBUTION} url={BASE_TILES} maxZoom={16} />
+      <TileLayer url={LABEL_TILES} maxZoom={16} />
       <MapController sites={sites} selectedId={selectedId} markers={markers} />
       {ordered.map((site, i) => (
         <Marker
@@ -92,7 +98,7 @@ export default function SiteMap({
             else markers.current.delete(site.id);
           }}
         >
-          <Popup minWidth={220}>
+          <Popup minWidth={240}>
             <SitePopup site={site} />
           </Popup>
         </Marker>
@@ -103,42 +109,41 @@ export default function SiteMap({
 
 function SitePopup({ site }: { site: SiteSummary }) {
   const risk = site.risk;
+  const AlertIcon = site.top_alert ? ALERT_ICONS[site.top_alert] : null;
   return (
-    <div className="space-y-2 text-sm">
+    <div className="space-y-3 text-sm">
       <div>
-        <div className="text-base font-semibold">{site.name}</div>
-        <div className="text-neutral-500">
+        <div className="text-base font-semibold text-ink">{site.name}</div>
+        <div className="text-xs text-muted">
           {site.utility} · {site.county} County
         </div>
       </div>
-      {risk ? (
-        <div className="flex items-center gap-2">
-          <span
-            className="rounded px-2 py-0.5 font-bold text-white"
-            style={{ background: RISK_COLORS[risk.level] }}
-          >
-            {risk.score.toFixed(1)}
-          </span>
-          <span className="font-medium">{RISK_LABELS[risk.level]} risk</span>
-        </div>
-      ) : (
-        <div className="text-neutral-500">No risk score yet</div>
-      )}
-      {site.top_alert && (
-        <div className="font-medium text-red-700">
-          {ALERT_ICONS[site.top_alert]} {ALERT_LABELS[site.top_alert]}
-          {site.active_alert_count > 1 && ` +${site.active_alert_count - 1} more`}
+      <div className="flex items-center gap-2">
+        <ScoreChip score={risk?.score ?? null} level={risk?.level ?? null} />
+        <span className="text-ink-2">{risk ? `${RISK_LABELS[risk.level]} risk` : "No risk score yet"}</span>
+      </div>
+      {site.top_alert && AlertIcon && (
+        <div className="flex items-center gap-2 font-medium text-[#ff9b9b]">
+          <AlertIcon className="h-4 w-4" aria-hidden />
+          {ALERT_LABELS[site.top_alert]}
+          {site.active_alert_count > 1 && <span className="text-muted">+{site.active_alert_count - 1} more</span>}
         </div>
       )}
       {risk && risk.factors.length > 0 && (
-        <ul className="list-disc pl-4 text-neutral-700">
+        <ul className="space-y-1 text-xs text-ink-2">
           {risk.factors.slice(0, 3).map((f) => (
-            <li key={f.key}>{f.label}</li>
+            <li key={f.key} className="flex justify-between gap-3">
+              <span>{f.label}</span>
+              <span className="tabular text-muted">+{f.contribution.toFixed(1)}</span>
+            </li>
           ))}
         </ul>
       )}
-      <Link href={`/sites/${site.id}`} className="inline-block font-medium text-blue-700 hover:underline">
-        View site →
+      <Link
+        href={`/sites/${site.id}`}
+        className="inline-flex items-center gap-1 text-sm font-medium !text-accent hover:underline"
+      >
+        View site <ArrowRight className="h-3.5 w-3.5" aria-hidden />
       </Link>
     </div>
   );
