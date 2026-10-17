@@ -57,11 +57,20 @@ def utc_day(values: pd.Series) -> pd.Series:
     return pd.to_datetime(values, utc=True).dt.tz_localize(None).dt.normalize()
 
 
+# NWS forecast zones wrap the county name: 'COASTAL HILLSBOROUGH', 'INLAND PALM BEACH COUNTY', 'METRO BROWARD',
+# 'MONROE/LOWER KEYS', 'SOUTHERN BREVARD BARRIER ISLANDS', 'FAR SOUTH MIAMI-DADE COUNTY'.
+ZONE_WORDS = {"COASTAL", "INLAND", "METRO", "METROPOLITAN", "MAINLAND", "COUNTY", "FAR", "NORTH", "SOUTH", "EAST",
+              "WEST", "CENTRAL", "NORTHERN", "SOUTHERN", "EASTERN", "WESTERN", "NORTHEAST", "NORTHWEST", "SOUTHEAST",
+              "SOUTHWEST", "UPPER", "MIDDLE", "LOWER", "KEYS", "BARRIER", "ISLANDS"}
+
+
 def normalize_county(name: object) -> str:
-    """'MIAMI-DADE' and 'Miami Dade' -> 'MIAMI DADE'; 'ST. JOHNS' -> 'ST JOHNS'."""
+    """County or zone name -> comparable key: 'COASTAL MIAMI-DADE COUNTY' and 'Miami Dade' -> 'MIAMIDADE',
+    'ST. JOHNS' -> 'STJOHNS', 'DE SOTO' and 'DeSoto' -> 'DESOTO'."""
     if not isinstance(name, str):
         return ""
-    return " ".join(re.sub(r"[^A-Z ]", " ", name.upper()).split())
+    words = re.sub(r"[^A-Z ]", " ", name.upper()).split()
+    return "".join(w for w in words if w not in ZONE_WORDS)
 
 
 def miles(lat1, lon1, lat2, lon2) -> np.ndarray:

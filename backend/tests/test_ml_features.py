@@ -18,9 +18,19 @@ def labelled(*events):
 
 
 def test_normalize_county():
-    assert normalize_county("MIAMI-DADE") == normalize_county("Miami Dade") == "MIAMI DADE"
-    assert normalize_county("ST. JOHNS") == "ST JOHNS"
+    assert normalize_county("MIAMI-DADE") == normalize_county("Miami Dade") == "MIAMIDADE"
+    assert normalize_county("ST. JOHNS") == normalize_county("St Johns")
+    assert normalize_county("DE SOTO") == normalize_county("DeSoto")
     assert normalize_county(None) == ""
+
+
+def test_normalize_county_strips_zone_words():
+    miami = normalize_county("Miami Dade")
+    for zone in ["COASTAL MIAMI-DADE COUNTY", "METROPOLITAN MIAMI-DADE", "FAR SOUTH MIAMI-DADE COUNTY"]:
+        assert normalize_county(zone) == miami
+    assert normalize_county("MONROE/LOWER KEYS") == normalize_county("Monroe")
+    assert normalize_county("SOUTHERN BREVARD BARRIER ISLANDS") == normalize_county("Brevard")
+    assert normalize_county("COASTAL HILLSBOROUGH") != normalize_county("Pinellas")
 
 
 def test_add_features_prev_3_day_rain_and_month():
@@ -42,6 +52,7 @@ def test_label_within_radius():
 
 def test_label_same_county_without_coordinates():
     assert labelled(event("Excessive Heat", cz="MIAMI-DADE")) == ["2024-06-01"]
+    assert labelled(event("Tropical Storm", cz="COASTAL MIAMI-DADE COUNTY")) == ["2024-06-01"]
     assert labelled(event("Excessive Heat", cz="BROWARD")) == []
 
 
