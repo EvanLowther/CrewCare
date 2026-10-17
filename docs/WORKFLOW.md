@@ -50,7 +50,7 @@ Tick items in the PR that finishes them.
 - [x] Open-Meteo + NWS polling worker
 - [x] `rules-v1` scoring job
 - [ ] Lightning rule + countdown + replay
-- [ ] Training set + XGBoost
+- [x] Training set + XGBoost
 - [ ] USGS flood rule
 - [ ] Score explanations
 - [ ] Crew reports raise the score

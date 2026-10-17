@@ -1,0 +1,47 @@
+{
+  "version": "xgb-2026-10-17",
+  "trained_at": "2026-10-17T05:11:16+00:00",
+  "features": [
+    "max_heat_index_f",
+    "total_precip_in",
+    "precip_prev_3d_in",
+    "avg_soil_moisture",
+    "max_gust_mph",
+    "max_hourly_precip_in",
+    "month"
+  ],
+  "base_rate": 0.04015,
+  "rows": 65760,
+  "days": [
+    "2023-01-01",
+    "2025-12-31"
+  ],
+  "params": {
+    "n_estimators": 300,
+    "max_depth": 4,
+    "learning_rate": 0.05,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "min_child_weight": 5,
+    "eval_metric": "aucpr"
+  },
+  "test_metrics": {
+    "test_rows": 21900,
+    "test_hazard_rate": 0.0307,
+    "roc_auc": 0.85,
+    "pr_auc": 0.143,
+    "pr_auc_baseline": 0.031,
+    "brier": 0.0279,
+    "brier_baseline": 0.0299,
+    "hazard_rate_top_10pct": 0.131
+  },
+  "importance": {
+    "max_heat_index_f": 0.0824,
+    "total_precip_in": 0.3291,
+    "precip_prev_3d_in": 0.0501,
+    "avg_soil_moisture": 0.0471,
+    "max_gust_mph": 0.125,
+    "max_hourly_precip_in": 0.2757,
+    "month": 0.0906
+  }
+}
