@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+from datetime import UTC, datetime
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 
@@ -21,7 +22,7 @@ log = logging.getLogger("planit.worker")
 
 # name -> (function, seconds between runs). Enable a job by implementing its function.
 JOBS = {
-    "open_meteo": (open_meteo.poll, 600),
+    "open_meteo": (open_meteo.poll, 1800),  # free-tier budget: 60 sites x 48 polls/day ~ 2,900 calls
     "nws": (nws.poll, 300),
     "usgs": (usgs.poll, 900),
     "lightning": (lightning.evaluate, 15),
@@ -54,7 +55,8 @@ def main() -> None:
 
     sched = BlockingScheduler(timezone="UTC")
     for name, (fn, seconds) in JOBS.items():
-        sched.add_job(_safe(name, fn), "interval", seconds=seconds, id=name, max_instances=1, coalesce=True)
+        sched.add_job(_safe(name, fn), "interval", seconds=seconds, id=name, max_instances=1, coalesce=True,
+                      next_run_time=datetime.now(UTC))  # run once at startup, not only after the first interval
     log.info("worker started with jobs: %s", ", ".join(JOBS))
     sched.start()
 
