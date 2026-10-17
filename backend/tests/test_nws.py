@@ -15,12 +15,15 @@ def test_event_types():
     assert alert_type_for("Dense Fog Advisory") == "nws"
 
 
-def test_severity():
-    assert severity_for("Extreme") == "danger"
-    assert severity_for("Severe") == "danger"
-    assert severity_for("Moderate") == "warning"
-    assert severity_for("Minor") == "info"
-    assert severity_for(None) == "info"
+def test_severity_comes_from_the_event():
+    assert severity_for("Tornado Warning", "Extreme") == "danger"
+    assert severity_for("Flash Flood Warning", "Severe") == "danger"
+    assert severity_for("Flood Warning", "Severe") == "warning"  # 6.5: restricted work, not stop
+    assert severity_for("Wind Advisory", "Moderate") == "warning"
+    assert severity_for("Dense Fog Advisory", "Minor") == "info"
+    # Unknown events fall back to NWS's severity field
+    assert severity_for("Some New Product", "Extreme") == "danger"
+    assert severity_for("Some New Product", None) == "info"
 
 
 def test_relevance_filters_cancels_tests_and_marine():
@@ -46,6 +49,6 @@ def test_to_rows():
     }}
     nws_row, app_row = to_rows(638, feature)
     assert nws_row["alert_id"] == app_row["dedupe_key"] == "urn:oid:2.49.0.1.840.0.abc"
-    assert app_row["type"] == "flood" and app_row["severity"] == "danger"
+    assert app_row["type"] == "flood" and app_row["severity"] == "warning"  # Flood Warning scores 6.5
     assert app_row["message"] == "Flooding is occurring."
     assert app_row["meta"].obj["source"] == "nws"

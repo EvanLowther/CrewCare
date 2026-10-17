@@ -86,7 +86,7 @@ export function Dashboard() {
             actions={<RiskLegend />}
           />
           <div className="relative h-[55vh] min-h-[360px] border-t border-line xl:h-[calc(100vh-24rem)] xl:min-h-[520px]">
-            <SiteMap sites={sites} selectedId={selectedId} onSelect={setSelectedId} />
+            <SiteMap sites={sites} selectedId={selectedId} onSelect={setSelectedId} model={model} />
             {/* Above Leaflet's panes and controls (z-index up to 1000). */}
             <div className="absolute right-3 top-3 z-1001">
               <ModelSwitch value={model} onChange={setModel} />

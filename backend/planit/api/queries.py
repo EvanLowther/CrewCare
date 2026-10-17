@@ -11,6 +11,7 @@ from typing import Any
 
 from planit.config import settings
 from planit.db import connection
+from planit.hazards import nws_heat_index
 from planit.models import (
     Alert,
     Conditions,
@@ -44,14 +45,14 @@ active_alerts AS (
     GROUP BY site_id
 ),
 latest_heat AS (
-    SELECT DISTINCT ON (site_id) site_id, heat_index_f
+    SELECT DISTINCT ON (site_id) site_id, temp_f, humidity_pct
     FROM weather
     WHERE NOT is_forecast AND ts > now() - interval '2 days' AND ts <= now()
     ORDER BY site_id, ts DESC
 )
 SELECT s.id, s.name, s.utility, s.county, s.plant_type, s.capacity_mw, s.latitude, s.longitude, s.timezone,
        ls.score, ls.level, ls.factors, ls.model_version, ls.computed_at,
-       coalesce(aa.n, 0) AS active_alert_count, aa.top_type, lh.heat_index_f
+       coalesce(aa.n, 0) AS active_alert_count, aa.top_type, lh.temp_f, lh.humidity_pct
 FROM sites s
 LEFT JOIN latest_score ls ON ls.site_id = s.id
 LEFT JOIN active_alerts aa ON aa.site_id = s.id
@@ -87,12 +88,26 @@ def _summary(row: dict) -> SiteSummary:
         plant_type=row["plant_type"], capacity_mw=_float(row["capacity_mw"]),
         latitude=row["latitude"], longitude=row["longitude"], timezone=row["timezone"],
         risk=risk, active_alert_count=row["active_alert_count"], top_alert=row["top_type"],
-        heat_index_f=_float(row["heat_index_f"]),
+        heat_index_f=nws_heat_index(_float(row["temp_f"]), _float(row["humidity_pct"])),
     )
 
 
 def _conditions(row: dict) -> Conditions:
-    return Conditions(**{k: (row[k] if k in ("ts", "weather_code") else _float(row[k])) for k in row})
+    """A weather row for the API. heat_index_f is the NWS heat index (what the score uses and OSHA's bands are
+    defined on), computed from temperature and humidity; the stored column is Open-Meteo's "feels like"."""
+    values = {k: (row[k] if k in ("ts", "weather_code") else _float(row[k])) for k in row}
+    values["heat_index_f"] = nws_heat_index(values["temp_f"], values["humidity_pct"])
+    return Conditions(**values)
+
+
+def _last_24h(rows: list[dict]) -> Last24h | None:
+    if not rows:
+        return None
+    rain = [float(r["precip_in"]) for r in rows if r["precip_in"] is not None]
+    heat = [h for r in rows if (h := nws_heat_index(_float(r["temp_f"]), _float(r["humidity_pct"]))) is not None]
+    gust = [float(r["gust_mph"]) for r in rows if r["gust_mph"] is not None]
+    return Last24h(total_precip_in=round(sum(rain), 2) if rain else None, max_heat_index_f=max(heat, default=None),
+                   max_gust_mph=max(gust, default=None))
 
 
 def default_scorer() -> str:
@@ -142,12 +157,11 @@ def get_site(site_id: int, scorer: str | None = None) -> SiteDetail | None:
             (site_id,),
         ).fetchone()
 
-        last24 = conn.execute(
-            "SELECT count(*) AS n, sum(precip_in) AS total_precip_in, max(heat_index_f) AS max_heat_index_f, "
-            "max(gust_mph) AS max_gust_mph FROM weather "
+        past_day = conn.execute(
+            "SELECT precip_in, temp_f, humidity_pct, gust_mph FROM weather "
             "WHERE site_id = %s AND NOT is_forecast AND ts > now() - interval '24 hours' AND ts <= now()",
             (site_id,),
-        ).fetchone()
+        ).fetchall()
 
         forecast = conn.execute(
             f"SELECT {_CONDITION_COLS} FROM weather WHERE site_id = %s AND is_forecast "
@@ -179,11 +193,7 @@ def get_site(site_id: int, scorer: str | None = None) -> SiteDetail | None:
     return SiteDetail(
         site=_summary(row),
         conditions=_conditions(current) if current else None,
-        last_24h=Last24h(
-            total_precip_in=_float(last24["total_precip_in"]),
-            max_heat_index_f=_float(last24["max_heat_index_f"]),
-            max_gust_mph=_float(last24["max_gust_mph"]),
-        ) if last24["n"] else None,
+        last_24h=_last_24h(past_day),
         forecast=[_conditions(r) for r in forecast],
         alerts=[Alert(**r) for r in alerts],
         reports=[

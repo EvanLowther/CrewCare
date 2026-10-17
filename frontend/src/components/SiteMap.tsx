@@ -4,11 +4,11 @@ import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
-import type { SiteSummary } from "@/lib/api";
+import type { Scorer, SiteSummary } from "@/lib/api";
 import { ALERT_EMOJI, ALERT_ICONS, ALERT_LABELS } from "@/lib/alerts";
-import { NO_SCORE_COLOR, NO_SCORE_INK, RISK_COLORS, RISK_INK, RISK_LABELS } from "@/lib/risk";
+import { NO_SCORE_COLOR, NO_SCORE_INK, RISK_COLORS, RISK_GUIDANCE, RISK_INK, RISK_LABELS } from "@/lib/risk";
 import { ScoreChip } from "./ui";
 
 const FLORIDA_CENTER: L.LatLngTuple = [27.9, -83.2];
@@ -47,12 +47,25 @@ function MapController({
 }) {
   const map = useMap();
   const fitted = useRef(false);
+  const [sized, setSized] = useState(false);
+
+  // Leaflet only measures its box on window resize. In a background tab or a hidden pane the box is 0x0 at
+  // first, and fitting then zooms to the maximum, so re-measure whenever the container's size changes.
+  useEffect(() => {
+    const container = map.getContainer();
+    const observer = new ResizeObserver(() => {
+      map.invalidateSize();
+      setSized(container.clientWidth > 0 && container.clientHeight > 0);
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [map]);
 
   useEffect(() => {
-    if (fitted.current || sites.length === 0) return;
+    if (fitted.current || !sized || sites.length === 0) return;
     map.fitBounds(L.latLngBounds(sites.map((s) => [s.latitude, s.longitude])), { padding: [30, 30] });
     fitted.current = true;
-  }, [map, sites]);
+  }, [map, sites, sized]);
 
   useEffect(() => {
     if (selectedId === null) return;
@@ -71,10 +84,12 @@ export default function SiteMap({
   sites,
   selectedId,
   onSelect,
+  model,
 }: {
   sites: SiteSummary[];
   selectedId: number | null;
   onSelect: (id: number) => void;
+  model?: Scorer;
 }) {
   const markers = useRef(new Map<number, L.Marker>());
   // Draw the riskiest sites on top when pins overlap.
@@ -99,7 +114,7 @@ export default function SiteMap({
           }}
         >
           <Popup minWidth={240}>
-            <SitePopup site={site} />
+            <SitePopup site={site} model={model} />
           </Popup>
         </Marker>
       ))}
@@ -107,7 +122,7 @@ export default function SiteMap({
   );
 }
 
-function SitePopup({ site }: { site: SiteSummary }) {
+function SitePopup({ site, model }: { site: SiteSummary; model?: Scorer }) {
   const risk = site.risk;
   const AlertIcon = site.top_alert ? ALERT_ICONS[site.top_alert] : null;
   return (
@@ -120,7 +135,7 @@ function SitePopup({ site }: { site: SiteSummary }) {
       </div>
       <div className="flex items-center gap-2">
         <ScoreChip score={risk?.score ?? null} level={risk?.level ?? null} />
-        <span className="text-ink-2">{risk ? `${RISK_LABELS[risk.level]} risk` : "No risk score yet"}</span>
+        <span className="text-ink-2">{risk ? `${RISK_LABELS[risk.level]} · ${RISK_GUIDANCE[risk.level]}` : "No risk score yet"}</span>
       </div>
       {site.top_alert && AlertIcon && (
         <div className="flex items-center gap-2 font-medium text-[#ff9b9b]">
@@ -134,13 +149,18 @@ function SitePopup({ site }: { site: SiteSummary }) {
           {risk.factors.slice(0, 3).map((f) => (
             <li key={f.key} className="flex justify-between gap-3">
               <span>{f.label}</span>
-              <span className="tabular text-muted">+{f.contribution.toFixed(1)}</span>
+              <span className="tabular text-muted">{f.contribution.toFixed(1)}</span>
             </li>
           ))}
         </ul>
       )}
+      {risk?.factors.find((f) => f.action)?.action && (
+        <p className="rounded-md bg-accent-soft px-2.5 py-1.5 text-xs text-ink">
+          {risk.factors.find((f) => f.action)?.action}
+        </p>
+      )}
       <Link
-        href={`/sites/${site.id}`}
+        href={`/sites/${site.id}${model ? `?model=${model}` : ""}`}
         className="inline-flex items-center gap-1 text-sm font-medium !text-accent hover:underline"
       >
         View site <ArrowRight className="h-3.5 w-3.5" aria-hidden />

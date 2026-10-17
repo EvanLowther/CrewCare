@@ -31,10 +31,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Whose risk scores: 'ml' (XGBoost) or 'rules' (rules-v1). Default: ml.",
+              "description": "Whose risk scores: 'ml' (XGBoost, Predictive) or 'rules' (rules-v2, Real-time). Default: ml.",
               "title": "Model"
             },
-            "description": "Whose risk scores: 'ml' (XGBoost) or 'rules' (rules-v1). Default: ml."
+            "description": "Whose risk scores: 'ml' (XGBoost, Predictive) or 'rules' (rules-v2, Real-time). Default: ml."
           }
         ],
         "responses": {
@@ -95,10 +95,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Whose risk scores: 'ml' (XGBoost) or 'rules' (rules-v1). Default: ml.",
+              "description": "Whose risk scores: 'ml' (XGBoost, Predictive) or 'rules' (rules-v2, Real-time). Default: ml.",
               "title": "Model"
             },
-            "description": "Whose risk scores: 'ml' (XGBoost) or 'rules' (rules-v1). Default: ml."
+            "description": "Whose risk scores: 'ml' (XGBoost, Predictive) or 'rules' (rules-v2, Real-time). Default: ml."
           }
         ],
         "responses": {
@@ -1225,7 +1225,7 @@
             "type": "string",
             "title": "Model Version",
             "examples": [
-              "rules-v1"
+              "rules-v2+xgb-2026-10-17"
             ]
           },
           "updated_at": {
@@ -1257,15 +1257,30 @@
             "type": "string",
             "title": "Label",
             "examples": [
-              "Heat index 112\u00b0F"
+              "Heat index 108\u00b0F \u00b7 OSHA high risk"
             ]
           },
           "contribution": {
             "type": "number",
             "title": "Contribution",
-            "description": "Points this factor adds to the 0-10 score",
+            "description": "This hazard's own severity on the 0-10 scale (rules-v2); the worst one sets the score",
             "examples": [
-              2.4
+              6.0
+            ]
+          },
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action",
+            "description": "What a supervisor should do about it, from the work rule behind the threshold",
+            "examples": [
+              "Limit exertion; enforce work/rest cycles; watch crews at all times"
             ]
           }
         },

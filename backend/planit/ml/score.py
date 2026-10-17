@@ -1,22 +1,16 @@
-"""Owner: Person A. Hazard score (0-10) per site: current hour + next 24 hours -> `hazard_scores`.
+"""Owner: Person A. Hazard scores (0-10) per site: current hour + next 24 hours -> `hazard_scores`.
 
-rules-v1 is a transparent rule-based score so the dashboard has real scores before the ML model
-exists. Each factor adds points; its label states the fact behind it (supervisors read these):
+Every run writes two scorers side by side, so the dashboard's Real-time / Predictive switch can show either:
 
-    heat index    up to 3.5  0 below 90°F, 1.5 at 103°F (OSHA "extreme caution"), 3.0 at 115°F, 3.5 above
-    thunderstorm  up to 2.5  2.5 when storms are forecast (WMO 95-99), else CAPE x rain chance
-    24 h rain     up to 2    ~0.7 per inch
-    wet ground    up to 1.5  soil moisture 25% -> 40%
-    wind gusts    up to 2    0 below 25 mph, 1.5 at 45 mph, 2 above
-    alerts        up to 4    lightning 4, danger 2.5, warning 1.2, info 0.3; strongest + half the next
+- scorer 'rules' (Real-time), rules-v2 (planit/hazards.py): every hazard on one 0-10 scale anchored to published
+  work rules (the NWS heat index on OSHA's bands, lightning, forecast thunderstorms and storm energy, wind gusts
+  against lift limits, rain rate, 24 h rain, saturated ground, NWS alerts by event). The site score is the worst
+  kind of hazard plus a little for other serious ones; each factor carries a recommended action.
+- scorer 'ml' (Predictive), with a trained model in ml/models/ and PLANIT_SCORE_MODEL=xgb (the default): the XGBoost
+  model scores each hour on the 24 hours around it (the "day" it learned from), with the OSHA heat floor from
+  ml/model.py, plus alert points and the lightning floor (combine()).
 
-The total is capped at 10, and an active lightning stop-work alert keeps the score at least 8.
-
-With a trained model in ml/models/ (and PLANIT_SCORE_MODEL=xgb, the default), every run also writes ML scores
-(scorer 'ml') next to the rules-v1 ones (scorer 'rules'), so the dashboard can switch between them. The ML weather
-part comes from the XGBoost model: each hour is scored on the 24 hours around it (12 h back, 12 h ahead), the "day"
-the model learned from, with the OSHA heat floor from ml/model.py. Alert points and the lightning floor are added
-the same way as above. Rows carry the scorer's version (e.g. 'xgb-2026-10-17').
+Rows carry the scorer's version ('rules-v2', 'xgb-2026-10-17').
 
 Level bands (keep in sync with frontend/src/lib/risk.ts): low < 2.5 <= moderate < 5 <= high < 7.5 <= extreme
 """
@@ -32,19 +26,22 @@ from statistics import mean
 
 from psycopg.types.json import Jsonb
 
+from planit import hazards
 from planit.config import settings
 from planit.db import connection
 
 log = logging.getLogger(__name__)
 
-MODEL_VERSION = "rules-v1"
+MODEL_VERSION = "rules-v2"
 FORECAST_HOURS = 24
+RULES_HISTORY = timedelta(hours=72)  # rain in the last 3 days, for saturated ground
 ML_HALF_WINDOW = timedelta(hours=12)  # each hour is scored on the 24 h around it
 ML_RAIN_HISTORY = timedelta(days=3)  # precip_prev_3d_in: the 3 days before that window
+
+# ML scorer only: alert points on top of the model's weather score (see combine()).
 LIGHTNING_FLOOR = 8.0
 ALERT_POINTS = {"danger": 2.5, "warning": 1.2, "info": 0.3}
 LIGHTNING_POINTS = 4.0
-THUNDERSTORM_CODES = range(95, 100)
 
 
 def level_for(score: float) -> str:
@@ -57,74 +54,100 @@ def level_for(score: float) -> str:
     return "low"
 
 
+# --- rules-v2 (scorer 'rules') ------------------------------------------------------------------------------
+
 @dataclass
 class HourInputs:
-    heat_index_f: float | None = None
+    heat_index_f: float | None = None  # NWS heat index (hazards.nws_heat_index), not Open-Meteo "feels like"
+    rain_1h_in: float | None = None
     rain_24h_in: float | None = None
+    rain_72h_in: float | None = None
     soil_moisture: float | None = None
     gust_mph: float | None = None
     cape_jkg: float | None = None
     precip_prob_pct: float | None = None
     weather_code: int | None = None
-    alerts: list[dict] = field(default_factory=list)  # {"type", "severity", "title"}
+    is_forecast: bool = False
+    alerts: list[dict] = field(default_factory=list)  # see alerts_at()
 
 
-def _ramp(value: float, start: float, end: float, points: float) -> float:
-    """0 at `start`, `points` at `end`, linear between."""
-    if value <= start:
-        return 0.0
-    return points * min(1.0, (value - start) / (end - start))
-
-
-def heat_points(hi: float) -> float:
-    if hi < 90:
-        return 0.0
-    if hi < 103:
-        return _ramp(hi, 90, 103, 1.5)
-    if hi < 115:
-        return 1.5 + _ramp(hi, 103, 115, 1.5)
-    return 3.5
-
-
-def storm_points(code: int | None, cape: float | None, prob: float | None) -> float:
-    if code is not None and code in THUNDERSTORM_CODES:
-        return 2.5
-    if cape is None:
-        return 0.0
-    chance = (prob / 100) if prob is not None else 0.5
-    return round(_ramp(cape, 1000, 3000, 2.0) * chance, 3)
+def rule_hazards(x: HourInputs) -> list[hazards.Hazard | None]:
+    return [
+        hazards.heat(x.heat_index_f),
+        hazards.thunderstorm(x.weather_code, x.is_forecast) or hazards.storm_potential(x.cape_jkg, x.precip_prob_pct),
+        hazards.wind(x.gust_mph),
+        hazards.rain_rate(x.rain_1h_in),
+        hazards.rain_24h(x.rain_24h_in),
+        hazards.ground(x.soil_moisture, x.rain_72h_in),
+        *(hazards.alert(a) for a in x.alerts),
+    ]
 
 
 def score_hour(x: HourInputs) -> tuple[float, list[dict]]:
-    """(score, top-3 factors) for one site-hour."""
-    factors: list[dict] = []
+    """rules-v2 (score, top-3 factors with actions) for one site-hour."""
+    return hazards.combine(rule_hazards(x))
 
-    def add(key: str, label: str, points: float) -> None:
-        if points >= 0.05:
-            factors.append({"key": key, "label": label, "contribution": round(points, 1)})
 
-    if x.heat_index_f is not None:
-        add("heat_index", f"Heat index {round(x.heat_index_f)}°F", heat_points(x.heat_index_f))
-    storms = storm_points(x.weather_code, x.cape_jkg, x.precip_prob_pct)
-    if x.weather_code in THUNDERSTORM_CODES:
-        add("thunderstorm", "Thunderstorms forecast", storms)
-    elif storms:
-        chance = f", {round(x.precip_prob_pct)}% rain chance" if x.precip_prob_pct is not None else ""
-        add("thunderstorm", f"Storm energy (CAPE {round(x.cape_jkg):,}{chance})", storms)
-    if x.rain_24h_in is not None:
-        add("rain_24h", f"{x.rain_24h_in:.1f} in of rain in 24 h", min(2.0, x.rain_24h_in * 0.7))
-    if x.soil_moisture is not None:
-        add("soil_moisture", f"Wet ground (soil moisture {round(x.soil_moisture * 100)}%)",
-            _ramp(x.soil_moisture, 0.25, 0.40, 1.5))
-    if x.gust_mph is not None:
-        gust = 2.0 if x.gust_mph > 45 else _ramp(x.gust_mph, 25, 45, 1.5)
-        add("wind", f"Gusts {round(x.gust_mph)} mph", gust)
+def _short_title(alert: dict) -> str:
+    meta = alert.get("meta") or {}
+    return meta.get("nws_event") or alert["title"]
 
-    return combine(sum(f["contribution"] for f in factors), factors, x.alerts)
 
+def _applies(alert: dict, hour: datetime) -> bool:
+    """Is this active alert still in force at `hour`? Lightning lasts until all-clear, NWS until it ends."""
+    if alert["type"] == "lightning":
+        return alert["all_clear_at"] is None or alert["all_clear_at"] > hour
+    ends = (alert.get("meta") or {}).get("ends")
+    return ends is None or datetime.fromisoformat(ends) > hour
+
+
+def alerts_at(alerts: list[dict], hour: datetime) -> list[dict]:
+    """Active alerts in force at `hour`: {"type", "severity", "title" (short), "nws_event", "nws_severity",
+    "nearest_mi"}, the shape both hazards.alert() and combine() take."""
+    out = []
+    for a in alerts:
+        if not _applies(a, hour):
+            continue
+        meta = a.get("meta") or {}
+        out.append({"type": a["type"], "severity": a["severity"], "title": _short_title(a),
+                    "nws_event": meta.get("nws_event"), "nws_severity": meta.get("nws_severity"),
+                    "nearest_mi": meta.get("nearest_strike_mi")})
+    return out
+
+
+def _total(rows: list[dict], key: str) -> float | None:
+    values = [r[key] for r in rows if r[key] is not None]
+    return sum(values) if values else None
+
+
+def build_inputs(weather: list[dict], alerts: list[dict], hours: list[datetime]) -> dict[datetime, HourInputs]:
+    """Per-hour rules-v2 inputs for one site. `weather` rows are observed up to now and forecast after; hours[0]
+    is now."""
+    by_hour = {w["ts"]: w for w in weather}
+    out = {}
+    for hour in hours:
+        row = by_hour.get(hour)
+        if row is None:  # no reading for this exact hour: use the latest one before it
+            earlier = [w for w in weather if w["ts"] <= hour]
+            row = earlier[-1] if earlier else None
+        if row is None:
+            continue
+        out[hour] = HourInputs(
+            heat_index_f=hazards.nws_heat_index(row["temp_f"], row["humidity_pct"]),
+            rain_1h_in=row["precip_in"],
+            rain_24h_in=_total([w for w in weather if hour - timedelta(hours=24) < w["ts"] <= hour], "precip_in"),
+            rain_72h_in=_total([w for w in weather if hour - RULES_HISTORY < w["ts"] <= hour], "precip_in"),
+            soil_moisture=row["soil_moisture"], gust_mph=row["gust_mph"], cape_jkg=row["cape_jkg"],
+            precip_prob_pct=row["precip_prob_pct"], weather_code=row["weather_code"],
+            is_forecast=hour > hours[0], alerts=alerts_at(alerts, hour),
+        )
+    return out
+
+
+# --- ML model (scorer 'ml') ---------------------------------------------------------------------------------
 
 def combine(weather_score: float, weather_factors: list[dict], alerts: list[dict]) -> tuple[float, list[dict]]:
-    """Weather score (rules-v1 or the ML model) + alert points, capped at 10; lightning keeps it at least 8."""
+    """ML scorer: the model's weather score + alert points, capped at 10; lightning keeps it at least 8."""
     alert_pts = sorted(
         ((LIGHTNING_POINTS if a["type"] == "lightning" else ALERT_POINTS.get(a["severity"], 0.0), a) for a in alerts),
         key=lambda p: p[0], reverse=True,
@@ -141,46 +164,6 @@ def combine(weather_score: float, weather_factors: list[dict], alerts: list[dict
         score = max(score, LIGHTNING_FLOOR)
     factors = sorted([*weather_factors, *extra], key=lambda f: f["contribution"], reverse=True)
     return round(score, 1), factors[:3]
-
-
-def _short_title(alert: dict) -> str:
-    meta = alert.get("meta") or {}
-    return meta.get("nws_event") or alert["title"]
-
-
-def _applies(alert: dict, hour: datetime) -> bool:
-    """Is this active alert still in force at `hour`? Lightning lasts until all-clear, NWS until it ends."""
-    if alert["type"] == "lightning":
-        return alert["all_clear_at"] is None or alert["all_clear_at"] > hour
-    ends = (alert.get("meta") or {}).get("ends")
-    return ends is None or datetime.fromisoformat(ends) > hour
-
-
-def build_inputs(weather: list[dict], alerts: list[dict], hours: list[datetime]) -> dict[datetime, HourInputs]:
-    """Per-hour inputs for one site. `weather` rows are observed up to now and forecast after."""
-    by_hour = {w["ts"]: w for w in weather}
-    out = {}
-    for hour in hours:
-        row = by_hour.get(hour)
-        if row is None:  # no reading for this exact hour: use the latest one before it
-            earlier = [w for w in weather if w["ts"] <= hour]
-            row = earlier[-1] if earlier else None
-        if row is None:
-            continue
-        window = [w["precip_in"] for w in weather if hour - timedelta(hours=24) < w["ts"] <= hour
-                  and w["precip_in"] is not None]
-        out[hour] = HourInputs(
-            heat_index_f=row["heat_index_f"], rain_24h_in=sum(window) if window else None,
-            soil_moisture=row["soil_moisture"], gust_mph=row["gust_mph"], cape_jkg=row["cape_jkg"],
-            precip_prob_pct=row["precip_prob_pct"], weather_code=row["weather_code"],
-            alerts=alerts_at(alerts, hour),
-        )
-    return out
-
-
-def alerts_at(alerts: list[dict], hour: datetime) -> list[dict]:
-    return [{"type": a["type"], "severity": a["severity"], "title": _short_title(a)}
-            for a in alerts if _applies(a, hour)]
 
 
 def window_features(weather: list[dict], hour: datetime) -> dict | None:
@@ -208,14 +191,15 @@ def window_features(weather: list[dict], hour: datetime) -> dict | None:
 
 @functools.cache
 def ml_model():
-    """The latest trained model, or None (then rules-v1 scores) if disabled, missing or not installed."""
+    """The latest trained model, or None (then only rules-v2 scores are written) if disabled, missing or not
+    installed."""
     if settings.score_model != "xgb":
         return None
     try:
         from planit.ml.model import load_latest  # pandas + xgboost: the [ml] extras
         return load_latest()
     except (ImportError, FileNotFoundError) as e:
-        log.warning("ML model unavailable (%s); scoring with %s", e, MODEL_VERSION)
+        log.warning("ML model unavailable (%s); writing %s scores only", e, MODEL_VERSION)
         return None
 
 
@@ -230,6 +214,8 @@ def ml_scores(model, weather: list[dict], alerts: list[dict], hours: list[dateti
     return {hour: combine(score, factors, alerts_at(alerts, hour))
             for (hour, _), (score, factors) in zip(rows, model.explain(frame), strict=True)}
 
+
+# --- Writing ------------------------------------------------------------------------------------------------
 
 UPSERT_SQL = """
 INSERT INTO hazard_scores (site_id, ts, kind, scorer, score, level, factors, model_version, computed_at)
@@ -251,21 +237,21 @@ def score_all() -> int:
 
 
 def compute_scores() -> list[dict]:
-    """hazard_scores rows for every site, current hour + next 24, without writing them: rules-v1 always
+    """hazard_scores rows for every site, current hour + next 24, without writing them: rules-v2 always
     (scorer 'rules'), plus the ML model (scorer 'ml') when one is enabled, so the dashboard can switch."""
     now = datetime.now(UTC)
     current = now.replace(minute=0, second=0, microsecond=0)
     hours = [current + timedelta(hours=h) for h in range(FORECAST_HOURS + 1)]
 
     model = ml_model()
-    # Observed rows up to now, forecast rows after. rules-v1 looks 24 h back; the model 12 h either side of each
-    # hour plus 3 days of rain before that.
-    first, last = ((current - ML_HALF_WINDOW - ML_RAIN_HISTORY, hours[-1] + ML_HALF_WINDOW) if model
-                   else (current - timedelta(hours=24), hours[-1]))
+    # Observed rows up to now, forecast rows after. rules-v2 looks 3 days back (rain for saturated ground); the
+    # model 12 h either side of each hour plus 3 days of rain before that.
+    first = current - (ML_HALF_WINDOW + ML_RAIN_HISTORY if model else RULES_HISTORY)
+    last = hours[-1] + (ML_HALF_WINDOW if model else timedelta(0))
     with connection() as conn:
         weather = conn.execute(
-            "SELECT site_id, ts, heat_index_f, precip_in, precip_prob_pct, soil_moisture, gust_mph, cape_jkg, "
-            "weather_code FROM weather WHERE ts > %s AND ts <= %s "
+            "SELECT site_id, ts, temp_f, humidity_pct, heat_index_f, precip_in, precip_prob_pct, soil_moisture, "
+            "gust_mph, cape_jkg, weather_code FROM weather WHERE ts > %s AND ts <= %s "
             "AND ((NOT is_forecast AND ts <= %s) OR (is_forecast AND ts > %s)) ORDER BY site_id, ts",
             (first, last, now, now),
         ).fetchall()

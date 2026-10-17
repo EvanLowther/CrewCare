@@ -7,11 +7,12 @@ from planit.ml.evaluate import calibration_table, level_table, rules_scores, sum
 
 
 def test_rules_scores_treat_missing_values_as_unknown():
-    frame = pd.DataFrame({"max_heat_index_f": [float("nan"), 115.0], "total_precip_in": [0.0, 0.0],
+    frame = pd.DataFrame({"max_nws_heat_index_f": [float("nan"), 115.0], "total_precip_in": [0.0, 0.0],
+                          "max_hourly_precip_in": [0.0, 0.0], "precip_prev_3d_in": [0.0, 0.0],
                           "avg_soil_moisture": [0.1, 0.1], "max_gust_mph": [10.0, 10.0]})
     calm, hot = rules_scores(frame)
     assert calm == 0.0  # a NaN heat index must not count as extreme heat
-    assert hot == 3.5
+    assert hot == 9.0  # rules-v2: OSHA says no strenuous work at 115°F
 
 
 def test_summary_and_level_table():

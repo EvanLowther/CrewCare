@@ -3,13 +3,13 @@
     python -m planit.ml.evaluate
 
 Leave-one-year-out over 2023-2025: each year is scored by a model trained on the other two, so every number is
-out of sample. For each year the model is compared with rules-v1 run on the same daily weather, on what the
+out of sample. For each year the model is compared with rules-v2 run on the same daily weather, on what the
 dashboard shows: how often "high"/"extreme" days were real hazard days (precision), how many real hazard days
 were flagged high or above (recall), recall per hazard group, calibration, and named case studies. Finally it
 compares live forecast weather with observed weather for the same days (train/serve skew).
 
-rules-v1 here sees what history has: heat, rain, soil and gusts. Live it also gets CAPE, thunderstorm codes and
-alerts, so this comparison is about the weather part of the score.
+rules-v2 here sees what history has: the day's peak NWS heat index, rain, peak hourly rain, soil and gusts. Live it
+also gets CAPE, thunderstorm codes and alerts, so this comparison is about the weather part of the score.
 """
 
 from __future__ import annotations
@@ -20,13 +20,13 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import average_precision_score, roc_auc_score
 
-from planit.ml.features import FEATURES, build_frame, label_days, load_inputs
+from planit.ml.features import FEATURES, build_frame, label_days, load_inputs, utc_day
 from planit.ml.model import heat_floor, score_from_probability
 from planit.ml.score import HourInputs, level_for, score_hour
 from planit.ml.train import fit
 
 LEVELS = ["low", "moderate", "high", "extreme"]
-SCORERS = ["model", "model_heat", "rules"]  # ML alone, ML + OSHA heat floor (what ships), rules-v1
+SCORERS = ["model", "model_heat", "rules"]  # ML alone, ML + OSHA heat floor (Predictive), rules-v2 (Real-time)
 FLAG_AT = 5.0  # "high" or above: what a supervisor would act on
 
 HAZARD_GROUPS = {
@@ -66,15 +66,37 @@ WHERE f.is_forecast AND NOT o.is_forecast AND f.hours = 24 AND o.hours = 24
 """
 
 
+# Daily peak NWS heat index from hourly temperature + humidity (Rothfusz regression; the small NWS humidity
+# adjustments in hazards.nws_heat_index are left out here, they move the peak by well under 1°F in Florida).
+NWS_HEAT_SQL = """
+WITH h AS (
+    SELECT site_id, time_bucket('1 day', ts) AS day, temp_f AS t, humidity_pct AS rh,
+           0.5 * (temp_f + 61.0 + (temp_f - 68.0) * 1.2 + humidity_pct * 0.094) AS simple
+    FROM weather
+    WHERE NOT is_forecast AND ts >= %(start)s AND ts < %(end)s AND temp_f IS NOT NULL AND humidity_pct IS NOT NULL
+)
+SELECT site_id, day, max(CASE WHEN (simple + t) / 2 < 80 THEN simple ELSE
+    -42.379 + 2.04901523 * t + 10.14333127 * rh - 0.22475541 * t * rh - 0.00683783 * t * t
+    - 0.05481717 * rh * rh + 0.00122874 * t * t * rh + 0.00085282 * t * rh * rh - 0.00000199 * t * t * rh * rh
+    END) AS max_nws_heat_index_f
+FROM h GROUP BY 1, 2
+"""
+
+
 def _value(v: float) -> float | None:
     return None if v is None or (isinstance(v, float) and math.isnan(v)) else float(v)
 
 
 def rules_scores(frame: pd.DataFrame) -> np.ndarray:
-    """rules-v1 on daily weather (no CAPE, thunderstorm codes or alerts in history)."""
+    """rules-v2 on daily weather (no CAPE, thunderstorm codes or alerts in history)."""
+    def col(r, name):
+        return _value(getattr(r, name, None))
+
     return np.array([score_hour(HourInputs(
-        heat_index_f=_value(r.max_heat_index_f), rain_24h_in=_value(r.total_precip_in),
-        soil_moisture=_value(r.avg_soil_moisture), gust_mph=_value(r.max_gust_mph)))[0]
+        heat_index_f=col(r, "max_nws_heat_index_f"), rain_1h_in=col(r, "max_hourly_precip_in"),
+        rain_24h_in=col(r, "total_precip_in"),
+        rain_72h_in=(col(r, "total_precip_in") or 0) + (col(r, "precip_prev_3d_in") or 0),
+        soil_moisture=col(r, "avg_soil_moisture"), gust_mph=col(r, "max_gust_mph")))[0]
         for r in frame.itertuples()])
 
 
@@ -181,9 +203,11 @@ def main() -> None:
         daily, sites, events = load_inputs()
         with connection() as conn:
             skew = skew_report(conn)
+            heat = pd.DataFrame(conn.execute(NWS_HEAT_SQL, {"start": "2023-01-01", "end": "2026-01-01"}).fetchall())
     finally:
         get_pool().close()
-    scored = leave_one_year_out(build_frame(daily, sites, events))
+    heat["day"] = utc_day(heat["day"])
+    scored = leave_one_year_out(build_frame(daily, sites, events).merge(heat, on=["site_id", "day"], how="left"))
     y_all = scored["label"].to_numpy()
 
     print(f"{len(scored):,} site-days, {100 * y_all.mean():.1f}% hazard days. Each year scored by a model trained"
