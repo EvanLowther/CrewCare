@@ -1,25 +1,48 @@
 "use client";
 
-import { Bell, Camera, FileText, LayoutDashboard, Menu, Search, X, Zap, type LucideIcon } from "lucide-react";
+import {
+  Bell,
+  Camera,
+  FileText,
+  LayoutDashboard,
+  LogIn,
+  LogOut,
+  Menu,
+  MapPinPlus,
+  Search,
+  ShieldCheck,
+  X,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { api, type SiteSummary } from "@/lib/api";
+import { DEV_AUTH, DEV_USERS, devUser, setDevUser, SIGN_OUT_HREF, signInHref } from "@/lib/auth";
 import { usePolling } from "@/lib/usePolling";
+import { useMe } from "./MeProvider";
 import { ScoreChip } from "./ui";
 
 const fetchAlerts = () => api.alerts();
 
-const NAV: { href: string; label: string; icon: LucideIcon; badge?: "alerts" }[] = [
+type NavItem = { href: string; label: string; icon: LucideIcon; badge?: "alerts"; show?: "manager" | "admin" };
+
+const NAV: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/alerts", label: "Alerts", icon: Bell, badge: "alerts" },
   { href: "/report", label: "Crew reports", icon: Camera },
   { href: "/briefings", label: "Briefings", icon: FileText },
+  { href: "/sites/new", label: "New site", icon: MapPinPlus, show: "manager" },
+  { href: "/admin", label: "Admin", icon: ShieldCheck, show: "admin" },
 ];
 
 function isActive(pathname: string, href: string) {
-  return href === "/" ? pathname === "/" || pathname.startsWith("/sites") : pathname.startsWith(href);
+  if (href === "/") return pathname === "/" || (pathname.startsWith("/sites") && pathname !== "/sites/new");
+  return pathname.startsWith(href);
 }
+
+const ROLE_LABELS = { admin: "Admin", manager: "Manager", crew: "Crew" } as const;
 
 function Logo() {
   return (
@@ -134,11 +157,15 @@ function ActiveNavLinks({ onNavigate }: { onNavigate?: () => void }) {
 
 function NavList({ pathname, onNavigate }: { pathname: string | null; onNavigate?: () => void }) {
   const { data } = usePolling(fetchAlerts, 30_000);
+  const { role } = useMe();
   const alertCount = data?.alerts.length ?? 0;
+  const items = NAV.filter(
+    (n) => !n.show || role === "admin" || (n.show === "manager" && role === "manager"),
+  );
 
   return (
     <nav className="flex flex-col gap-1" aria-label="Main">
-      {NAV.map(({ href, label, icon: Icon, badge }) => {
+      {items.map(({ href, label, icon: Icon, badge }) => {
         const active = pathname !== null && isActive(pathname, href);
         return (
           <Link
@@ -166,6 +193,73 @@ function NavList({ pathname, onNavigate }: { pathname: string | null; onNavigate
   );
 }
 
+/** Sign in / out, and who you are. On laptops (NEXT_PUBLIC_AUTH_DEV=1) a "Sign in as" menu of fake users. */
+const noSubscribe = () => () => {};
+
+function Account() {
+  const { me } = useMe();
+  const user = me?.user;
+  // localStorage only exists in the browser; the server renders "signed out" and the browser fills it in.
+  const currentDevUser = useSyncExternalStore(noSubscribe, devUser, () => null);
+
+  if (DEV_AUTH) {
+    return (
+      <label className="block rounded-lg border border-dashed border-line bg-card px-3 py-2.5 text-xs">
+        <span className="mb-1 block font-medium text-muted">Sign in as (dev)</span>
+        <select
+          value={currentDevUser ?? ""}
+          onChange={(e) => setDevUser(e.target.value || null)}
+          className="w-full rounded-md border border-line bg-raised px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none"
+        >
+          <option value="">Signed out</option>
+          {DEV_USERS.map((u) => (
+            <option key={u.key} value={u.key}>
+              {u.label} ({u.role})
+            </option>
+          ))}
+        </select>
+      </label>
+    );
+  }
+
+  if (!me) return <div className="h-[52px] rounded-lg border border-line bg-card" aria-hidden />;
+  if (!user) {
+    return (
+      // A full page load (not <Link>): Auth0's login is a redirect handled by the server.
+      <a
+        href="/auth/login"
+        onClick={(e) => {
+          // Come back to the page they were on.
+          e.currentTarget.href = signInHref(window.location.pathname + window.location.search);
+        }}
+        className="flex items-center justify-center gap-2 rounded-lg border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink hover:border-accent"
+      >
+        <LogIn className="h-4 w-4 text-accent" aria-hidden />
+        Sign in
+      </a>
+    );
+  }
+  return (
+    <div className="flex items-center gap-2.5 rounded-lg border border-line bg-card px-3 py-2.5">
+      {user.picture ? (
+        // eslint-disable-next-line @next/next/no-img-element -- Auth0/Google avatar
+        <img src={user.picture} alt="" className="h-8 w-8 rounded-full" referrerPolicy="no-referrer" />
+      ) : (
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent-soft text-sm font-medium text-accent">
+          {(user.name ?? user.email ?? "?").slice(0, 1).toUpperCase()}
+        </span>
+      )}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm text-ink">{user.name ?? user.email}</span>
+        <span className="text-xs text-muted">{ROLE_LABELS[user.role]}</span>
+      </span>
+      <a href={SIGN_OUT_HREF} aria-label="Sign out" title="Sign out" className="p-1.5 text-ink-2 hover:text-ink">
+        <LogOut className="h-4 w-4" aria-hidden />
+      </a>
+    </div>
+  );
+}
+
 function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="flex h-full flex-col gap-6 px-4 py-5">
@@ -175,10 +269,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
       <SiteSearch onNavigate={onNavigate} />
       <NavLinks onNavigate={onNavigate} />
       <div className="mt-auto space-y-3">
-        <div className="rounded-lg border border-line bg-card px-3 py-3 text-xs text-ink-2">
-          <p className="font-medium text-ink">US field operations</p>
-          <p className="mt-0.5 text-muted">Weather every 30 min · NWS alerts every 2 min</p>
-        </div>
+        <Account />
         <Link
           href="/report"
           onClick={onNavigate}

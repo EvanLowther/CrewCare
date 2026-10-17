@@ -10,6 +10,8 @@ Environment=NODE_ENV=production
 Environment=PORT=3000
 Environment=HOSTNAME=127.0.0.1
 Environment=API_PROXY_TARGET=http://127.0.0.1:8000
+# AUTH0_* settings for sign-in (docs/AUTH.md) live in the shared .env.
+EnvironmentFile=/opt/planit/.env
 ExecStart=/opt/planit/frontend/node_modules/.bin/next start
 Restart=always
 RestartSec=3

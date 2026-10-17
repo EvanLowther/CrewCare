@@ -27,6 +27,13 @@ if [[ "${1:-}" == "--force" ]] || grep -q '^backend/pyproject.toml' <<<"$changed
   as_planit "$APP/.venv/bin/pip" install -q -e "$APP/backend[ml]"
 fi
 
+if grep -q '^deploy/systemd/' <<<"$changed"; then
+  log "updating services"
+  cp "$APP"/deploy/systemd/*.service "$APP"/deploy/systemd/*.timer /etc/systemd/system/
+  systemctl daemon-reload
+  systemctl restart planit-web
+fi
+
 if grep -q '^db/migrations/' <<<"$changed"; then
   log "applying migrations"
   (cd "$APP/backend" && as_planit "$APP/.venv/bin/python" scripts/migrate.py)

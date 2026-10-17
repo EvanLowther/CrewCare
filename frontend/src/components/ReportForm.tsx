@@ -9,6 +9,8 @@ import {
   HeartPulse,
   ImagePlus,
   Loader2,
+  LogIn,
+  Lock,
   MapPin,
   Mountain,
   PawPrint,
@@ -21,8 +23,10 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, type HazardReport, type HazardType, type ReportSeverity, type SiteSummary } from "@/lib/api";
+import { DEV_AUTH, signInHref } from "@/lib/auth";
+import { useMe } from "./MeProvider";
 import type { LatLng } from "./ReportPinMap";
-import { Card, CardHeader } from "./ui";
+import { Card, CardHeader, EmptyState } from "./ui";
 
 const ReportPinMap = dynamic(() => import("./ReportPinMap"), {
   ssr: false,
@@ -45,8 +49,7 @@ const SEVERITIES: { value: ReportSeverity; label: string; hint: string; color: s
   { value: "high", label: "High", hint: "Stop / keep clear", color: "#d03b3b" },
 ];
 
-const NAME_KEY = "planit.reporterName";
-const SITE_RADIUS_MI = 10; // same as the API's NEAREST_SITE_MI
+const REPORT_RADIUS_MI = 5; // same as the API's REPORT_RADIUS_MI (planit/api/access.py)
 
 function miles(a: LatLng, b: { latitude: number; longitude: number }): number {
   const rad = Math.PI / 180;
@@ -56,20 +59,8 @@ function miles(a: LatLng, b: { latitude: number; longitude: number }): number {
   return 3958.8 * 2 * Math.asin(Math.sqrt(h));
 }
 
-function readName(): string {
-  try {
-    return localStorage.getItem(NAME_KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-function saveName(name: string) {
-  try {
-    localStorage.setItem(NAME_KEY, name);
-  } catch {
-    /* private mode: just don't remember it */
-  }
+function fmtMiles(mi: number) {
+  return mi < 0.1 ? `${Math.round(mi * 5280)} ft` : `${mi.toFixed(1)} mi`;
 }
 
 type Gps = { status: "idle" | "locating" | "ok" | "denied" | "unavailable" | "insecure"; accuracyM: number | null };
@@ -82,8 +73,34 @@ function initialGps(): Gps {
   return { status: "locating", accuracyM: null };
 }
 
-export function ReportForm() {
-  const [sites, setSites] = useState<SiteSummary[]>([]);
+/** Signed-in members report on their sites; signed-out visitors get a sign-in prompt. */
+export function ReportForm({ initialSiteId }: { initialSiteId: number | null }) {
+  const { me } = useMe();
+  if (!me) return <p className="text-sm text-muted">Loading…</p>;
+  if (!me.user) {
+    return (
+      <Card className="mx-auto max-w-xl">
+        <EmptyState icon={Lock} title="Sign in to report a hazard" detail="Reports go to the crews and managers on your sites." />
+        <div className="pb-8 text-center">
+          {DEV_AUTH ? (
+            <p className="text-sm text-muted">Pick a user in the sidebar&apos;s &ldquo;Sign in as&rdquo; menu.</p>
+          ) : (
+            <a
+              href={signInHref(`/report${initialSiteId ? `?site=${initialSiteId}` : ""}`)}
+              className="inline-flex items-center gap-2 rounded-lg bg-accent-strong px-4 py-2 text-sm font-medium text-white hover:bg-accent"
+            >
+              <LogIn className="h-4 w-4" aria-hidden /> Sign in
+            </a>
+          )}
+        </div>
+      </Card>
+    );
+  }
+  return <SignedInReportForm initialSiteId={initialSiteId} isAdmin={me.user.role === "admin"} reporter={me.user.name ?? me.user.email ?? "you"} />;
+}
+
+function SignedInReportForm({ initialSiteId, isAdmin, reporter }: { initialSiteId: number | null; isAdmin: boolean; reporter: string }) {
+  const [sites, setSites] = useState<SiteSummary[] | null>(null);
   const [gps, setGps] = useState<Gps>(initialGps);
   const [gpsFix, setGpsFix] = useState<LatLng | null>(null);
   const [pin, setPin] = useState<LatLng | null>(null);
@@ -92,14 +109,18 @@ export function ReportForm() {
   const [hazard, setHazard] = useState<HazardType | null>(null);
   const [severity, setSeverity] = useState<ReportSeverity | null>(null);
   const [description, setDescription] = useState("");
-  const [name, setName] = useState(readName);
+  const [chosenId, setChosenId] = useState<number | null>(initialSiteId);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<HazardReport | null>(null);
 
   useEffect(() => {
-    api.sites("rules").then((r) => setSites(r.sites)).catch(() => setSites([]));
-  }, []);
+    // The sites this person may report on: the ones they're on (admins: all).
+    api
+      .sites("rules")
+      .then((r) => setSites(r.sites.filter((s) => isAdmin || s.my_role)))
+      .catch(() => setSites([]));
+  }, [isAdmin]);
 
   /** Ask the browser for a fix; state only changes in its callbacks. */
   const requestFix = useCallback(() => {
@@ -133,32 +154,41 @@ export function ReportForm() {
     if (preview) URL.revokeObjectURL(preview);
   }, [preview]);
 
-  const nearest = useMemo(() => {
-    if (!pin || sites.length === 0) return null;
-    let best: { site: SiteSummary; mi: number } | null = null;
-    for (const site of sites) {
-      const mi = miles(pin, site);
-      if (!best || mi < best.mi) best = { site, mi };
-    }
-    return best;
-  }, [pin, sites]);
+  // Your sites by distance from where you are (the GPS fix, or the pin until there is one).
+  const options = useMemo(() => {
+    const from = gpsFix ?? pin;
+    return (sites ?? [])
+      .map((site) => {
+        const mi = from ? miles(from, site) : null;
+        return { site, mi, eligible: isAdmin || (gpsFix !== null && mi !== null && mi <= REPORT_RADIUS_MI) };
+      })
+      .sort((a, b) => (a.mi ?? Infinity) - (b.mi ?? Infinity));
+  }, [sites, gpsFix, pin, isAdmin]);
+
+  // The chosen site if it's still eligible, otherwise the nearest eligible one.
+  const chosen =
+    options.find((o) => o.site.id === chosenId && o.eligible) ?? options.find((o) => o.eligible) ?? null;
+  const pinMi = chosen && pin ? miles(pin, chosen.site) : null;
+  const pinTooFar = !isAdmin && pinMi !== null && pinMi > REPORT_RADIUS_MI;
 
   const moved = pin && gpsFix ? miles(gpsFix, { latitude: pin.lat, longitude: pin.lng }) * 5280 : 0; // feet
-  const ready = pin !== null && hazard !== null && severity !== null && !submitting;
+  const ready = pin !== null && chosen !== null && !pinTooFar && hazard !== null && severity !== null && !submitting;
 
   async function submit() {
-    if (!pin || !hazard || !severity) return;
+    if (!pin || !hazard || !severity || !chosen) return;
     setSubmitting(true);
     setError(null);
     try {
-      if (name.trim()) saveName(name.trim());
       const report = await api.createReport({
+        site_id: chosen.site.id,
         latitude: pin.lat,
         longitude: pin.lng,
+        gps_latitude: gpsFix?.lat,
+        gps_longitude: gpsFix?.lng,
+        gps_accuracy_m: gps.accuracyM ?? undefined,
         hazard_type: hazard,
         severity,
         description: description.trim() || undefined,
-        reporter_name: name.trim() || undefined,
         photo: photo ?? undefined,
       });
       setCreated(report);
@@ -179,14 +209,14 @@ export function ReportForm() {
   }
 
   if (created) {
-    const site = sites.find((s) => s.id === created.site_id);
+    const site = (sites ?? []).find((s) => s.id === created.site_id);
     return (
       <Card className="mx-auto max-w-xl">
         <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
           <CheckCircle2 className="h-12 w-12 text-risk-low" aria-hidden />
           <h2 className="text-lg font-semibold text-ink">Report shared</h2>
           <p className="text-sm text-ink-2">
-            {site ? `Pinned near ${site.name}. ` : "Pinned on the map. "}Crews and supervisors can see it now.
+            {site ? `Filed on ${site.name}. ` : "Pinned on the map. "}Its crew and managers can see it now.
           </p>
           {created.photo_url && (
             // eslint-disable-next-line @next/next/no-img-element -- our own resized upload
@@ -210,6 +240,18 @@ export function ReportForm() {
             </button>
           </div>
         </div>
+      </Card>
+    );
+  }
+
+  if (sites !== null && sites.length === 0) {
+    return (
+      <Card className="mx-auto max-w-xl">
+        <EmptyState
+          icon={MapPin}
+          title="You're not on any sites yet"
+          detail="You can report hazards on sites you belong to. Ask your site manager to add you."
+        />
       </Card>
     );
   }
@@ -242,17 +284,15 @@ export function ReportForm() {
             gps={gpsFix}
             accuracyM={gps.accuracyM}
             recenterKey={recenterKey}
-            sites={sites}
+            sites={sites ?? []}
             onMove={setPin}
           />
         </div>
         <div className="space-y-1 px-5 py-3 text-xs">
           <GpsStatus gps={gps} hasPin={pin !== null} movedFt={moved} />
-          {nearest && (
-            <p className={nearest.mi <= SITE_RADIUS_MI ? "text-ink-2" : "text-[#fcc954]"}>
-              {nearest.mi <= SITE_RADIUS_MI
-                ? `Nearest site: ${nearest.site.name} · ${nearest.mi < 0.1 ? `${Math.round(nearest.mi * 5280)} ft` : `${nearest.mi.toFixed(1)} mi`}`
-                : `No site within ${SITE_RADIUS_MI} miles (nearest: ${nearest.site.name}, ${nearest.mi.toFixed(0)} mi). The report still goes on the map.`}
+          {pinTooFar && chosen && (
+            <p className="text-[#fcc954]">
+              The pin is {fmtMiles(pinMi!)} from {chosen.site.name}. Move it within {REPORT_RADIUS_MI} miles of the site.
             </p>
           )}
         </div>
@@ -261,6 +301,7 @@ export function ReportForm() {
       <Card>
         <CardHeader title="2. What is it?" icon={TriangleAlert} subtitle="A photo helps the next crew recognize it" />
         <div className="space-y-5 px-5 pb-5">
+          <SitePicker options={options} chosenId={chosen?.site.id ?? null} onChoose={setChosenId} isAdmin={isAdmin} gps={gpsFix !== null ? "ok" : gps.status === "locating" || gps.status === "idle" ? "waiting" : "off"} loading={sites === null} />
           <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-line bg-raised/50 p-3 hover:border-accent">
             {preview ? (
               // eslint-disable-next-line @next/next/no-img-element -- local preview of the chosen photo
@@ -339,16 +380,7 @@ export function ReportForm() {
             />
           </label>
 
-          <label className="block">
-            <span className="mb-1.5 block text-xs font-medium text-muted">Your name (optional, remembered on this device)</span>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={80}
-              placeholder="e.g. J. Ramirez"
-              className="w-full rounded-lg border border-line bg-raised px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none"
-            />
-          </label>
+          <p className="text-xs text-muted">Reporting as {reporter}</p>
 
           {error && <p className="rounded-lg bg-[rgb(208_59_59/0.12)] px-3 py-2 text-sm text-[#ff9b9b]">{error}</p>}
 
@@ -363,7 +395,17 @@ export function ReportForm() {
           </button>
           {!ready && !submitting && (
             <p className="text-center text-xs text-muted">
-              {!pin ? "Set the location first" : !hazard ? "Pick a hazard type" : "Pick a severity"}
+              {!pin
+                ? "Set the location first"
+                : !chosen
+                  ? gpsFix
+                    ? `None of your sites is within ${REPORT_RADIUS_MI} miles of you`
+                    : "Turn on location so we can confirm you're at the site"
+                  : pinTooFar
+                    ? "Move the pin closer to the site"
+                    : !hazard
+                      ? "Pick a hazard type"
+                      : "Pick a severity"}
             </p>
           )}
         </div>
@@ -396,4 +438,55 @@ function GpsStatus({ gps, hasPin, movedFt }: { gps: Gps; hasPin: boolean; movedF
     default:
       return hasPin ? null : <p className="text-muted">Tap the map where the hazard is.</p>;
   }
+}
+
+type SiteOption = { site: SiteSummary; mi: number | null; eligible: boolean };
+
+/** Which site the report is for: your sites within 5 miles of your GPS fix, nearest first. */
+function SitePicker({
+  options,
+  chosenId,
+  onChoose,
+  isAdmin,
+  gps,
+  loading,
+}: {
+  options: SiteOption[];
+  chosenId: number | null;
+  onChoose: (id: number) => void;
+  isAdmin: boolean;
+  gps: "ok" | "waiting" | "off";
+  loading: boolean;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-xs font-medium text-muted">
+        Site {isAdmin ? "(admin: any site)" : `(yours, within ${REPORT_RADIUS_MI} miles of you)`}
+      </span>
+      <select
+        value={chosenId ?? ""}
+        onChange={(e) => onChoose(Number(e.target.value))}
+        disabled={loading || !options.some((o) => o.eligible)}
+        className="w-full rounded-lg border border-line bg-raised px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none disabled:opacity-60"
+      >
+        {loading && <option value="">Loading your sites…</option>}
+        {!loading && !options.some((o) => o.eligible) && (
+          <option value="">
+            {gps === "ok"
+              ? `None of your sites within ${REPORT_RADIUS_MI} mi`
+              : gps === "waiting"
+                ? "Waiting for your location…"
+                : "Turn on location to report"}
+          </option>
+        )}
+        {options.map((o) => (
+          <option key={o.site.id} value={o.site.id} disabled={!o.eligible}>
+            {o.site.name}
+            {o.mi !== null ? ` · ${fmtMiles(o.mi)}` : ""}
+            {!o.eligible && o.mi !== null ? " (too far)" : ""}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 }

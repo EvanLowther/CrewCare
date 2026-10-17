@@ -6,8 +6,11 @@ import Link from "next/link";
 import { useCallback, useState } from "react";
 import { api, type Scorer } from "@/lib/api";
 import { usePolling } from "@/lib/usePolling";
+import { useSiteScope } from "@/lib/useSiteScope";
 import { AlertsFeed } from "./AlertsFeed";
+import { useMe } from "./MeProvider";
 import { MODEL_LABELS, ModelSwitch } from "./ModelSwitch";
+import { ScopeSwitch } from "./ScopeSwitch";
 import { SiteList } from "./SiteList";
 import { Card, CardHeader, ErrorBanner, LiveIndicator, PageHeader, RiskLegend, StatTile } from "./ui";
 
@@ -23,14 +26,19 @@ const fetchReports = () => api.reports();
 
 export function Dashboard() {
   const [model, setModel] = useState<Scorer>("ml");
-  const fetchSites = useCallback(() => api.sites(model), [model]);
+  const { me } = useMe();
+  const scope = useSiteScope();
+  // Refetch when the viewer changes (signing in reveals their private sites).
+  const viewer = me?.user?.id ?? null;
+  const fetchSites = useCallback(() => api.sites(model), [model, viewer]); // eslint-disable-line react-hooks/exhaustive-deps
   const sitesPoll = usePolling(fetchSites, POLL_MS);
   const alertsPoll = usePolling(fetchAlerts, POLL_MS);
   const reportsPoll = usePolling(fetchReports, POLL_MS);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  const sites = sitesPoll.data?.sites ?? [];
-  const alerts = alertsPoll.data?.alerts ?? [];
+  const sites = (sitesPoll.data?.sites ?? []).filter((s) => scope.includes(s.id));
+  const alerts = (alertsPoll.data?.alerts ?? []).filter((a) => scope.includes(a.site_id));
+  const reports = (reportsPoll.data?.reports ?? []).filter((r) => r.site_id === null || scope.includes(r.site_id));
   const anyScored = sites.some((s) => s.risk !== null);
   const danger = alerts.filter((a) => a.severity === "danger").length;
   const warning = alerts.filter((a) => a.severity === "warning").length;
@@ -43,10 +51,15 @@ export function Dashboard() {
         title="Site risk dashboard"
         subtitle={
           sitesPoll.data
-            ? `${sites.length} sites · updated ${new Date(sitesPoll.data.updated_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+            ? `${sites.length} ${sites.length === 1 ? "site" : "sites"} · updated ${new Date(sitesPoll.data.updated_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
             : "Loading sites…"
         }
-        actions={<LiveIndicator label="Live · refreshes every 10 s" />}
+        actions={
+          <div className="flex flex-wrap items-center gap-3">
+            {scope.available && <ScopeSwitch value={scope.scope} onChange={scope.setScope} />}
+            <LiveIndicator label="Live · refreshes every 10 s" />
+          </div>
+        }
       />
 
       {error && <ErrorBanner message={error} />}
@@ -93,7 +106,7 @@ export function Dashboard() {
               selectedId={selectedId}
               onSelect={setSelectedId}
               model={model}
-              reports={reportsPoll.data?.reports ?? []}
+              reports={reports}
             />
             {/* Above Leaflet's panes and controls (z-index up to 1000). */}
             <div className="absolute right-3 top-3 z-1001">
@@ -117,7 +130,7 @@ export function Dashboard() {
         <CardHeader
           title="Live alerts"
           icon={Siren}
-          subtitle="NWS warnings and stop-work alerts across all sites, most severe first"
+          subtitle={`NWS warnings and stop-work alerts across ${scope.scope === "mine" ? "your" : "all"} sites, most severe first`}
           actions={
             <Link href="/alerts" className="text-xs font-medium text-accent hover:underline">
               View all
