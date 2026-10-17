@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 import httpx
 from psycopg.types.json import Jsonb
 
+from planit import hazards
 from planit.config import settings
 from planit.db import connection
 
@@ -55,8 +56,10 @@ def alert_type_for(event: str) -> str:
     return "nws"
 
 
-def severity_for(nws_severity: str | None) -> str:
-    return {"Extreme": "danger", "Severe": "danger", "Moderate": "warning"}.get(nws_severity or "", "info")
+def severity_for(event: str, nws_severity: str | None = None) -> str:
+    """App badge from the rules-v2 event table (hazards.NWS_EVENTS): a Tornado Warning is danger, a Wind Advisory
+    a warning, whatever NWS's generic severity field says."""
+    return hazards.badge_for(hazards.nws_event(event, nws_severity)[0])
 
 
 def short_message(description: str | None, instruction: str | None) -> str:
@@ -86,7 +89,7 @@ def to_rows(site_id: int, feature: dict) -> tuple[dict, dict]:
     app_row = {
         "site_id": site_id,
         "type": alert_type_for(p["event"]),
-        "severity": severity_for(p.get("severity")),
+        "severity": severity_for(p["event"], p.get("severity")),
         "title": p.get("headline") or p["event"],
         "message": short_message(p.get("description"), p.get("instruction")),
         "started_at": _ts(p.get("onset")) or _ts(p.get("sent")) or datetime.now(UTC),

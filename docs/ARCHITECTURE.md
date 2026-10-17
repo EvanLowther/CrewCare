@@ -53,8 +53,32 @@ Changing the schema: add `db/migrations/002_<name>.sql`. Never edit a migration 
 
 ## Risk levels
 
-`low` < 2.5 ≤ `moderate` < 5 ≤ `high` < 7.5 ≤ `extreme`. Defined in `backend/planit/ml/score.py` and
-`frontend/src/lib/risk.ts`; keep them the same.
+Two scorers write `hazard_scores` side by side (`scorer` column, migration 003), and the dashboard's switch picks one
+(`?model=rules|ml`, default `ml`):
+
+- **Real-time** (`scorer='rules'`, rules-v2): measured conditions against work rules, described below.
+- **Predictive** (`scorer='ml'`, e.g. `xgb-2026-10-17`): the XGBoost model's storm-day likelihood, plus the OSHA heat
+  floor, alert points and the lightning floor (`backend/planit/ml/score.py`, `ml/model.py`).
+
+| Score | Level | Meaning for the crew |
+|---|---|---|
+| 0 – 2.4 | low | Normal operations |
+| 2.5 – 4.9 | moderate | Work with precautions |
+| 5 – 7.4 | high | Restricted work |
+| 7.5 – 10 | extreme | Stop non-essential work |
+
+Bands are defined in `backend/planit/ml/score.py` (`level_for`) and `frontend/src/lib/risk.ts`; keep them the same.
+
+rules-v2 scores every hazard on that one 0-10 scale in `backend/planit/hazards.py`, anchored to published work rules:
+the NWS heat index on OSHA's bands (91°F moderate, 103°F high, 115°F "no strenuous work" ≈ 9), lightning = 10,
+forecast thunderstorms 8-9, wind gusts against lift limits (20 mph personnel lifts, 28 mph aerial lifts, 40 mph
+elevated work), rain rate, 24 h rain, saturated ground, and NWS alerts by event (Tornado Warning 10, Wind
+Advisory 4.5, ...). The site score is the worst kind of hazard plus 0.25 × the second and 0.10 × the third, each only
+if it's high (≥ 5) on its own; hazards of the same kind (a Wind Advisory and the gusts it warns about) count once.
+Each factor carries a recommended `action` for supervisors.
+
+The API's `heat_index_f` is the NWS heat index computed from temperature and humidity. The stored
+`weather.heat_index_f` column is Open-Meteo's "feels like" value, which the model's features are trained on.
 
 ## Mock mode
 

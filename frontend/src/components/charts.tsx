@@ -122,7 +122,7 @@ function forecastRows(forecast: Conditions[]) {
   return forecast.map((c) => ({ t: new Date(c.ts).getTime(), heat: c.heat_index_f, rain: c.precip_prob_pct }));
 }
 
-/** Heat index for the next 48 h, with the OSHA "extreme caution" line at 103°F. */
+/** NWS heat index for the next 48 h, with OSHA's 103°F (high risk) and 115°F (no strenuous work) lines. */
 export function HeatIndexChart({ forecast, timeZone }: { forecast: Conditions[]; timeZone: string }) {
   const rows = forecastRows(forecast);
   if (rows.length === 0) return null;
@@ -130,7 +130,7 @@ export function HeatIndexChart({ forecast, timeZone }: { forecast: Conditions[];
   const end = rows[rows.length - 1].t;
   const values = rows.map((r) => r.heat ?? 0);
   const lo = Math.floor((Math.min(...values) - 5) / 10) * 10;
-  const hi = Math.max(110, Math.ceil((Math.max(...values) + 5) / 10) * 10);
+  const hi = Math.max(120, Math.ceil((Math.max(...values) + 5) / 10) * 10); // keep both OSHA lines in view
 
   return (
     <ResponsiveContainer width="100%" height={200}>
@@ -154,7 +154,9 @@ export function HeatIndexChart({ forecast, timeZone }: { forecast: Conditions[];
           tickLine={false}
         />
         <YAxis domain={[lo, hi]} tick={AXIS_TICK} axisLine={false} tickLine={false} width={44} tickFormatter={(v: number) => `${v}°`} />
-        <ReferenceLine y={103} stroke="#ec835a" strokeDasharray="4 4" label={{ value: "103°F extreme caution", fill: MUTED, fontSize: 11, position: "insideTopRight" }} />
+        {/* OSHA heat index bands: 103°F high risk; 115°F strenuous work should not be done */}
+        <ReferenceLine y={103} stroke="#ec835a" strokeDasharray="4 4" label={{ value: "103°F OSHA high risk", fill: MUTED, fontSize: 11, position: "insideTopRight" }} />
+        <ReferenceLine y={115} stroke="#d03b3b" strokeDasharray="4 4" label={{ value: "115°F no strenuous work", fill: MUTED, fontSize: 11, position: "insideTopRight" }} />
         <Tooltip
           cursor={{ stroke: MUTED, strokeWidth: 1 }}
           content={({ active, payload }) => {

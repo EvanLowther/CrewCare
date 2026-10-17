@@ -64,10 +64,15 @@ def _level(score: float) -> str:
 
 def _risk(site_id: int) -> Risk:
     score = _SCORES[site_id]
+    # Same shape as rules-v2: each factor's contribution is that hazard's own 0-10 severity, worst first.
     factors = [
-        RiskFactor(key="heat_index", label=f"Heat index {round(96 + score * 2)}°F", contribution=round(score * 0.35, 1)),
-        RiskFactor(key="soil_moisture", label="Soil saturated after 5 days of rain", contribution=round(score * 0.25, 1)),
-        RiskFactor(key="thunderstorm", label="Storms likely after 2 PM", contribution=round(score * 0.2, 1)),
+        RiskFactor(key="heat_index", label=f"Heat index {round(96 + score * 2)}°F · OSHA high risk",
+                   contribution=round(score * 0.9, 1),
+                   action="Limit exertion; enforce work/rest cycles; watch crews at all times"),
+        RiskFactor(key="soil_moisture", label="Saturated ground (soil moisture 41%)", contribution=round(score * 0.5, 1),
+                   action="Use matting or tracked equipment on unpaved access"),
+        RiskFactor(key="thunderstorm", label="Storm energy (CAPE 2,600, 60% rain chance)",
+                   contribution=round(score * 0.3, 1), action=None),
     ]
     return Risk(score=score, level=_level(score), factors=factors, model_version="mock", updated_at=_now())
 

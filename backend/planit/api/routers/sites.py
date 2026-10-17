@@ -12,7 +12,8 @@ from planit.models import SiteDetail, SiteList
 router = APIRouter(prefix="/api/sites", tags=["sites"])
 
 Scorer = Literal["ml", "rules"]
-MODEL_QUERY = Query(None, description="Whose risk scores: 'ml' (XGBoost) or 'rules' (rules-v1). Default: ml.")
+MODEL_QUERY = Query(None, description="Whose risk scores: 'ml' (XGBoost, Predictive) or 'rules' (rules-v2, "
+                          "Real-time). Default: ml.")
 
 
 @router.get("", response_model=SiteList)

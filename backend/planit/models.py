@@ -23,15 +23,23 @@ ReportSeverity = Literal["low", "medium", "high"]
 
 class RiskFactor(BaseModel):
     key: str = Field(examples=["heat_index"])
-    label: str = Field(examples=["Heat index 112°F"])
-    contribution: float = Field(description="Points this factor adds to the 0-10 score", examples=[2.4])
+    label: str = Field(examples=["Heat index 108°F · OSHA high risk"])
+    contribution: float = Field(
+        description="This hazard's own severity on the 0-10 scale (rules-v2); the worst one sets the score",
+        examples=[6.0],
+    )
+    action: str | None = Field(
+        default=None,
+        description="What a supervisor should do about it, from the work rule behind the threshold",
+        examples=["Limit exertion; enforce work/rest cycles; watch crews at all times"],
+    )
 
 
 class Risk(BaseModel):
     score: float = Field(ge=0, le=10, examples=[7.8])
     level: RiskLevel
     factors: list[RiskFactor] = Field(description="Top contributing factors, largest first")
-    model_version: str = Field(examples=["rules-v1"])
+    model_version: str = Field(examples=["rules-v2+xgb-2026-10-17"])
     updated_at: datetime
 
 

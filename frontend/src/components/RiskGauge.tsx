@@ -1,5 +1,5 @@
 import type { RiskLevel } from "@/lib/api";
-import { NO_SCORE_COLOR, RISK_COLORS, RISK_LABELS } from "@/lib/risk";
+import { NO_SCORE_COLOR, RISK_COLORS, RISK_GUIDANCE, RISK_LABELS } from "@/lib/risk";
 
 const R = 80;
 const CIRC = Math.PI * R; // half circle
@@ -23,7 +23,7 @@ export function RiskGauge({ score, level }: { score: number | null; level: RiskL
       </svg>
       <div className="absolute inset-x-0 bottom-1 flex flex-col items-center">
         <span className="text-5xl font-semibold leading-none text-ink">{score === null ? "–" : score.toFixed(1)}</span>
-        <span className="mt-1 text-xs text-muted">{level ? `${RISK_LABELS[level]} risk · out of 10` : "No score yet"}</span>
+        <span className="mt-1 text-xs text-muted">{level ? `${RISK_LABELS[level]} · ${RISK_GUIDANCE[level]}` : "No score yet"}</span>
       </div>
     </div>
   );
