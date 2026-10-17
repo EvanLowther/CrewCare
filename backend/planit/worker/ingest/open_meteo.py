@@ -1,12 +1,13 @@
 """Owner: Person A. Hourly weather for every site -> `weather` table (Open-Meteo, no key).
 
 - backfill_history(): years of observed weather for ML training (archive API).
-- poll(): last 24 h + 3-day forecast (forecast API), hourly from the worker.
+- poll(): last 24 h + 3-day forecast (forecast API), every 3 hours from the worker. Real-time weather comes from
+  the NWS (nws_weather.py); this poll supplies soil moisture, CAPE, hourly rain and the ML model's inputs.
 
 Free-tier budget: 10,000 "calls" a day and 5,000 an hour, where one location x two weeks x up to 10
 variables counts as one call (call_weight()). Two years of history for 100 sites costs ~5,200, so
 backfill_history() paces itself to the hourly budget. A 160-site poll with 14 variables costs ~220,
-so poll hourly (~5,400 a day), not every few minutes.
+so every 3 hours is ~1,800 a day.
 """
 
 from __future__ import annotations

@@ -1,6 +1,41 @@
 """Pure-function tests for the NWS ingest (no network, no database)."""
 
-from planit.worker.ingest.nws import alert_type_for, is_relevant, severity_for, short_message, to_rows
+from planit.worker.ingest.nws import (
+    affects,
+    alert_type_for,
+    in_geometry,
+    is_relevant,
+    severity_for,
+    short_message,
+    to_rows,
+)
+
+SITE = {"id": 6030, "latitude": 47.38, "longitude": -101.16, "nws_zone": "NDZ058", "nws_county_zone": "NDC055"}
+SQUARE = {"type": "Polygon", "coordinates": [[[-102, 47], [-100, 47], [-100, 48], [-102, 48], [-102, 47]]]}
+
+
+def feature(ugc=(), geometry=None):
+    return {"geometry": geometry, "properties": {"geocode": {"UGC": list(ugc)}}}
+
+
+def test_alerts_match_by_polygon_first():
+    assert affects(SITE, feature(["NDC001"], SQUARE))  # inside the storm polygon, whatever the county list says
+    off = {"type": "Polygon", "coordinates": [[[-99, 47], [-98, 47], [-98, 48], [-99, 48], [-99, 47]]]}
+    assert not affects(SITE, feature(["NDC055"], off))  # same county, but the warning polygon misses the site
+
+
+def test_alerts_match_by_zone_without_polygon():
+    assert affects(SITE, feature(["NDZ058"]))
+    assert affects(SITE, feature(["NDC055", "NDC057"]))
+    assert not affects(SITE, feature(["MNZ001"]))
+    assert not affects({**SITE, "nws_zone": None, "nws_county_zone": None}, feature([]))
+
+
+def test_point_in_multipolygon_with_hole():
+    hole = [[-101.5, 47.2], [-100.5, 47.2], [-100.5, 47.6], [-101.5, 47.6], [-101.5, 47.2]]
+    donut = {"type": "MultiPolygon", "coordinates": [[SQUARE["coordinates"][0], hole]]}
+    assert not in_geometry(-101.16, 47.38, donut)
+    assert in_geometry(-101.9, 47.9, donut)
 
 
 def test_event_types():

@@ -86,15 +86,15 @@ plants ≥ 50 MW). Sized for Open-Meteo's free tier (10,000 calls/day). `a/us-si
       Arizona without DST, Alaska, Hawaii); 2-year weather history; national Storm Events matched on
       (state, county); retrain with cold/winter/wildfire/fog/dust labels and location, cold and snow features;
       evaluate per region
-- [ ] Open-Meteo budget: soil moisture in its own request every 3 h so the 30-min poll stays at ≤ 10 variables
-      (160 sites × 48 polls ≈ 7,700 calls/day)
-- [ ] NWS alerts polled by state or nationally instead of one request per site
+- [x] `a/nws-weather`: Real-time weather from the NWS API every 30 min (gridpoint forecast + station observation,
+      no daily cap); Open-Meteo every 3 h for soil moisture, CAPE, hourly rain and the ML inputs (~1,800 calls/day)
+- [x] NWS alerts: one national request every 2 min, matched by polygon or zone, instead of one per site
 - [ ] Lightning rule + countdown + replay (the existing item); then live strikes (GOES GLM)
 - [ ] Flood replay demo button, like the lightning one
 - [ ] River flood rule with NWS flood stages (replaces "USGS flood rule"); must cover the Mississippi
-- [ ] rules-v2 for national hazards: wind chill / extreme cold, snow / ice / freezing rain, active wildfire,
-      smoke / AQI, fog / dust visibility, debris flow, earthquake, coastal flood; actions for their NWS events;
-      new hazard kinds so they compound correctly
+- [x] rules-v2: wind chill (cold) and visibility (fog) from NWS weather; severities and actions for the national
+      NWS events (winter storm, ice storm, blizzard, extreme cold, dust, smoke, coastal flood, tsunami, ...)
+- [ ] rules-v2 for the rest: snow / ice accumulation, active wildfire, smoke / AQI, debris flow, earthquake
 - [ ] Score baseline per region, if "5" should mean "unusual for this site" rather than nationally
 - [ ] Later: separate models per hazard (storm, winter, flood, heat) instead of one "hazard day" model
 - [ ] 6 PM briefing job works for every US timezone
