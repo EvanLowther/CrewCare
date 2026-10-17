@@ -45,3 +45,16 @@ def test_hourly_rows_marks_future_hours_as_forecast():
     now = datetime(2025, 8, 1, 14, 30, tzinfo=UTC)
     rows = hourly_rows(621, HOURLY, ARCHIVE_VARS, now=now)
     assert [dict(zip(WEATHER_COLUMNS, r, strict=True))["is_forecast"] for r in rows] == [False, True]
+
+
+def test_blend_soil_moisture_weights_layers_by_depth():
+    from planit.worker.ingest.open_meteo import blend_soil_moisture
+
+    hourly = {"time": ["a", "b", "c"],
+              "soil_moisture_0_to_1cm": [0.10, None, None],
+              "soil_moisture_1_to_3cm": [0.20, 0.30, None],
+              "soil_moisture_3_to_9cm": [0.40, 0.30, None]}
+    blended = blend_soil_moisture(hourly)["soil_moisture_0_to_7cm"]
+    assert blended[0] == round((0.10 * 1 + 0.20 * 2 + 0.40 * 4) / 7, 4)
+    assert blended[1] == 0.3  # missing layers are left out of the average
+    assert blended[2] is None

@@ -1,7 +1,7 @@
 """Owner: Person A. Hourly weather for every site -> `weather` table (Open-Meteo, no key).
 
 - backfill_history(): years of observed weather for ML training (archive API).
-- poll(): recent observations + forecast (forecast API). Hours 4-8.
+- poll(): last 24 h + 3-day forecast (forecast API), every 30 minutes from the worker.
 
 Free-tier budget: 10,000 "calls" a day, where one location x two weeks of data counts as one
 call. The 3-year backfill for 60 sites costs ~4,700; a 60-site poll costs 60, so poll every
@@ -43,7 +43,17 @@ ARCHIVE_VARS = {
 WEATHER_COLUMNS = ["site_id", "ts", "is_forecast", "temp_f", "heat_index_f", "humidity_pct", "precip_in",
                    "precip_prob_pct", "wind_mph", "gust_mph", "cape_jkg", "soil_moisture", "weather_code"]
 
+# The forecast API has CAPE and rain probability, and soil in 0-1 / 1-3 / 3-9 cm layers instead of the
+# archive's 0-7 cm; blend_soil_moisture() combines them so live and historical values are comparable.
+FORECAST_VARS = {
+    **{k: v for k, v in ARCHIVE_VARS.items() if k != "soil_moisture_0_to_7cm"},
+    "precipitation_probability": "precip_prob_pct",
+    "cape": "cape_jkg",
+}
+FORECAST_SOIL_LAYERS = {"soil_moisture_0_to_1cm": 1, "soil_moisture_1_to_3cm": 2, "soil_moisture_3_to_9cm": 4}
+
 SITES_PER_REQUEST = 5  # keeps each archive request well under the per-minute budget
+FORECAST_SITES_PER_REQUEST = 20
 MAX_RETRIES = 6
 
 
@@ -150,5 +160,35 @@ def refresh_daily_rollup(start: str, end: str) -> None:
             conn.autocommit = False
 
 
-def poll() -> None:
-    raise NotImplementedError
+def blend_soil_moisture(hourly: dict) -> dict:
+    """Add a 0-7 cm soil moisture series to a forecast `hourly` block, weighting layers by depth used."""
+    layers = [(hourly.get(name), weight) for name, weight in FORECAST_SOIL_LAYERS.items()]
+    blended = []
+    for i in range(len(hourly["time"])):
+        values = [(series[i], w) for series, w in layers if series is not None and series[i] is not None]
+        blended.append(round(sum(v * w for v, w in values) / sum(w for _, w in values), 4) if values else None)
+    return {**hourly, "soil_moisture_0_to_7cm": blended}
+
+
+def poll() -> int:
+    """Last 24 h of observations + 3-day forecast for every site. Hours after now are stored as forecast."""
+    sites = load_sites()
+    now = datetime.now(UTC)
+    variables = {**FORECAST_VARS, "soil_moisture_0_to_7cm": "soil_moisture"}
+    total = 0
+    with httpx.Client() as client:
+        for batch in chunks(sites, FORECAST_SITES_PER_REQUEST):
+            params = {
+                "latitude": ",".join(str(s["latitude"]) for s in batch),
+                "longitude": ",".join(str(s["longitude"]) for s in batch),
+                "past_days": 1,
+                "forecast_days": 3,
+                "hourly": ",".join([*FORECAST_VARS, *FORECAST_SOIL_LAYERS]),
+                **UNITS,
+            }
+            locations = fetch(client, FORECAST_URL, params)
+            rows = [r for site, loc in zip(batch, locations, strict=True)
+                    for r in hourly_rows(site["id"], blend_soil_moisture(loc["hourly"]), variables, now=now)]
+            total += upsert_weather(rows)
+    log.info("open-meteo poll: %d rows for %d sites", total, len(sites))
+    return total
