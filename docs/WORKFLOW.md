@@ -45,7 +45,7 @@ Tick items in the PR that finishes them.
 - [ ] Refresh demo data, record backup video, README + pitch, rehearse
 
 ### Person A (data + ML)
-- [ ] Load EIA-860M sites (`scripts/load_sites.py`)
+- [x] Load EIA-860M sites (`scripts/load_sites.py`)
 - [ ] Start Storm Events + Open-Meteo history downloads
 - [ ] Open-Meteo + NWS polling worker
 - [ ] `rules-v1` scoring job
