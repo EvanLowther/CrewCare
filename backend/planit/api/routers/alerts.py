@@ -7,8 +7,8 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter
 
-from planit.api import mock
-from planit.api.deps import not_built, use_mock
+from planit.api import mock, queries
+from planit.api.deps import use_mock
 from planit.models import AlertList
 
 router = APIRouter(prefix="/api/alerts", tags=["alerts"])
@@ -20,5 +20,4 @@ def list_alerts(site_id: int | None = None, since: datetime | None = None, inclu
     now = datetime.now(UTC)
     if use_mock():
         return AlertList(alerts=mock.alerts(site_id), server_time=now)
-    # TODO (hours 1-4)
-    raise not_built("GET /api/alerts")
+    return AlertList(alerts=queries.list_alerts(site_id, since, include_cleared), server_time=now)

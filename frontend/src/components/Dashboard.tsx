@@ -20,6 +20,7 @@ export function Dashboard() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const sites = data?.sites ?? [];
   const alerting = sites.filter((s) => s.active_alert_count > 0).length;
+  const anyScored = sites.some((s) => s.risk !== null);
 
   return (
     <div className="flex flex-col gap-4">
@@ -46,7 +47,9 @@ export function Dashboard() {
           <SiteMap sites={sites} selectedId={selectedId} onSelect={setSelectedId} />
         </div>
         <aside className="overflow-hidden rounded-lg border border-neutral-200 bg-white lg:h-[calc(100vh-11rem)]">
-          <h2 className="border-b border-neutral-200 px-3 py-2 text-sm font-semibold">Highest risk first</h2>
+          <h2 className="border-b border-neutral-200 px-3 py-2 text-sm font-semibold">
+            {anyScored || !data ? "Highest risk first" : "Largest plants first · no risk scores yet"}
+          </h2>
           <div className="lg:h-[calc(100%-2.3rem)] lg:overflow-y-auto">
             <SiteList sites={sites} selectedId={selectedId} onSelect={setSelectedId} />
           </div>
