@@ -2,7 +2,7 @@
 
 import type { SiteSummary } from "@/lib/api";
 import { ALERT_ICONS, ALERT_LABELS } from "@/lib/alerts";
-import { RISK_COLORS } from "@/lib/risk";
+import { ScoreChip } from "./ui";
 
 /** Sites ranked by risk (the API already sorts them, highest first). */
 export function SiteList({
@@ -15,36 +15,37 @@ export function SiteList({
   onSelect: (id: number) => void;
 }) {
   return (
-    <ol className="divide-y divide-neutral-200">
+    <ol className="divide-y divide-line">
       {sites.map((site, i) => {
         const selected = site.id === selectedId;
+        const AlertIcon = site.top_alert ? ALERT_ICONS[site.top_alert] : null;
         return (
           <li key={site.id}>
             <button
               type="button"
               onClick={() => onSelect(site.id)}
               aria-current={selected ? "true" : undefined}
-              className={`flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-neutral-100 ${
-                selected ? "bg-blue-50" : ""
+              className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-raised ${
+                selected ? "bg-accent-soft" : ""
               }`}
             >
-              <span className="w-5 shrink-0 text-right text-xs text-neutral-400">{i + 1}</span>
-              <span
-                className="flex h-9 w-11 shrink-0 items-center justify-center rounded-md text-sm font-bold text-white"
-                style={{ background: site.risk ? RISK_COLORS[site.risk.level] : "#6b7280" }}
-              >
-                {site.risk ? site.risk.score.toFixed(1) : "–"}
-              </span>
+              <span className="tabular w-5 shrink-0 text-right text-xs text-muted">{i + 1}</span>
+              <ScoreChip score={site.risk?.score ?? null} level={site.risk?.level ?? null} />
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium">{site.name}</span>
-                <span className="block truncate text-xs text-neutral-500">
-                  {site.top_alert
-                    ? `${ALERT_ICONS[site.top_alert]} ${ALERT_LABELS[site.top_alert]}`
-                    : (site.risk?.factors[0]?.label ?? site.county)}
+                <span className="block truncate text-sm font-medium text-ink">{site.name}</span>
+                <span className="flex items-center gap-1 truncate text-xs text-muted">
+                  {site.top_alert && AlertIcon ? (
+                    <>
+                      <AlertIcon className="h-3 w-3 shrink-0 text-[#ff9b9b]" aria-hidden />
+                      <span className="text-[#ff9b9b]">{ALERT_LABELS[site.top_alert]}</span>
+                    </>
+                  ) : (
+                    (site.risk?.factors[0]?.label ?? `${site.county} County`)
+                  )}
                 </span>
               </span>
               {site.heat_index_f !== null && (
-                <span className="shrink-0 text-xs text-neutral-500">{Math.round(site.heat_index_f)}°F</span>
+                <span className="tabular shrink-0 text-xs text-ink-2">{Math.round(site.heat_index_f)}°F</span>
               )}
             </button>
           </li>
