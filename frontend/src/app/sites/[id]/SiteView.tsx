@@ -8,8 +8,12 @@ import {
   CloudSun,
   Droplets,
   Gauge,
+  Camera,
+  CheckCircle2,
   Layers,
+  Lock,
   MapPin,
+  Settings,
   OctagonAlert,
   ThermometerSun,
   TrendingUp,
@@ -23,8 +27,9 @@ import { useCallback, useState } from "react";
 import { RainChanceChart, HeatIndexChart, RiskHistoryChart } from "@/components/charts";
 import { RiskGauge } from "@/components/RiskGauge";
 import { Card, CardHeader, EmptyState, ErrorBanner, LiveIndicator, ScoreChip, SeverityBadge } from "@/components/ui";
+import { useMe } from "@/components/MeProvider";
 import { ModelSwitch } from "@/components/ModelSwitch";
-import { api, type Alert, type Scorer, type SiteDetail } from "@/lib/api";
+import { api, type Alert, type HazardReport, type Scorer, type SiteDetail } from "@/lib/api";
 import { ALERT_ICONS, ALERT_LABELS, SEVERITY_RANK } from "@/lib/alerts";
 import { relativeTime, round, siteTime } from "@/lib/format";
 import { HAZARD_LABELS } from "@/lib/reports";
@@ -34,13 +39,28 @@ import { usePolling } from "@/lib/usePolling";
 
 export function SiteView({ id, initialModel }: { id: string; initialModel: Scorer }) {
   const [model, setModel] = useState<Scorer>(initialModel);
-  const fetchSite = useCallback(() => api.site(Number(id), model), [id, model]);
+  const { me } = useMe();
+  const viewer = me?.user?.id ?? null;
+  // Refetch when the viewer changes: their role decides what they may see and do here.
+  const fetchSite = useCallback(() => api.site(Number(id), model), [id, model, viewer]); // eslint-disable-line react-hooks/exhaustive-deps
   const { data, error } = usePolling(fetchSite, 30_000);
 
-  if (error?.startsWith("404")) {
+  const notFound = error === "Site not found";
+  const hidden = error === "You're not on this site";
+  if (notFound || hidden) {
     return (
       <Card>
-        <EmptyState icon={MapPin} title="Site not found" detail={`There is no site with id ${id}.`} />
+        <EmptyState
+          icon={hidden ? Lock : MapPin}
+          title={hidden ? "You're not on this site" : "Site not found"}
+          detail={
+            hidden
+              ? me?.user
+                ? "It's a private site. Ask one of its managers to add you."
+                : "It's a private site. Sign in if you're one of its crew."
+              : `There is no site with id ${id}.`
+          }
+        />
         <div className="pb-8 text-center">
           <Link href="/" className="text-sm text-accent hover:underline">
             Back to the dashboard
@@ -72,6 +92,21 @@ function SiteDetailView({
   const factors = site.risk?.factors ?? [];
   const topAction = factors.find((f) => f.action)?.action ?? null;
   const now = useNow();
+  const { role } = useMe();
+  const canReport = !!site.my_role || role === "admin";
+  const [resolved, setResolved] = useState<Set<string>>(new Set());
+  const [resolveError, setResolveError] = useState<string | null>(null);
+  const shownReports = reports.filter((r) => !resolved.has(r.id));
+
+  async function resolve(report: HazardReport) {
+    setResolveError(null);
+    try {
+      await api.resolveReport(report.id);
+      setResolved((prev) => new Set(prev).add(report.id));
+    } catch (e) {
+      setResolveError(e instanceof Error ? e.message : "Couldn't resolve the report");
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -81,14 +116,43 @@ function SiteDetailView({
         </Link>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="text-2xl font-semibold tracking-tight text-ink">{site.name}</h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-semibold tracking-tight text-ink">{site.name}</h1>
+              {!site.is_reference && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-xs text-ink-2">
+                  <Lock className="h-3 w-3" aria-hidden /> Private site
+                </span>
+              )}
+              {site.my_role && (
+                <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs text-ink">
+                  You: {site.my_role === "manager" ? "Manager" : "Crew"}
+                </span>
+              )}
+            </div>
             <p className="mt-1 text-sm text-ink-2">
-              {[site.utility, `${site.county} County`, site.plant_type, site.capacity_mw ? `${Math.round(site.capacity_mw).toLocaleString()} MW` : null]
+              {[site.utility, site.county ? `${site.county} County` : null, site.plant_type, site.capacity_mw ? `${Math.round(site.capacity_mw).toLocaleString()} MW` : null]
                 .filter(Boolean)
                 .join(" · ")}
             </p>
+            {site.description && <p className="mt-2 max-w-2xl whitespace-pre-line text-sm text-ink">{site.description}</p>}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {canReport && (
+              <Link
+                href={`/report?site=${site.id}`}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-accent-strong px-3 py-1.5 text-xs font-medium text-white hover:bg-accent"
+              >
+                <Camera className="h-3.5 w-3.5" aria-hidden /> Report hazard
+              </Link>
+            )}
+            {site.can_manage && (
+              <Link
+                href={`/sites/${site.id}/manage`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs text-ink-2 hover:text-ink"
+              >
+                <Settings className="h-3.5 w-3.5" aria-hidden /> Manage
+              </Link>
+            )}
             <ModelSwitch value={model} onChange={onModelChange} />
             <LiveIndicator label={`Local time ${siteTime(new Date(now).toISOString(), tz)}`} />
             <ScoreChip score={site.risk?.score ?? null} level={site.risk?.level ?? null} size="lg" />
@@ -201,11 +265,12 @@ function SiteDetailView({
         </Card>
         <Card>
           <CardHeader title="Crew reports" icon={MapPin} subtitle="Pinned by field crews at this site or within 5 miles" />
-          {reports.length === 0 ? (
+          {resolveError && <p className="mx-5 mb-3 rounded-lg bg-[rgb(208_59_59/0.12)] px-3 py-2 text-sm text-[#ff9b9b]">{resolveError}</p>}
+          {shownReports.length === 0 ? (
             <EmptyState icon={MapPin} title="No crew reports nearby" detail="Reports from the field show up here with their photo." />
           ) : (
             <ul className="divide-y divide-line border-t border-line">
-              {reports.map((r) => (
+              {shownReports.map((r) => (
                 <li key={r.id} className="flex gap-3 px-5 py-3">
                   {r.photo_url ? (
                     // eslint-disable-next-line @next/next/no-img-element -- served by our API, sizes vary
@@ -224,6 +289,16 @@ function SiteDetailView({
                       {r.reporter_name ?? "Crew member"} · {relativeTime(r.created_at)} · {distanceLabel(site, r)}
                     </p>
                   </div>
+                  {site.can_manage && r.site_id === site.id && (
+                    <button
+                      type="button"
+                      onClick={() => resolve(r)}
+                      title="Mark resolved: it leaves the map"
+                      className="ml-auto inline-flex h-fit shrink-0 items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs text-ink-2 hover:text-ink"
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" aria-hidden /> Resolve
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>

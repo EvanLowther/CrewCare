@@ -54,7 +54,7 @@ function MapController({
   markers: React.RefObject<Map<number, L.Marker>>;
 }) {
   const map = useMap();
-  const fitted = useRef(false);
+  const fitted = useRef<string | null>(null);
   const [sized, setSized] = useState(false);
 
   // Leaflet only measures its box on window resize. In a background tab or a hidden pane the box is 0x0 at
@@ -69,12 +69,16 @@ function MapController({
     return () => observer.disconnect();
   }, [map]);
 
+  // Fit once per set of sites (again when "My sites" / "All sites" changes it), not on every poll.
+  const siteKey = sites.map((s) => s.id).join(",");
   useEffect(() => {
-    if (fitted.current || !sized || sites.length === 0) return;
+    if (fitted.current === siteKey || !sized || sites.length === 0) return;
     const shown = sites.some(inLower48) ? sites.filter(inLower48) : sites;
-    map.fitBounds(L.latLngBounds(shown.map((s) => [s.latitude, s.longitude])), { padding: [30, 30] });
-    fitted.current = true;
-  }, [map, sites, sized]);
+    // maxZoom: a single site would otherwise zoom past the tiles.
+    map.fitBounds(L.latLngBounds(shown.map((s) => [s.latitude, s.longitude])), { padding: [30, 30], maxZoom: 11 });
+    fitted.current = siteKey;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- siteKey stands for `sites`
+  }, [map, siteKey, sized]);
 
   useEffect(() => {
     if (selectedId === null) return;
