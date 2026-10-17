@@ -27,10 +27,10 @@ PARAMS = {"n_estimators": 300, "max_depth": 4, "learning_rate": 0.05, "subsample
           "min_child_weight": 5, "eval_metric": "aucpr"}
 
 
-def fit(frame: pd.DataFrame, seed: int = 0) -> XGBClassifier:
+def fit(frame: pd.DataFrame, seed: int = 0, features: list[str] = FEATURES) -> XGBClassifier:
     """Plain probabilities (no class weighting): the score needs calibrated chances, not just a ranking."""
     model = XGBClassifier(**PARAMS, random_state=seed)
-    model.fit(frame[FEATURES], frame["label"])
+    model.fit(frame[features], frame["label"])
     return model
 
 

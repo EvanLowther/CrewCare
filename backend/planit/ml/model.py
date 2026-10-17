@@ -6,6 +6,10 @@ would almost never leave 'low'. score = 10 * ln(1 + p / base_rate) / ln(11), so 
 
 Factors come from XGBoost's own SHAP values (pred_contribs): each feature's push toward "hazard" is turned into a
 share of the score, so the factors add up to the score. Labels state the fact behind them, like rules-v1.
+
+Heat has an OSHA floor on top of the model: NOAA only logs "Excessive Heat" where a few panhandle offices file it
+(every heat label is from August 2023), so the model can't learn heat danger. A heat index of 103°F or more keeps
+the score at least 5.0 (high) and 115°F or more at least 7.5 (extreme), matching OSHA's heat index bands.
 """
 
 from __future__ import annotations
@@ -26,6 +30,31 @@ TOP_FACTORS = 3
 
 def score_from_probability(p: float, base_rate: float) -> float:
     return round(min(10.0, 10 * math.log1p(p / base_rate) / math.log(11)), 1)
+
+
+# OSHA heat index bands: (at least this °F, score floor, band name), highest first
+HEAT_FLOORS = [(115.0, 7.5, "extreme"), (103.0, 5.0, "high")]
+
+
+def heat_floor(heat_index_f: float | None) -> tuple[float, str | None]:
+    """(score floor, OSHA band) for a heat index; (0, None) below 103°F or when unknown."""
+    if heat_index_f is None or pd.isna(heat_index_f):
+        return 0.0, None
+    for at_least, floor, band in HEAT_FLOORS:
+        if heat_index_f >= at_least:
+            return floor, band
+    return 0.0, None
+
+
+def apply_heat_floor(score: float, factors: list[dict], heat_index_f: float | None) -> tuple[float, list[dict]]:
+    """Raise the score to the OSHA floor; the heat factor takes up the difference so factors still add up."""
+    floor, band = heat_floor(heat_index_f)
+    if floor <= score:
+        return score, factors
+    others = [f for f in factors if f["key"] != "heat_index"]
+    heat = {"key": "heat_index", "label": f"Heat index {heat_index_f:.0f}°F (OSHA {band} risk)",
+            "contribution": round(floor - sum(f["contribution"] for f in others), 1)}
+    return floor, sorted([heat, *others], key=lambda f: f["contribution"], reverse=True)[:TOP_FACTORS]
 
 
 # feature -> (factor key, label for the value). Keys match rules-v1 where they mean the same thing.
@@ -77,7 +106,8 @@ class HazardModel:
                         continue
                     key, label = FACTOR_LABELS[self.features[i]]
                     factors.append({"key": key, "label": label(value), "contribution": points})
-            out.append((score, factors))
+            heat = values[self.features.index("max_heat_index_f")] if "max_heat_index_f" in self.features else None
+            out.append(apply_heat_floor(score, factors, heat))
         return out
 
 

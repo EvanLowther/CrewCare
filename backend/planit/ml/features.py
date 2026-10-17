@@ -119,8 +119,8 @@ def label_days(sites: pd.DataFrame, events: pd.DataFrame, radius_mi: float = LAB
     return hits.assign(label=1).reset_index(drop=True)
 
 
-def training_frame(start: str = "2023-01-01", end: str = "2026-01-01") -> pd.DataFrame:
-    """Features + label for every site-day in [start, end). Storm Events are loaded for 2023-2025."""
+def load_inputs(start: str = "2023-01-01", end: str = "2026-01-01") -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """(daily weather, sites, storm events) for [start, end). Storm Events are loaded for 2023-2025."""
     window = {"start": start, "end": end}
     with connection() as conn:
         daily = pd.DataFrame(conn.execute(DAILY_SQL, window).fetchall())
@@ -128,6 +128,15 @@ def training_frame(start: str = "2023-01-01", end: str = "2026-01-01") -> pd.Dat
         events = pd.DataFrame(conn.execute(
             "SELECT event_type, begin_ts, end_ts, cz_name, latitude, longitude FROM storm_events "
             "WHERE begin_ts >= %(start)s AND begin_ts < %(end)s", window).fetchall())
+    return daily, sites, events
+
+
+def build_frame(daily: pd.DataFrame, sites: pd.DataFrame, events: pd.DataFrame) -> pd.DataFrame:
     frame = add_features(daily).merge(label_days(sites, events), on=["site_id", "day"], how="left")
     frame["label"] = frame["label"].fillna(0).astype(int)
     return frame
+
+
+def training_frame(start: str = "2023-01-01", end: str = "2026-01-01") -> pd.DataFrame:
+    """Features + label for every site-day in [start, end)."""
+    return build_frame(*load_inputs(start, end))
