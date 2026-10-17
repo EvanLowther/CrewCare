@@ -12,10 +12,11 @@ exists. Each factor adds points; its label states the fact behind it (supervisor
 
 The total is capped at 10, and an active lightning stop-work alert keeps the score at least 8.
 
-With a trained model in ml/models/ (and PLANIT_SCORE_MODEL=xgb, the default), the weather part comes from the
-XGBoost model instead: each hour is scored on the 24 hours around it (12 h back, 12 h ahead), the "day" the model
-learned from, with the OSHA heat floor from ml/model.py. Alert points and the lightning floor are added the same
-way as above. Rows carry the model's version (e.g. 'xgb-2026-10-17'); with no model it falls back to rules-v1.
+With a trained model in ml/models/ (and PLANIT_SCORE_MODEL=xgb, the default), every run also writes ML scores
+(scorer 'ml') next to the rules-v1 ones (scorer 'rules'), so the dashboard can switch between them. The ML weather
+part comes from the XGBoost model: each hour is scored on the 24 hours around it (12 h back, 12 h ahead), the "day"
+the model learned from, with the OSHA heat floor from ml/model.py. Alert points and the lightning floor are added
+the same way as above. Rows carry the scorer's version (e.g. 'xgb-2026-10-17').
 
 Level bands (keep in sync with frontend/src/lib/risk.ts): low < 2.5 <= moderate < 5 <= high < 7.5 <= extreme
 """
@@ -231,9 +232,9 @@ def ml_scores(model, weather: list[dict], alerts: list[dict], hours: list[dateti
 
 
 UPSERT_SQL = """
-INSERT INTO hazard_scores (site_id, ts, kind, score, level, factors, model_version, computed_at)
-VALUES (%(site_id)s, %(ts)s, %(kind)s, %(score)s, %(level)s, %(factors)s, %(model_version)s, now())
-ON CONFLICT (site_id, ts, kind) DO UPDATE SET
+INSERT INTO hazard_scores (site_id, ts, kind, scorer, score, level, factors, model_version, computed_at)
+VALUES (%(site_id)s, %(ts)s, %(kind)s, %(scorer)s, %(score)s, %(level)s, %(factors)s, %(model_version)s, now())
+ON CONFLICT (site_id, ts, kind, scorer) DO UPDATE SET
     score = EXCLUDED.score, level = EXCLUDED.level, factors = EXCLUDED.factors,
     model_version = EXCLUDED.model_version, computed_at = now()
 """
@@ -245,12 +246,13 @@ def score_all() -> int:
     with connection() as conn, conn.transaction(), conn.cursor() as cur:
         cur.executemany(UPSERT_SQL, rows)
     log.info("scored %d sites, %d rows with %s", len({r["site_id"] for r in rows}), len(rows),
-             rows[0]["model_version"] if rows else "-")
+             ", ".join(sorted({r["model_version"] for r in rows})) or "-")
     return len(rows)
 
 
 def compute_scores() -> list[dict]:
-    """hazard_scores rows for every site, current hour + next 24, without writing them."""
+    """hazard_scores rows for every site, current hour + next 24, without writing them: rules-v1 always
+    (scorer 'rules'), plus the ML model (scorer 'ml') when one is enabled, so the dashboard can switch."""
     now = datetime.now(UTC)
     current = now.replace(minute=0, second=0, microsecond=0)
     hours = [current + timedelta(hours=h) for h in range(FORECAST_HOURS + 1)]
@@ -278,16 +280,16 @@ def compute_scores() -> list[dict]:
     for a in alerts:
         alerts_by_site[a["site_id"]].append(a)
 
-    version = model.version if model else MODEL_VERSION
     rows = []
     for site_id, site_weather in weather_by_site.items():
         site_alerts = alerts_by_site[site_id]
+        scorers = [("rules", MODEL_VERSION,
+                    {h: score_hour(x) for h, x in build_inputs(site_weather, site_alerts, hours).items()})]
         if model:
-            scored = ml_scores(model, site_weather, site_alerts, hours)
-        else:
-            scored = {h: score_hour(x) for h, x in build_inputs(site_weather, site_alerts, hours).items()}
-        for hour, (score, factors) in scored.items():
-            rows.append({"site_id": site_id, "ts": hour, "kind": "current" if hour == current else "forecast",
-                         "score": score, "level": level_for(score), "factors": Jsonb(factors),
-                         "model_version": version})
+            scorers.append(("ml", model.version, ml_scores(model, site_weather, site_alerts, hours)))
+        for scorer, version, scored in scorers:
+            for hour, (score, factors) in scored.items():
+                rows.append({"site_id": site_id, "ts": hour, "kind": "current" if hour == current else "forecast",
+                             "scorer": scorer, "score": score, "level": level_for(score), "factors": Jsonb(factors),
+                             "model_version": version})
     return rows

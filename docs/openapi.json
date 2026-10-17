@@ -13,6 +13,30 @@
         "summary": "List Sites",
         "description": "All sites, highest risk first.",
         "operationId": "list_sites_api_sites_get",
+        "parameters": [
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "ml",
+                    "rules"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Whose risk scores: 'ml' (XGBoost) or 'rules' (rules-v1). Default: ml.",
+              "title": "Model"
+            },
+            "description": "Whose risk scores: 'ml' (XGBoost) or 'rules' (rules-v1). Default: ml."
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -20,6 +44,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SiteList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -43,6 +77,28 @@
               "type": "integer",
               "title": "Site Id"
             }
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "ml",
+                    "rules"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Whose risk scores: 'ml' (XGBoost) or 'rules' (rules-v1). Default: ml.",
+              "title": "Model"
+            },
+            "description": "Whose risk scores: 'ml' (XGBoost) or 'rules' (rules-v1). Default: ml."
           }
         ],
         "responses": {

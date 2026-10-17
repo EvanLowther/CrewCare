@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from planit.config import settings
 from planit.db import connection
 from planit.models import (
     Alert,
@@ -31,7 +32,8 @@ _SITE_SUMMARY_SQL = f"""
 WITH latest_score AS (
     SELECT DISTINCT ON (site_id) site_id, score, level, factors, model_version, computed_at
     FROM hazard_scores
-    WHERE kind = 'current' AND ts > now() - interval '2 days' AND ts <= now() + interval '1 hour'
+    WHERE kind = 'current' AND scorer = %(scorer)s
+      AND ts > now() - interval '2 days' AND ts <= now() + interval '1 hour'
     ORDER BY site_id, ts DESC
 ),
 active_alerts AS (
@@ -93,11 +95,17 @@ def _conditions(row: dict) -> Conditions:
     return Conditions(**{k: (row[k] if k in ("ts", "weather_code") else _float(row[k])) for k in row})
 
 
-def list_sites() -> list[SiteSummary]:
-    """Highest risk first; unscored sites last, largest plants first among them."""
+def default_scorer() -> str:
+    """Which hazard_scores to show when the client doesn't ask: the ML model unless PLANIT_SCORE_MODEL=rules."""
+    return "ml" if settings.score_model == "xgb" else "rules"
+
+
+def list_sites(scorer: str | None = None) -> list[SiteSummary]:
+    """Highest risk first by `scorer` ('ml' or 'rules'); unscored sites last, largest plants first among them."""
     with connection() as conn:
         rows = conn.execute(
-            _SITE_SUMMARY_SQL + " ORDER BY ls.score DESC NULLS LAST, s.capacity_mw DESC NULLS LAST, s.id"
+            _SITE_SUMMARY_SQL + " ORDER BY ls.score DESC NULLS LAST, s.capacity_mw DESC NULLS LAST, s.id",
+            {"scorer": scorer or default_scorer()},
         ).fetchall()
     return [_summary(r) for r in rows]
 
@@ -120,9 +128,11 @@ def list_alerts(site_id: int | None = None, since: datetime | None = None,
         return [Alert(**r) for r in conn.execute(sql, params).fetchall()]
 
 
-def get_site(site_id: int) -> SiteDetail | None:
+def get_site(site_id: int, scorer: str | None = None) -> SiteDetail | None:
+    scorer = scorer or default_scorer()
     with connection() as conn:
-        row = conn.execute(_SITE_SUMMARY_SQL + " WHERE s.id = %s", (site_id,)).fetchone()
+        row = conn.execute(_SITE_SUMMARY_SQL + " WHERE s.id = %(site_id)s",
+                           {"scorer": scorer, "site_id": site_id}).fetchone()
         if row is None:
             return None
 
@@ -161,9 +171,9 @@ def get_site(site_id: int) -> SiteDetail | None:
         ).fetchall()
 
         history = conn.execute(
-            "SELECT ts, score, level, kind FROM hazard_scores WHERE site_id = %s "
+            "SELECT ts, score, level, kind FROM hazard_scores WHERE site_id = %s AND scorer = %s "
             "AND ts >= now() - interval '24 hours' AND ts <= now() + interval '24 hours' ORDER BY ts, kind",
-            (site_id,),
+            (site_id, scorer),
         ).fetchall()
 
     return SiteDetail(
