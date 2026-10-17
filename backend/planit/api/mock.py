@@ -12,17 +12,21 @@ import random
 import uuid
 from datetime import UTC, date, datetime, timedelta
 
+from planit.auth import CurrentUser
 from planit.models import (
     Alert,
     Briefing,
     Conditions,
     HazardReport,
     Last24h,
+    Me,
+    MySite,
     Risk,
     RiskFactor,
     RiskPoint,
     SiteDetail,
     SiteSummary,
+    User,
 )
 
 # (id, name, utility, county, plant_type, capacity_mw, lat, lon, timezone)
@@ -211,3 +215,24 @@ def briefings(for_date: date) -> list[Briefing]:
             generated_by="template", generated_at=_now(),
         ))
     return out
+
+
+# Mock memberships for the dev "Sign in as" users: dev email name -> [(site id, role)].
+_MEMBERSHIPS = {
+    "manager": [(9001, "manager"), (9011, "manager"), (9003, "crew")],
+    "manager2": [(9008, "manager")],
+    "crew": [(9001, "crew"), (9011, "crew")],
+    "crew2": [(9008, "crew")],
+}
+
+
+def me(user: CurrentUser | None) -> Me:
+    if user is None:
+        return Me(user=None, sites=[], auth="dev")
+    names = {sid: name for sid, name, *_ in _SITES}
+    key = (user.email or "").split("@")[0]
+    return Me(
+        user=User(id=user.id, name=user.name, email=user.email, picture=user.picture, role=user.role),
+        sites=[MySite(site_id=sid, site_name=names[sid], role=role) for sid, role in _MEMBERSHIPS.get(key, [])],
+        auth="dev",
+    )

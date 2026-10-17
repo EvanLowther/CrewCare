@@ -13,11 +13,15 @@ export interface paths {
         };
         /**
          * List Sites
-         * @description All sites, highest risk first.
+         * @description Sites the viewer may see (reference sites, plus their own; admins see all), highest risk first.
          */
         get: operations["list_sites_api_sites_get"];
         put?: never;
-        post?: never;
+        /**
+         * Create Site
+         * @description A new private site; the creator becomes its manager. Managers and admins only.
+         */
+        post: operations["create_site_api_sites_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -35,7 +39,56 @@ export interface paths {
         get: operations["get_site_api_sites__site_id__get"];
         put?: never;
         post?: never;
+        /**
+         * Delete Site
+         * @description Deletes the site and its history. The manager who created it, or an admin.
+         */
+        delete: operations["delete_site_api_sites__site_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Site
+         * @description Rename, move or re-describe a site. Its managers and admins only.
+         */
+        patch: operations["update_site_api_sites__site_id__patch"];
+        trace?: never;
+    };
+    "/api/sites/{site_id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Members
+         * @description Who's on the site. Its members and admins.
+         */
+        get: operations["list_members_api_sites__site_id__members_get"];
+        put?: never;
+        /**
+         * Add Member
+         * @description Add someone (or change their role on the site). Only users with the manager role can be site managers.
+         */
+        post: operations["add_member_api_sites__site_id__members_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sites/{site_id}/members/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Member */
+        delete: operations["remove_member_api_sites__site_id__members__user_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -50,7 +103,8 @@ export interface paths {
         };
         /**
          * List Alerts
-         * @description Active alerts. With `since`, only alerts updated after that time (includes newly cleared ones).
+         * @description Active alerts on sites the viewer may see. With `since`, only alerts updated after that time (includes newly
+         *     cleared ones).
          */
         get: operations["list_alerts_api_alerts_get"];
         put?: never;
@@ -68,18 +122,42 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Reports */
+        /**
+         * List Reports
+         * @description Active reports on sites the viewer may see.
+         */
         get: operations["list_reports_api_reports_get"];
         put?: never;
         /**
          * Create Report
-         * @description multipart/form-data. The API ties it to the nearest site and resizes the photo (dropping its metadata).
+         * @description multipart/form-data. Members of `site_id` only, with the phone's GPS fix and the pin within 5 miles of it
+         *     (admins anywhere). The photo is resized and its metadata dropped; the reporter's name comes from their login.
          */
         post: operations["create_report_api_reports_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/reports/{report_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Resolve Report
+         * @description Mark a report resolved so it leaves the map. The site's managers and admins only.
+         */
+        patch: operations["resolve_report_api_reports__report_id__resolve_patch"];
         trace?: never;
     };
     "/api/photos/{photo_id}": {
@@ -89,7 +167,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Photo */
+        /**
+         * Get Photo
+         * @description Use `photo_url` from a report: it carries a signature, because <img> tags can't send the sign-in token.
+         */
         get: operations["get_photo_api_photos__photo_id__get"];
         put?: never;
         post?: never;
@@ -130,7 +211,7 @@ export interface paths {
         put?: never;
         /**
          * Generate Now
-         * @description Demo button: generate tomorrow's briefings immediately instead of waiting for 6 PM.
+         * @description Demo button (admins only): generate tomorrow's briefings immediately instead of waiting for 6 PM.
          */
         post: operations["generate_now_api_briefings_generate_post"];
         delete?: never;
@@ -152,13 +233,90 @@ export interface paths {
          * Lightning Replay
          * @description Start a storm near a site: strikes arrive every interval_seconds, each one resets the 30-min countdown.
          *
-         *     Queued in `job_requests`; the worker picks it up within ~2 s, so the worker must be running.
+         *     Admins only. Queued in `job_requests`; the worker picks it up within ~2 s, so the worker must be running.
          */
         post: operations["lightning_replay_api_demo_lightning_replay_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Me
+         * @description The signed-in user (null when signed out) and the sites they're on.
+         */
+        get: operations["get_me_api_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Users
+         * @description Signed-up users whose name or email contains `q`. Managers and admins only.
+         */
+        get: operations["search_users_api_users_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Users */
+        get: operations["list_users_api_admin_users_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set Role
+         * @description Make someone admin, manager or crew. Demoting a manager to crew makes them crew on their sites too.
+         */
+        patch: operations["set_role_api_admin_users__user_id__patch"];
         trace?: never;
     };
     "/api/health": {
@@ -182,6 +340,42 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AdminUser */
+        AdminUser: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string | null;
+            /** Email */
+            email: string | null;
+            /** Picture */
+            picture?: string | null;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "admin" | "manager" | "crew";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Last Seen At
+             * Format: date-time
+             */
+            last_seen_at: string;
+            /** Site Count */
+            site_count: number;
+        };
+        /** AdminUserList */
+        AdminUserList: {
+            /** Users */
+            users: components["schemas"]["AdminUser"][];
+        };
         /** Alert */
         Alert: {
             /**
@@ -257,9 +451,17 @@ export interface components {
         };
         /** Body_create_report_api_reports_post */
         Body_create_report_api_reports_post: {
-            /** Latitude */
+            /** Site Id */
+            site_id: number;
+            /**
+             * Latitude
+             * @description The pin
+             */
             latitude: number;
-            /** Longitude */
+            /**
+             * Longitude
+             * @description The pin
+             */
             longitude: number;
             /**
              * Hazard Type
@@ -271,10 +473,20 @@ export interface components {
              * @enum {string}
              */
             severity: "low" | "medium" | "high";
+            /**
+             * Gps Latitude
+             * @description The phone's GPS fix
+             */
+            gps_latitude?: number | null;
+            /**
+             * Gps Longitude
+             * @description The phone's GPS fix
+             */
+            gps_longitude?: number | null;
+            /** Gps Accuracy M */
+            gps_accuracy_m?: number | null;
             /** Description */
             description?: string | null;
-            /** Reporter Name */
-            reporter_name?: string | null;
             /** Photo */
             photo?: string | null;
         };
@@ -469,6 +681,48 @@ export interface components {
              */
             interval_seconds: number;
         };
+        /** Me */
+        Me: {
+            /** @description Null when signed out */
+            user: components["schemas"]["User"] | null;
+            /**
+             * Sites
+             * @description Sites the user is a member of
+             */
+            sites: components["schemas"]["MySite"][];
+            /**
+             * Auth
+             * @description dev = the laptop 'Sign in as' menu (PLANIT_AUTH_DEV=1)
+             * @enum {string}
+             */
+            auth: "auth0" | "dev";
+        };
+        /** MemberAdd */
+        MemberAdd: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /**
+             * Role
+             * @default crew
+             * @enum {string}
+             */
+            role: "manager" | "crew";
+        };
+        /** MySite */
+        MySite: {
+            /** Site Id */
+            site_id: number;
+            /** Site Name */
+            site_name: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "manager" | "crew";
+        };
         /** ReportList */
         ReportList: {
             /** Reports */
@@ -547,6 +801,31 @@ export interface components {
              */
             kind: "current" | "forecast";
         };
+        /** RoleUpdate */
+        RoleUpdate: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "admin" | "manager" | "crew";
+        };
+        /** SiteCreate */
+        SiteCreate: {
+            /**
+             * Name
+             * @example Riverside substation rebuild
+             */
+            name: string;
+            /** Latitude */
+            latitude: number;
+            /** Longitude */
+            longitude: number;
+            /**
+             * Description
+             * @example Trenching along the east fence; crane on site Tue-Thu.
+             */
+            description?: string | null;
+        };
         /**
          * SiteDetail
          * @description Everything the site page shows.
@@ -588,6 +867,33 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** SiteMember */
+        SiteMember: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Name */
+            name: string | null;
+            /** Email */
+            email: string | null;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "manager" | "crew";
+            /**
+             * Added At
+             * Format: date-time
+             */
+            added_at: string;
+        };
+        /** SiteMemberList */
+        SiteMemberList: {
+            /** Members */
+            members: components["schemas"]["SiteMember"][];
         };
         /**
          * SiteSummary
@@ -633,6 +939,69 @@ export interface components {
             top_alert: ("lightning" | "flood" | "heat" | "storm" | "wind" | "wildfire" | "crew_report" | "nws") | null;
             /** Heat Index F */
             heat_index_f: number | null;
+            /**
+             * Is Reference
+             * @description Public reference site (anyone can view); false = private site a manager created, visible to its members and admins
+             * @default true
+             */
+            is_reference: boolean;
+            /**
+             * Description
+             * @description Manager's note about the site, shown on its page
+             */
+            description?: string | null;
+            /**
+             * My Role
+             * @description The viewer's role on this site, if a member
+             */
+            my_role?: ("manager" | "crew") | null;
+            /**
+             * Can Manage
+             * @description Viewer may edit the site, add members, resolve reports
+             * @default false
+             */
+            can_manage: boolean;
+            /**
+             * Can Delete
+             * @description Viewer may delete the site
+             * @default false
+             */
+            can_delete: boolean;
+        };
+        /** SiteUpdate */
+        SiteUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Latitude */
+            latitude?: number | null;
+            /** Longitude */
+            longitude?: number | null;
+            /** Description */
+            description?: string | null;
+        };
+        /** User */
+        User: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string | null;
+            /** Email */
+            email: string | null;
+            /** Picture */
+            picture?: string | null;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "admin" | "manager" | "crew";
+        };
+        /** UserList */
+        UserList: {
+            /** Users */
+            users: components["schemas"]["User"][];
         };
         /** ValidationError */
         ValidationError: {
@@ -688,6 +1057,39 @@ export interface operations {
             };
         };
     };
+    create_site_api_sites_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_site_api_sites__site_id__get: {
         parameters: {
             query?: {
@@ -709,6 +1111,168 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SiteDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_site_api_sites__site_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_site_api_sites__site_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_members_api_sites__site_id__members_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteMemberList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_member_api_sites__site_id__members_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberAdd"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteMemberList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_member_api_sites__site_id__members__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: number;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteMemberList"];
                 };
             };
             /** @description Validation Error */
@@ -819,9 +1383,43 @@ export interface operations {
             };
         };
     };
-    get_photo_api_photos__photo_id__get: {
+    resolve_report_api_reports__report_id__resolve_patch: {
         parameters: {
             query?: never;
+            header?: never;
+            path: {
+                report_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HazardReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_photo_api_photos__photo_id__get: {
+        parameters: {
+            query?: {
+                exp?: number | null;
+                sig?: string | null;
+            };
             header?: never;
             path: {
                 photo_id: string;
@@ -921,6 +1519,112 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DemoAck"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_me_api_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
+                };
+            };
+        };
+    };
+    search_users_api_users_get: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_users_api_admin_users_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserList"];
+                };
+            };
+        };
+    };
+    set_role_api_admin_users__user_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUser"];
                 };
             };
             /** @description Validation Error */

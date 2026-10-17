@@ -11,7 +11,7 @@
           "sites"
         ],
         "summary": "List Sites",
-        "description": "All sites, highest risk first.",
+        "description": "Sites the viewer may see (reference sites, plus their own; admins see all), highest risk first.",
         "operationId": "list_sites_api_sites_get",
         "parameters": [
           {
@@ -44,6 +44,46 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SiteList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "sites"
+        ],
+        "summary": "Create Site",
+        "description": "A new private site; the creator becomes its manager. Managers and admins only.",
+        "operationId": "create_site_api_sites_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteDetail"
                 }
               }
             }
@@ -123,6 +163,237 @@
             }
           }
         }
+      },
+      "patch": {
+        "tags": [
+          "sites"
+        ],
+        "summary": "Update Site",
+        "description": "Rename, move or re-describe a site. Its managers and admins only.",
+        "operationId": "update_site_api_sites__site_id__patch",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Site Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "sites"
+        ],
+        "summary": "Delete Site",
+        "description": "Deletes the site and its history. The manager who created it, or an admin.",
+        "operationId": "delete_site_api_sites__site_id__delete",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Site Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites/{site_id}/members": {
+      "get": {
+        "tags": [
+          "sites"
+        ],
+        "summary": "List Members",
+        "description": "Who's on the site. Its members and admins.",
+        "operationId": "list_members_api_sites__site_id__members_get",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Site Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteMemberList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "sites"
+        ],
+        "summary": "Add Member",
+        "description": "Add someone (or change their role on the site). Only users with the manager role can be site managers.",
+        "operationId": "add_member_api_sites__site_id__members_post",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Site Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberAdd"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteMemberList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites/{site_id}/members/{user_id}": {
+      "delete": {
+        "tags": [
+          "sites"
+        ],
+        "summary": "Remove Member",
+        "operationId": "remove_member_api_sites__site_id__members__user_id__delete",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Site Id"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteMemberList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/alerts": {
@@ -131,7 +402,7 @@
           "alerts"
         ],
         "summary": "List Alerts",
-        "description": "Active alerts. With `since`, only alerts updated after that time (includes newly cleared ones).",
+        "description": "Active alerts on sites the viewer may see. With `since`, only alerts updated after that time (includes newly\ncleared ones).",
         "operationId": "list_alerts_api_alerts_get",
         "parameters": [
           {
@@ -208,6 +479,7 @@
           "reports"
         ],
         "summary": "List Reports",
+        "description": "Active reports on sites the viewer may see.",
         "operationId": "list_reports_api_reports_get",
         "parameters": [
           {
@@ -255,7 +527,7 @@
           "reports"
         ],
         "summary": "Create Report",
-        "description": "multipart/form-data. The API ties it to the nearest site and resizes the photo (dropping its metadata).",
+        "description": "multipart/form-data. Members of `site_id` only, with the phone's GPS fix and the pin within 5 miles of it\n(admins anywhere). The photo is resized and its metadata dropped; the reporter's name comes from their login.",
         "operationId": "create_report_api_reports_post",
         "requestBody": {
           "required": true,
@@ -291,12 +563,57 @@
         }
       }
     },
+    "/api/reports/{report_id}/resolve": {
+      "patch": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Resolve Report",
+        "description": "Mark a report resolved so it leaves the map. The site's managers and admins only.",
+        "operationId": "resolve_report_api_reports__report_id__resolve_patch",
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HazardReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/photos/{photo_id}": {
       "get": {
         "tags": [
           "reports"
         ],
         "summary": "Get Photo",
+        "description": "Use `photo_url` from a report: it carries a signature, because <img> tags can't send the sign-in token.",
         "operationId": "get_photo_api_photos__photo_id__get",
         "parameters": [
           {
@@ -307,6 +624,38 @@
               "type": "string",
               "format": "uuid",
               "title": "Photo Id"
+            }
+          },
+          {
+            "name": "exp",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Exp"
+            }
+          },
+          {
+            "name": "sig",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sig"
             }
           }
         ],
@@ -389,7 +738,7 @@
           "briefings"
         ],
         "summary": "Generate Now",
-        "description": "Demo button: generate tomorrow's briefings immediately instead of waiting for 6 PM.",
+        "description": "Demo button (admins only): generate tomorrow's briefings immediately instead of waiting for 6 PM.",
         "operationId": "generate_now_api_briefings_generate_post",
         "responses": {
           "200": {
@@ -411,7 +760,7 @@
           "demo"
         ],
         "summary": "Lightning Replay",
-        "description": "Start a storm near a site: strikes arrive every interval_seconds, each one resets the 30-min countdown.\n\nQueued in `job_requests`; the worker picks it up within ~2 s, so the worker must be running.",
+        "description": "Start a storm near a site: strikes arrive every interval_seconds, each one resets the 30-min countdown.\n\nAdmins only. Queued in `job_requests`; the worker picks it up within ~2 s, so the worker must be running.",
         "operationId": "lightning_replay_api_demo_lightning_replay_post",
         "requestBody": {
           "content": {
@@ -430,6 +779,148 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DemoAck"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Get Me",
+        "description": "The signed-in user (null when signed out) and the sites they're on.",
+        "operationId": "get_me_api_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Search Users",
+        "description": "Signed-up users whose name or email contains `q`. Managers and admins only.",
+        "operationId": "search_users_api_users_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 100,
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Users",
+        "operationId": "list_users_api_admin_users_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users/{user_id}": {
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Set Role",
+        "description": "Make someone admin, manager or crew. Demoting a manager to crew makes them crew on their sites too.",
+        "operationId": "set_role_api_admin_users__user_id__patch",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUser"
                 }
               }
             }
@@ -471,6 +962,98 @@
   },
   "components": {
     "schemas": {
+      "AdminUser": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "picture": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Picture"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "manager",
+              "crew"
+            ],
+            "title": "Role"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "last_seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Seen At"
+          },
+          "site_count": {
+            "type": "integer",
+            "title": "Site Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "email",
+          "role",
+          "created_at",
+          "last_seen_at",
+          "site_count"
+        ],
+        "title": "AdminUser"
+      },
+      "AdminUserList": {
+        "properties": {
+          "users": {
+            "items": {
+              "$ref": "#/components/schemas/AdminUser"
+            },
+            "type": "array",
+            "title": "Users"
+          }
+        },
+        "type": "object",
+        "required": [
+          "users"
+        ],
+        "title": "AdminUserList"
+      },
       "Alert": {
         "properties": {
           "id": {
@@ -618,13 +1201,19 @@
       },
       "Body_create_report_api_reports_post": {
         "properties": {
+          "site_id": {
+            "type": "integer",
+            "title": "Site Id"
+          },
           "latitude": {
             "type": "number",
-            "title": "Latitude"
+            "title": "Latitude",
+            "description": "The pin"
           },
           "longitude": {
             "type": "number",
-            "title": "Longitude"
+            "title": "Longitude",
+            "description": "The pin"
           },
           "hazard_type": {
             "type": "string",
@@ -648,6 +1237,41 @@
             ],
             "title": "Severity"
           },
+          "gps_latitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gps Latitude",
+            "description": "The phone's GPS fix"
+          },
+          "gps_longitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gps Longitude",
+            "description": "The phone's GPS fix"
+          },
+          "gps_accuracy_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gps Accuracy M"
+          },
           "description": {
             "anyOf": [
               {
@@ -658,17 +1282,6 @@
               }
             ],
             "title": "Description"
-          },
-          "reporter_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reporter Name"
           },
           "photo": {
             "anyOf": [
@@ -685,6 +1298,7 @@
         },
         "type": "object",
         "required": [
+          "site_id",
           "latitude",
           "longitude",
           "hazard_type",
@@ -1176,6 +1790,95 @@
         ],
         "title": "LightningReplayRequest"
       },
+      "Me": {
+        "properties": {
+          "user": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/User"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when signed out"
+          },
+          "sites": {
+            "items": {
+              "$ref": "#/components/schemas/MySite"
+            },
+            "type": "array",
+            "title": "Sites",
+            "description": "Sites the user is a member of"
+          },
+          "auth": {
+            "type": "string",
+            "enum": [
+              "auth0",
+              "dev"
+            ],
+            "title": "Auth",
+            "description": "dev = the laptop 'Sign in as' menu (PLANIT_AUTH_DEV=1)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user",
+          "sites",
+          "auth"
+        ],
+        "title": "Me"
+      },
+      "MemberAdd": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "manager",
+              "crew"
+            ],
+            "title": "Role",
+            "default": "crew"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id"
+        ],
+        "title": "MemberAdd"
+      },
+      "MySite": {
+        "properties": {
+          "site_id": {
+            "type": "integer",
+            "title": "Site Id"
+          },
+          "site_name": {
+            "type": "string",
+            "title": "Site Name"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "manager",
+              "crew"
+            ],
+            "title": "Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "site_id",
+          "site_name",
+          "role"
+        ],
+        "title": "MySite"
+      },
       "ReportList": {
         "properties": {
           "reports": {
@@ -1331,6 +2034,71 @@
         ],
         "title": "RiskPoint"
       },
+      "RoleUpdate": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "manager",
+              "crew"
+            ],
+            "title": "Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "title": "RoleUpdate"
+      },
+      "SiteCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Name",
+            "examples": [
+              "Riverside substation rebuild"
+            ]
+          },
+          "latitude": {
+            "type": "number",
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "Latitude"
+          },
+          "longitude": {
+            "type": "number",
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "Longitude"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "examples": [
+              "Trenching along the east fence; crane on site Tue-Thu."
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "latitude",
+          "longitude"
+        ],
+        "title": "SiteCreate"
+      },
       "SiteDetail": {
         "properties": {
           "site": {
@@ -1424,6 +2192,75 @@
           "updated_at"
         ],
         "title": "SiteList"
+      },
+      "SiteMember": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "manager",
+              "crew"
+            ],
+            "title": "Role"
+          },
+          "added_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Added At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "name",
+          "email",
+          "role",
+          "added_at"
+        ],
+        "title": "SiteMember"
+      },
+      "SiteMemberList": {
+        "properties": {
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/SiteMember"
+            },
+            "type": "array",
+            "title": "Members"
+          }
+        },
+        "type": "object",
+        "required": [
+          "members"
+        ],
+        "title": "SiteMemberList"
       },
       "SiteSummary": {
         "properties": {
@@ -1548,6 +2385,52 @@
               }
             ],
             "title": "Heat Index F"
+          },
+          "is_reference": {
+            "type": "boolean",
+            "title": "Is Reference",
+            "description": "Public reference site (anyone can view); false = private site a manager created, visible to its members and admins",
+            "default": true
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Manager's note about the site, shown on its page"
+          },
+          "my_role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "manager",
+                  "crew"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "My Role",
+            "description": "The viewer's role on this site, if a member"
+          },
+          "can_manage": {
+            "type": "boolean",
+            "title": "Can Manage",
+            "description": "Viewer may edit the site, add members, resolve reports",
+            "default": false
+          },
+          "can_delete": {
+            "type": "boolean",
+            "title": "Can Delete",
+            "description": "Viewer may delete the site",
+            "default": false
           }
         },
         "type": "object",
@@ -1568,6 +2451,138 @@
         ],
         "title": "SiteSummary",
         "description": "One row on the dashboard map / ranked list."
+      },
+      "SiteUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "latitude": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 90.0,
+                "minimum": -90.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latitude"
+          },
+          "longitude": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 180.0,
+                "minimum": -180.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Longitude"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "title": "SiteUpdate"
+      },
+      "User": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "picture": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Picture"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "manager",
+              "crew"
+            ],
+            "title": "Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "email",
+          "role"
+        ],
+        "title": "User"
+      },
+      "UserList": {
+        "properties": {
+          "users": {
+            "items": {
+              "$ref": "#/components/schemas/User"
+            },
+            "type": "array",
+            "title": "Users"
+          }
+        },
+        "type": "object",
+        "required": [
+          "users"
+        ],
+        "title": "UserList"
       },
       "ValidationError": {
         "properties": {
