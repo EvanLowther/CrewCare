@@ -6,6 +6,7 @@
     python dev.py worker    background data jobs (Person A)
     python dev.py migrate   apply db/migrations to Tiger
     python dev.py load_sites [--write [--prune]]   load the demo sites from EIA-860M (dry run by default)
+    python dev.py backfill_weather 2023-01-01 2025-12-31   hourly weather history for ML training
     python dev.py types     regenerate frontend types after changing backend/planit/models.py
     python dev.py test      backend contract tests + frontend type check
     python dev.py lint
@@ -96,6 +97,10 @@ def load_sites() -> None:
     run([venv_python(), "scripts/load_sites.py", *sys.argv[2:]], cwd=BACKEND)
 
 
+def backfill_weather() -> None:
+    run([venv_python(), "scripts/backfill_weather.py", *sys.argv[2:]], cwd=BACKEND)
+
+
 def types() -> None:
     run([venv_python(), "scripts/export_openapi.py", str(ROOT / "docs" / "openapi.json")], cwd=BACKEND)
     run([pnpm(), "exec", "openapi-typescript", "../docs/openapi.json", "-o", "src/lib/api-types.ts"], cwd=FRONTEND)
@@ -112,7 +117,7 @@ def lint() -> None:
     run([pnpm(), "lint"], cwd=FRONTEND)
 
 
-COMMANDS = {f.__name__: f for f in (setup, api, web, worker, migrate, load_sites, types, test, lint)}
+COMMANDS = {f.__name__: f for f in (setup, api, web, worker, migrate, load_sites, backfill_weather, types, test, lint)}
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] not in COMMANDS:
