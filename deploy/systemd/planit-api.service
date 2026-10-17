@@ -1,0 +1,14 @@
+[Unit]
+Description=PlanIT Control API (FastAPI)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=planit
+WorkingDirectory=/opt/planit/backend
+ExecStart=/opt/planit/.venv/bin/uvicorn planit.api.main:app --host 127.0.0.1 --port 8000 --workers 2 --proxy-headers
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
