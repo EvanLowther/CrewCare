@@ -12,7 +12,8 @@ phone / browser ──HTTPS──▶ Caddy :443 ──/api/*──▶ FastAPI 12
 - **Updates:** `planit-deploy.timer` checks GitHub `main` every minute and runs `deploy.sh` when it changed:
   Python packages if `pyproject.toml` changed, migrations if `db/migrations/` changed, and a website rebuild if
   `frontend/` changed. The new build is made beside the live one and swapped in only if it succeeds.
-- **Secrets:** only in `/opt/planit/.env` on the server (template: `env.production.example`).
+- **Secrets:** only in `/opt/planit/.env` on the server (template: `env.production.example`), shared by the API,
+  worker and website (Auth0 sign-in settings, see docs/AUTH.md).
 - **Only one worker:** don't run `python dev.py worker` on a laptop while the server's worker is on; both would
   poll the same APIs and run demo jobs twice.
 

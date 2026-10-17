@@ -5,12 +5,15 @@ import { AlertsFeed } from "@/components/AlertsFeed";
 import { Card, CardHeader, ErrorBanner, LiveIndicator, PageHeader } from "@/components/ui";
 import { api } from "@/lib/api";
 import { usePolling } from "@/lib/usePolling";
+import { useSiteScope } from "@/lib/useSiteScope";
+import { ScopeSwitch } from "@/components/ScopeSwitch";
 
 const fetchAlerts = () => api.alerts();
 
 export function AlertsView() {
   const { data, error } = usePolling(fetchAlerts, 10_000);
-  const alerts = data?.alerts ?? [];
+  const scope = useSiteScope();
+  const alerts = (data?.alerts ?? []).filter((a) => scope.includes(a.site_id));
   const sites = new Set(alerts.map((a) => a.site_id)).size;
 
   return (
@@ -18,7 +21,12 @@ export function AlertsView() {
       <PageHeader
         title="Alerts"
         subtitle={data ? `${alerts.length} active across ${sites} ${sites === 1 ? "site" : "sites"}` : "Loading alerts…"}
-        actions={<LiveIndicator label="Live · refreshes every 10 s" />}
+        actions={
+          <div className="flex flex-wrap items-center gap-3">
+            {scope.available && <ScopeSwitch value={scope.scope} onChange={scope.setScope} />}
+            <LiveIndicator label="Live · refreshes every 10 s" />
+          </div>
+        }
       />
       {error && <ErrorBanner message={error} />}
       <Card className="overflow-hidden">
