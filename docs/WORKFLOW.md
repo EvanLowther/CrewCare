@@ -48,7 +48,7 @@ Tick items in the PR that finishes them.
 - [x] Load EIA-860M sites (`scripts/load_sites.py`)
 - [x] Start Storm Events + Open-Meteo history downloads
 - [x] Open-Meteo + NWS polling worker
-- [ ] `rules-v1` scoring job
+- [x] `rules-v1` scoring job
 - [ ] Lightning rule + countdown + replay
 - [ ] Training set + XGBoost
 - [ ] USGS flood rule

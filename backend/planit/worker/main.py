@@ -27,7 +27,7 @@ JOBS = {
     "usgs": (usgs.poll, 900),
     "lightning": (lightning.evaluate, 15),
     "flood": (flood.evaluate, 900),
-    "score": (score.score_all, 900),
+    "score": (score.score_all, 300),
     "briefing": (generate.run_due, 300),  # sends each site's briefing at 6 PM site-local time
 }
 
