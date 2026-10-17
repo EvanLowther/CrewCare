@@ -355,7 +355,7 @@
           "demo"
         ],
         "summary": "Lightning Replay",
-        "description": "Start a storm near a site: strikes arrive every interval_seconds, each one resets the 30-min countdown.",
+        "description": "Start a storm near a site: strikes arrive every interval_seconds, each one resets the 30-min countdown.\n\nQueued in `job_requests`; the worker picks it up within ~2 s, so the worker must be running.",
         "operationId": "lightning_replay_api_demo_lightning_replay_post",
         "requestBody": {
           "content": {

@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from apscheduler.schedulers.blocking import BlockingScheduler
 
 from planit.ml import score
+from planit.worker import jobs
 from planit.worker.briefing import generate
 from planit.worker.ingest import nws, open_meteo, usgs
 from planit.worker.rules import flood, lightning
@@ -29,6 +30,7 @@ JOBS = {
     "flood": (flood.evaluate, 900),
     "score": (score.score_all, 300),
     "briefing": (generate.run_due, 300),  # sends each site's briefing at 6 PM site-local time
+    "jobs": (jobs.poll, 2),  # demo buttons: job_requests rows inserted by the API
 }
 
 

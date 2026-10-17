@@ -151,6 +151,8 @@ export interface paths {
         /**
          * Lightning Replay
          * @description Start a storm near a site: strikes arrive every interval_seconds, each one resets the 30-min countdown.
+         *
+         *     Queued in `job_requests`; the worker picks it up within ~2 s, so the worker must be running.
          */
         post: operations["lightning_replay_api_demo_lightning_replay_post"];
         delete?: never;
