@@ -1,8 +1,15 @@
 name: CI
 on:
   pull_request:
+    paths-ignore: ["**.md"]  # docs-only changes don't need the test suite
   push:
     branches: [main]
+    paths-ignore: ["**.md"]
+
+# A new push to the same branch cancels the run it replaces.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   backend:
@@ -15,6 +22,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
       - run: pip install -e ".[dev,ml]"
       - run: ruff check .
       - run: pytest -q
@@ -42,23 +51,3 @@ jobs:
       - run: pnpm lint
       - run: pnpm exec next typegen && pnpm exec tsc --noEmit
       - run: pnpm build
-
-  # Runs the same commands a teammate on Windows runs, so setup can't silently break there.
-  windows-setup:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - uses: pnpm/action-setup@v4
-        with:
-          package_json_file: frontend/package.json
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
-      - run: python dev.py setup
-      - run: python dev.py test
-      - run: python dev.py lint

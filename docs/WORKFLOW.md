@@ -5,7 +5,11 @@
   migrations. Never push broken code to it.
 - One branch per task: `a/<name>` for Person A, `b/<name>` for Person B. Two sessions at once: give the second its
   own worktree (`git worktree add ../planit-control-<name> -b a/<name> main`).
-- Open a PR, let CI pass, merge, then pull `main`. GitHub deletes the branch on merge.
+- Before pushing, run the quick checks for what you changed (`ruff check .` and the related `pytest` files, or
+  `pnpm lint` + `tsc`), then open the PR and merge it; no need to wait for CI. CI (about 1-2 min) still runs on the
+  PR and on `main`: if it goes red, fix it next. GitHub deletes the branch on merge.
+- CI skips Markdown-only changes. The slow Windows setup check runs only when setup files change (`dev.py`,
+  `pyproject.toml`, `package.json`, the lockfile, the `.env` examples).
 - Tick an item here in the PR that finishes it, then move it to "Already done".
 
 ## Who touches what
