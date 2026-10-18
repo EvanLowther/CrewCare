@@ -1,4 +1,4 @@
-# PlanIT Control
+# Crew Care
 
 > Which job sites are dangerous for field crews today, and tomorrow? A live 0-10 hazard score for 160 US power plants,
 > one from work rules and one learned from weather history.
@@ -8,7 +8,7 @@
 It's 6:45 AM in August at a job site in the Everglades. By noon the heat index will pass 110°F, thunderstorms are
 building to the west, the access road is mud after a week of rain, and someone saw an alligator yesterday. Every one
 of those hazards was knowable in advance, but the data is spread across a dozen agencies and apps, and the go/no-go
-call gets made on instinct. PlanIT Control puts it on one map: for every site it pulls the conditions crews work in,
+call gets made on instinct. Crew Care puts it on one map: for every site it pulls the conditions crews work in,
 fires stop-work alerts, and scores the hazard level now and for the next 24 hours. We test whether a model trained on
 weather history can (1) tell hazard days from normal ones on years it has never seen, (2) work in every region of the
 country, and (3) catch what published work rules miss.

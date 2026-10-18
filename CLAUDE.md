@@ -1,4 +1,4 @@
-# PlanIT Control
+# Crew Care
 
 Read README.md, docs/ARCHITECTURE.md, docs/API.md and docs/WORKFLOW.md before changing anything.
 

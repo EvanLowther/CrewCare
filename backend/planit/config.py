@@ -17,7 +17,7 @@ class Settings(BaseSettings):
 
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-2.5-flash"
-    nws_user_agent: str = "PlanIT Control (hackathon project)"
+    nws_user_agent: str = "Crew Care (hackathon project)"
 
     # Hazard score: "xgb" uses the trained model in planit/ml/models/ (falls back to rules-v1 without one),
     # "rules" forces rules-v1.

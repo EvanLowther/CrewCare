@@ -1,5 +1,5 @@
 [Unit]
-Description=PlanIT Control website (Next.js)
+Description=Crew Care website (Next.js)
 After=network-online.target planit-api.service
 Wants=network-online.target
 
