@@ -1,7 +1,7 @@
 # Architecture
 
 ```
- Open-Meteo   NWS weather + alerts   USGS gauges   Lightning replay   Crew phones
+ Open-Meteo   NWS weather + alerts   USGS gauges   GOES lightning     Crew phones
  (+ air quality)  NIFC fires  USGS quakes                                  │
      │            │             │                 │                        │
      └────────────┴──────┬──────┴─────────────────┘                        │
@@ -52,7 +52,7 @@ That lets each person build and test their half alone.
 | `nws_weather` | hypertable | worker (`ingest/nws_weather.py`) | NWS station observation + 72 h gridpoint forecast per site: wind chill, WBGT, visibility, ice, thunder chance. Real-time score only. 005; `sites.nws_*` hold each site's grid, station and alert zones. |
 | `air_quality` | hypertable | worker (`ingest/air_quality.py`) | Hourly US AQI, PM2.5 AQI and PM2.5 per site, observed + 2-day forecast (Open-Meteo / CAMS). Smoke in the Real-time score and the Predictive smoke floor. 007. |
 | `river_gauges`, `river_levels` | table, hypertable | worker | USGS stage/flow for flood rules. |
-| `lightning_strikes` | hypertable | worker / replay | Every strike. `source` says replay, simulator or live. |
+| `lightning_strikes` | hypertable | worker (`ingest/glm.py`) / replay | Flashes within 10 mi of a site: `glm` (GOES-East and GOES-West, live, every 20 s) or `replay` (the demo button). `rules/lightning.py` turns them into stop-work alerts. |
 | `nws_alerts` | table | worker | Raw NWS alerts matched to sites. |
 | `alerts` | table | worker | **What users see.** One active row per (site, type, dedupe_key). Lightning uses `all_clear_at`. `meta.source` says who raised it: `nws`, `nifc` (wildfire), `usgs` (earthquake, `meta.ends` 12 h after the quake). Types `air_quality` and `earthquake` since 007. |
 | `hazard_scores` | hypertable | worker (ml/score.py) | 0-10 score, level, top factors, `kind` current/forecast. |

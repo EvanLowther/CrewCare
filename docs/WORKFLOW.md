@@ -32,10 +32,8 @@ What's left, measured against the Sperry Tech brief (`.github/sperry tech.pdf`).
 - [ ] Fill in the README's Auth0 row in the tools table
 
 ### Person A (worker + ML)
-- [ ] ⭐ Lightning stop-work, live: merge `a/lightning` (the rule, the 30-minute all-clear that restarts with each
-      strike, replay; rebase on `main` and renumber its `006_simulated_weather.sql` to `010`; 011 is notifications),
-      then feed it real strikes from GOES GLM (NOAA, free, ~20 s delay). `worker/rules/lightning.py` on `main` is
-      still a stub, so no site gets a lightning alert today. The site page's countdown banner is already built
+- [x] ⭐ Lightning stop-work, live: the rule from `a/lightning` (stop work for any flash within 10 mi, a 30-minute
+      all-clear that restarts with each strike, replay) fed by GOES GLM every 20 s (`ingest/glm.py`)
 - [ ] ⭐ River flood-risk warning: "sites along rivers, such as the Mississippi, get a flood-risk warning after a
       night of heavy rain". Tag the sites within a few miles of big rivers (Mississippi, Ohio, Missouri, ...), and
       raise a `flood` alert when the night's rain passes ~1-2 in (`rules/flood.py` is a stub). River gauges later
