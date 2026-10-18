@@ -64,9 +64,11 @@ def main() -> None:
     args = parser.parse_args()
 
     from planit.db import get_pool
+    from planit.ml.scale import scale_from_history  # imports evaluate, which imports this module
 
     try:
         frame = training_frame()
+        scale = scale_from_history()  # scores on the Real-time scale (model.score_on_scale)
     finally:
         get_pool().close()
     train, test = frame[frame["day"] < TEST_FROM], frame[frame["day"] >= TEST_FROM]
@@ -88,6 +90,7 @@ def main() -> None:
         "test_metrics": metrics,
         "importance": {k: round(float(v), 4) for k, v in zip(FEATURES, final.feature_importances_, strict=True)},
     }
+    meta["scale"] = scale
     path = save(final, meta, args.out)
     print(f"saved {path} (base rate {meta['base_rate']:.3f})")
 

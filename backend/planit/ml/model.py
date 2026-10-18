@@ -1,8 +1,10 @@
 """Owner: Person A. The trained hazard model: probability of a hazard day -> 0-10 score + top factors.
 
-The score is relative to a normal day, because hazard days are rare (~4% of site-days): a raw probability x 10
-would almost never leave 'low'. score = 10 * ln(1 + p / base_rate) / ln(11), so the base rate scores ~2.9
-(moderate), 2.7x the base rate ~5.5 (high), and 10x the base rate or more 10.
+The score is on the Real-time (rules-v2) scale: a Predictive 5 is as likely to be a hazard day as a Real-time 5.
+The model's metadata carries that mapping (`scale`, from planit/ml/scale.py): for each Real-time score on a
+0.1 grid, the share of historical site-days at that score that were hazard days. A probability scores as the lowest
+Real-time score whose hazard-day rate reaches it, so the levels mean the same on both dashboard views. A model
+without `scale` falls back to 10 * ln(1 + p / base_rate) / ln(11) (the base rate scores ~2.9).
 
 Factors come from XGBoost's own SHAP values (pred_contribs): each feature's push toward "hazard" is turned into a
 share of the score, so the factors add up to the score. Labels state the fact behind them, like rules-v1.
@@ -30,6 +32,22 @@ TOP_FACTORS = 3
 
 def score_from_probability(p: float, base_rate: float) -> float:
     return round(min(10.0, 10 * math.log1p(p / base_rate) / math.log(11)), 1)
+
+
+def fit_scale(real_time_scores: np.ndarray, labels: np.ndarray, step: float = 0.1) -> dict:
+    """The hazard-day rate at each Real-time score (isotonic, so it never falls as the score rises), on a grid."""
+    from sklearn.isotonic import IsotonicRegression
+
+    iso = IsotonicRegression(increasing=True, out_of_bounds="clip").fit(real_time_scores, labels)
+    scores = np.round(np.arange(0, 10 + step / 2, step), 1)
+    return {"scores": scores.tolist(), "rates": np.round(iso.predict(scores), 5).tolist()}
+
+
+def score_on_scale(p: float, scale: dict) -> float:
+    """The lowest Real-time score whose historical hazard-day rate reaches p; 10 above the top of the scale.
+    `scale` = {"scores": [0.0, 0.1, ..., 10.0], "rates": [non-decreasing hazard-day rates]}."""
+    i = int(np.searchsorted(np.asarray(scale["rates"]), p, side="left"))
+    return 10.0 if i >= len(scale["scores"]) else round(float(scale["scores"][i]), 1)
 
 
 # OSHA heat index bands: (at least this °F, score floor, band name), highest first
@@ -102,6 +120,7 @@ class HazardModel:
     features: list[str]
     base_rate: float
     version: str
+    scale: dict | None = None  # see score_on_scale(); None for models trained before it
 
     @classmethod
     def load(cls, path: Path) -> HazardModel:
@@ -109,7 +128,10 @@ class HazardModel:
         meta = json.loads(path.with_suffix(".meta.json").read_text())
         booster = xgb.Booster()
         booster.load_model(path)
-        return cls(booster, meta["features"], meta["base_rate"], meta["version"])
+        return cls(booster, meta["features"], meta["base_rate"], meta["version"], meta.get("scale"))
+
+    def score(self, p: float) -> float:
+        return score_on_scale(p, self.scale) if self.scale else score_from_probability(p, self.base_rate)
 
     def probabilities(self, rows: pd.DataFrame) -> np.ndarray:
         return self.booster.predict(xgb.DMatrix(rows[self.features], feature_names=self.features))
@@ -121,7 +143,7 @@ class HazardModel:
         contribs = self.booster.predict(matrix, pred_contribs=True)[:, :-1]  # last column is the bias
         out = []
         for values, p, push in zip(rows[self.features].itertuples(index=False), probs, contribs, strict=True):
-            score = score_from_probability(float(p), self.base_rate)
+            score = self.score(float(p))
             positive = np.clip(push, 0, None)
             total = positive.sum()
             factors = []
