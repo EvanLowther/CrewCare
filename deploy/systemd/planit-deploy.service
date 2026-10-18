@@ -1,5 +1,5 @@
 [Unit]
-Description=PlanIT Control: deploy origin/main if it changed
+Description=Crew Care: deploy origin/main if it changed
 
 [Service]
 Type=oneshot

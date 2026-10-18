@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* PlanIT Control design tokens ("Skyline", dark only). Use the Tailwind classes they generate, e.g.
+/* Crew Care design tokens ("Skyline", dark only). Use the Tailwind classes they generate, e.g.
    bg-card, border-line, text-ink-2, bg-accent-strong text-on-accent, font-display. Risk colors live in
    src/lib/risk.ts too. */
 @theme inline {

@@ -24,7 +24,7 @@ const bigShoulders = Big_Shoulders({
 });
 
 export const metadata: Metadata = {
-  title: "PlanIT Control",
+  title: "Crew Care",
   description: "The forecast your crew actually needs: a 0-10 hazard score for every job site, now and for the next 24 hours",
 };
 

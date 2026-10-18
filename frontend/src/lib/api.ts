@@ -1,4 +1,4 @@
-// Typed client for the PlanIT API. Types come from src/lib/api-types.ts,
+// Typed client for the Crew Care API. Types come from src/lib/api-types.ts,
 // which is generated from backend/planit/models.py (run `python dev.py types`, never edit it by hand).
 import type { components } from "./api-types";
 import { authHeaders } from "./auth";

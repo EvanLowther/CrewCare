@@ -1,4 +1,4 @@
-"""PlanIT Control dev commands. Works the same on Windows, macOS and Linux.
+"""Crew Care dev commands. Works the same on Windows, macOS and Linux.
 
     python dev.py setup     install everything, create .env files
     python dev.py api       FastAPI on http://localhost:8000 (docs at /docs)

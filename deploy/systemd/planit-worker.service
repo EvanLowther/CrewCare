@@ -1,5 +1,5 @@
 [Unit]
-Description=PlanIT Control worker (weather, alerts, scoring, briefings)
+Description=Crew Care worker (weather, alerts, scoring, briefings)
 After=network-online.target
 Wants=network-online.target
 
