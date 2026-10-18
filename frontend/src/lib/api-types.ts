@@ -189,7 +189,7 @@ export interface paths {
         };
         /**
          * List Briefings
-         * @description Briefings for a work day. Defaults to tomorrow.
+         * @description Briefings for a work day on the sites the viewer may see, riskiest first. Defaults to tomorrow.
          */
         get: operations["list_briefings_api_briefings_get"];
         put?: never;
@@ -211,7 +211,10 @@ export interface paths {
         put?: never;
         /**
          * Generate Now
-         * @description Demo button (admins only): generate tomorrow's briefings immediately instead of waiting for 6 PM.
+         * @description Admins only: generate tomorrow's briefings now instead of waiting for 6 PM.
+         *
+         *     Queued in `job_requests`; the worker picks it up within ~2 s and writes every site's briefing (the worker must be
+         *     running). Poll GET /api/briefings to see them arrive.
          */
         post: operations["generate_now_api_briefings_generate_post"];
         delete?: never;

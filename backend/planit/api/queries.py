@@ -6,7 +6,7 @@ Time-series reads are bounded to recent days so they stay fast as `weather` grow
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from planit.api.access import can_delete, can_manage, can_view, signed_photo_url, visible_sites_sql
@@ -17,6 +17,7 @@ from planit.hazards import nws_heat_index
 from planit.models import (
     AirQuality,
     Alert,
+    Briefing,
     Conditions,
     HazardReport,
     Last24h,
@@ -158,6 +159,20 @@ def list_alerts(site_id: int | None = None, since: datetime | None = None, inclu
     sql += f" ORDER BY {_SEVERITY_RANK.replace('severity', 'a.severity')}, a.started_at DESC"
     with connection() as conn:
         return [Alert(**r) for r in conn.execute(sql, params).fetchall()]
+
+
+def list_briefings(for_date: date, user: CurrentUser | None = None) -> list[Briefing]:
+    """Briefings for one work day (written by the worker's 6 PM job) on sites `user` may see, riskiest first."""
+    visible, params = visible_sites_sql(user)
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT b.id, b.site_id, s.name AS site_name, b.for_date, b.summary, b.details, b.generated_by, "
+            "b.generated_at FROM briefings b JOIN sites s ON s.id = b.site_id "
+            f"WHERE b.for_date = %(for_date)s AND {visible} "
+            "ORDER BY (b.details->>'risk_score')::float DESC NULLS LAST, s.name",
+            {"for_date": for_date, **params},
+        ).fetchall()
+    return [Briefing(**r) for r in rows]
 
 
 class SiteHidden(Exception):

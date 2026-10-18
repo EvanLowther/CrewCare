@@ -25,14 +25,14 @@
 - [ ] Feature freeze, bug fixes
 - [ ] Refresh the demo data, record a backup video, README + pitch, rehearse
 - [ ] Fill in the README's Auth0 and Gemini rows in the tools table
+- [ ] Put the Gemini key on the server (`PLANIT_GEMINI_API_KEY` in `/opt/planit/.env`, then
+      `systemctl restart planit-worker planit-api`); until then every briefing is the template
 
 ### Person A (data + ML)
 - [ ] Merge `a/lightning`: lightning stop-work rule, 30-minute countdown, replay, and the `simulate` demo script
       (lightning, hurricane, flood, blizzard). Rebase on `main` and renumber its `006_simulated_weather.sql` to
       `008` (006 is taken by auth). `worker/rules/lightning.py` on `main` is still a stub, so the demo button's
       replay does nothing yet
-- [ ] Merge `a/briefings`: the 6 PM next-day briefing job (Gemini, template fallback), for every US timezone.
-      `worker/briefing/generate.py` on `main` is still a stub
 - [ ] River flood rule with NWS flood stages; must cover the Mississippi (`ingest/usgs.py` and `rules/flood.py`
       are stubs)
 - [ ] Crew reports raise the score
@@ -44,8 +44,6 @@
       (storm, winter, flood, heat) instead of one "hazard day" model
 
 ### Person B (app)
-- [ ] Real `GET /api/briefings` and `POST /api/briefings/generate` (both return "not built" outside mock mode),
-      then the briefings page on real data with "Generate now" (it's an empty placeholder now)
 - [ ] Demo buttons in the app for admins: lightning replay (`POST /api/demo/lightning-replay` exists), then flood
 - [ ] Test the report form on a phone on the hosted URL (camera, GPS)
 - [ ] `mock.py` sample sites across the country and timezones (it still has 12 Florida sites); contract tests pass
@@ -66,6 +64,8 @@
   recommended action (#17, #22)
 - Both scorers side by side; Predictive on the Real-time 0-10 scale with floors at NWS warnings (#15, #29)
 - Wildfire (NIFC), smoke (PM2.5 air quality) and earthquakes (USGS) in both scorers (#31)
+- 6 PM next-day briefing per site in its own timezone: facts from the scores, forecasts, smoke and alerts; Gemini
+  writes the summary, the template covers it without a key
 - `job_requests` so demo buttons reach the worker through the database (#14)
 
 **App (Person B)**
@@ -76,3 +76,4 @@
 - Login and roles with Auth0: admin / manager / crew, private sites, site management, admin page (#25, #27)
 - Address search for new sites; maps survive navigating back; Real-time is the default view (#30)
 - Hosted on Vultr over HTTPS, auto-deploying `main` (#19, #20)
+- Briefings API (private sites stay private) and page: tomorrow or today, riskiest first, "Generate now" for admins
