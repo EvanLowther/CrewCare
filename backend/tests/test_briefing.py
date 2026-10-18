@@ -181,3 +181,11 @@ def test_generate_now_for_a_managers_sites_only(monkeypatch):
     G.generate_all(site_ids=[3, 1, 99])
     G.generate_all()
     assert built == [[1, 3], [1, 2, 3]]  # a site they don't manage (99) or that isn't in the list is skipped
+
+
+def test_scores_reach_the_end_of_the_briefed_work_day():
+    # Generated just after midnight, "tomorrow" ends 24 h + WORK_END hours later. Scores that stop short of that
+    # leave the briefing without a risk score (a grey chip).
+    from planit.ml import score
+
+    assert score.FORECAST_HOURS >= 24 + G.WORK_END

@@ -1,4 +1,4 @@
-"""Owner: Person A. Hazard scores (0-10) per site: current hour + next 24 hours -> `hazard_scores`.
+"""Owner: Person A. Hazard scores (0-10) per site: current hour + next 48 hours -> `hazard_scores`.
 
 Every run writes two scorers side by side, so the dashboard's Real-time / Predictive switch can show either:
 
@@ -40,7 +40,10 @@ from planit.db import connection
 log = logging.getLogger(__name__)
 
 MODEL_VERSION = "rules-v2"
-FORECAST_HOURS = 24
+# 48, not 24: the next-day briefing scores tomorrow's 6 AM - 6 PM, which is up to 42 h away when it's written just
+# after midnight (a late "Generate now"). The weather forecasts reach ~65 h, enough for the model's 12 h window around
+# each hour.
+FORECAST_HOURS = 48
 RULES_HISTORY = timedelta(hours=72)  # rain in the last 3 days, for saturated ground
 ML_HALF_WINDOW = timedelta(hours=12)  # each hour is scored on the 24 h around it
 ML_RAIN_HISTORY = timedelta(days=3)  # precip_prev_3d_in: the 3 days before that window
@@ -354,7 +357,7 @@ ON CONFLICT (site_id, ts, kind, scorer) DO UPDATE SET
 
 
 def score_all() -> int:
-    """Score every site for the current hour and the next 24. Returns rows written."""
+    """Score every site for the current hour and the next FORECAST_HOURS. Returns rows written."""
     rows = compute_scores()
     with connection() as conn, conn.transaction(), conn.cursor() as cur:
         cur.executemany(UPSERT_SQL, rows)
@@ -364,7 +367,7 @@ def score_all() -> int:
 
 
 def compute_scores() -> list[dict]:
-    """hazard_scores rows for every site, current hour + next 24, without writing them: rules-v2 always
+    """hazard_scores rows for every site, current hour + next FORECAST_HOURS, without writing them: rules-v2 always
     (scorer 'rules'), plus the ML model (scorer 'ml') when one is enabled, so the dashboard can switch."""
     now = datetime.now(UTC)
     current = now.replace(minute=0, second=0, microsecond=0)
