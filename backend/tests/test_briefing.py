@@ -91,36 +91,64 @@ def test_gemini_numbers_must_come_from_the_facts():
     assert not G.valid_summary("Short", f)
 
 
+class ApiError(Exception):
+    """Like google.genai.errors.APIError: carries the HTTP status as `code`."""
+
+    def __init__(self, code):
+        super().__init__(f"{code} error")
+        self.code = code
+
+
 class FakeModels:
-    def __init__(self, reply):
-        self.reply, self.calls = reply, 0
+    """`replies`: model name -> list of replies (an Exception is raised), consumed in order."""
+
+    def __init__(self, replies):
+        self.replies, self.calls = replies, []
 
     def generate_content(self, model, contents, config):
-        self.calls += 1
-        if isinstance(self.reply, Exception):
-            raise self.reply
-        return type("Resp", (), {"text": self.reply})()
+        self.calls.append(model)
+        queue = self.replies.get(model) or [ApiError(404)]
+        reply = queue.pop(0) if len(queue) > 1 else queue[0]
+        if isinstance(reply, Exception):
+            raise reply
+        return type("Resp", (), {"text": reply})()
 
 
-def fake_client(reply):
-    return type("Client", (), {"models": FakeModels(reply)})()
+def fake_client(replies):
+    return type("Client", (), {"models": FakeModels(replies if isinstance(replies, dict) else
+                                                    {G.settings.gemini_model: [replies]})})()
+
+
+GOOD = "High risk tomorrow: storms 2 PM - 5 PM, gusts to 30 mph."
 
 
 def test_gemini_keeps_valid_summaries_and_drops_the_rest():
     f = facts()
     batch = [{"site_id": 1, "site": "A, FL", "facts": f}, {"site_id": 2, "site": "B, TX", "facts": f}]
-    reply = json.dumps([{"site_id": 1, "summary": "High risk tomorrow: storms 2 PM - 5 PM, gusts to 30 mph."},
+    reply = json.dumps([{"site_id": 1, "summary": GOOD},
                         {"site_id": 2, "summary": "Gusts to 99 mph, evacuate the county."},
                         {"site_id": 3, "summary": "Not in this batch, so ignored entirely."}])
-    assert G.gemini_summaries(batch, fake_client(reply)) == {
-        1: "High risk tomorrow: storms 2 PM - 5 PM, gusts to 30 mph."}
-    assert G.gemini_summaries(batch, fake_client("not json")) == {}
-    assert G.gemini_summaries(batch, fake_client(RuntimeError("429 quota"))) == {}
+    assert G.gemini_summaries(batch, fake_client(reply)) == ({1: GOOD}, G.settings.gemini_model)
+
+
+def test_a_retired_model_hands_over_and_a_busy_one_is_retried(monkeypatch):
+    monkeypatch.setattr(G, "RETRY_WAIT_S", 0)
+    monkeypatch.setattr(G.settings, "gemini_model", "gemini-2.5-flash")  # what the server's .env still pins
+    monkeypatch.setattr(G.settings, "gemini_fallback_models", "gemini-flash-latest, gemini-3.8-flash")
+    batch = [{"site_id": 1, "site": "A, FL", "facts": facts()}]
+    ok = json.dumps([{"site_id": 1, "summary": GOOD}])
+    client = fake_client({"gemini-2.5-flash": [ApiError(404)], "gemini-flash-latest": [ApiError(503), ok]})
+    assert G.gemini_summaries(batch, client) == ({1: GOOD}, "gemini-flash-latest")
+    assert client.models.calls == ["gemini-2.5-flash", "gemini-flash-latest", "gemini-flash-latest"]
+
+    down = fake_client({"gemini-flash-latest": [ApiError(503)], "gemini-3.8-flash": ["not json"]})
+    assert G.gemini_summaries(batch, down) == ({}, None)  # nobody answered: the template covers it
+    assert down.models.calls == ["gemini-2.5-flash", "gemini-flash-latest", "gemini-flash-latest", "gemini-3.8-flash"]
 
 
 def test_without_a_key_gemini_is_skipped(monkeypatch):
     monkeypatch.setattr(G.settings, "gemini_api_key", None)
-    assert G.gemini_summaries([{"site_id": 1, "site": "A, FL", "facts": facts()}]) == {}  # every site: template
+    assert G.gemini_summaries([{"site_id": 1, "site": "A, FL", "facts": facts()}]) == ({}, None)  # all template
 
 
 def test_generate_now_job_is_registered(monkeypatch):
