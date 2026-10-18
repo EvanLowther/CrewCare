@@ -14,19 +14,20 @@ import { ScoreChip } from "./ui";
 
 const fetchAlerts = () => api.alerts();
 
-type NavItem = { href: string; label: string; badge?: "alerts"; show?: "manager" | "admin" };
+type NavItem = { href: string; label: string; badge?: "alerts"; show?: "admin" };
 
 const NAV: NavItem[] = [
   { href: "/", label: "Dashboard" },
   { href: "/alerts", label: "Alerts", badge: "alerts" },
   { href: "/briefings", label: "Briefings" },
-  { href: "/my-sites", label: "My sites" },
-  { href: "/sites/new", label: "New site", show: "manager" },
+  { href: "/my-sites", label: "Sites" },
   { href: "/admin", label: "Admin", show: "admin" },
 ];
 
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/" || (pathname.startsWith("/sites") && pathname !== "/sites/new");
+  // The new-site form is reached from the Sites page, so it stays under that tab.
+  if (href === "/my-sites") return pathname.startsWith("/my-sites") || pathname === "/sites/new";
   return pathname.startsWith(href);
 }
 
@@ -160,7 +161,7 @@ function ActiveNavLinks({ vertical, onNavigate }: { vertical: boolean; onNavigat
 function NavList({ pathname, vertical, onNavigate }: { pathname: string | null; vertical: boolean; onNavigate?: () => void }) {
   const alertCount = useAlertCount();
   const { role } = useMe();
-  const items = NAV.filter((n) => !n.show || role === "admin" || (n.show === "manager" && role === "manager"));
+  const items = NAV.filter((n) => !n.show || role === "admin");
 
   return (
     <nav

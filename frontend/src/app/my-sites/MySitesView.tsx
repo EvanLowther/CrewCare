@@ -37,7 +37,7 @@ export function MySitesView({ siteId }: { siteId: number | null }) {
   if (!signedIn) {
     return (
       <div className="flex flex-col gap-6">
-        <PageHeader title="My sites" />
+        <PageHeader title="Sites" />
         <Card>
           <EmptyState icon={LogIn} title="Sign in to see your sites" detail="Your sites and their crew reports show up here once you're signed in." />
           {!DEV_AUTH && (
@@ -68,7 +68,7 @@ export function MySitesView({ siteId }: { siteId: number | null }) {
     <div className="flex flex-col gap-6">
       <div className={siteId !== null ? "hidden lg:block" : ""}>
         <PageHeader
-          title="My sites"
+          title="Sites"
           subtitle="Pick a site to see its crew reports. Managers can manage the site and resolve reports here."
           actions={
             <Link
@@ -115,6 +115,18 @@ export function MySitesView({ siteId }: { siteId: number | null }) {
               />
             </label>
           </div>
+          {(role === "manager" || isAdmin) && (
+            <Link href="/sites/new" className="flex items-center gap-3 border-b border-line px-4 py-3 transition-colors hover:bg-raised">
+              <span className="inline-flex h-8 w-11 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
+                <Plus className="h-4 w-4" aria-hidden />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-ink">New site</span>
+                <span className="block truncate text-xs text-muted">Create a private site and add your crew</span>
+              </span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted" aria-hidden />
+            </Link>
+          )}
           {list.length === 0 ? (
             <EmptyState
               icon={Building2}
@@ -189,7 +201,7 @@ export function MySitesView({ siteId }: { siteId: number | null }) {
 function BackToList() {
   return (
     <Link href="/my-sites" scroll={false} className="inline-flex min-h-10 items-center gap-1.5 px-5 pt-4 text-sm text-accent hover:underline">
-      <ArrowLeft className="h-4 w-4" aria-hidden /> All my sites
+      <ArrowLeft className="h-4 w-4" aria-hidden /> Back to sites
     </Link>
   );
 }
