@@ -84,7 +84,8 @@ export default function ReportPinMap({
       center={position ? [position.lat, position.lng] : US_CENTER}
       zoom={position ? 16 : 4}
       className="h-full w-full"
-      scrollWheelZoom={false}
+      scrollWheelZoom
+      wheelPxPerZoomLevel={120}
     >
       <TileLayer attribution="Tiles &copy; Esri" url={BASE_TILES} maxZoom={18} />
       <TileLayer url={LABEL_TILES} maxZoom={18} />
