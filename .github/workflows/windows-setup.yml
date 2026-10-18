@@ -1,0 +1,47 @@
+name: Windows setup
+# Runs the same commands a teammate on Windows runs, so setup can't silently break there. It's the slowest check
+# (about 4 min), so it only runs when something setup depends on changes.
+on:
+  pull_request:
+    paths:
+      - dev.py
+      - backend/pyproject.toml
+      - frontend/package.json
+      - frontend/pnpm-lock.yaml
+      - .env.example
+      - frontend/.env.example
+      - .github/workflows/windows-setup.yml
+  push:
+    branches: [main]
+    paths:
+      - dev.py
+      - backend/pyproject.toml
+      - frontend/package.json
+      - frontend/pnpm-lock.yaml
+      - .env.example
+      - frontend/.env.example
+      - .github/workflows/windows-setup.yml
+
+concurrency:
+  group: windows-setup-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-setup:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: python dev.py setup
+      - run: python dev.py test
+      - run: python dev.py lint
