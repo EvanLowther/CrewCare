@@ -6,6 +6,11 @@ The model's metadata carries that mapping (`scale`, from planit/ml/scale.py): fo
 Real-time score whose hazard-day rate reaches it, so the levels mean the same on both dashboard views. A model
 without `scale` falls back to 10 * ln(1 + p / base_rate) / ln(11) (the base rate scores ~2.9).
 
+Below 1.0 the match stops working: every calm day scores Real-time 0 (none of its rules apply), and those days were
+hazard days 0.34% of the time, but the model tells calm days apart (from 0.03% to 1%). Matching would score a
+quarter of all days exactly 0. So under 1.0 the score spreads the model's odds on a log scale instead, from
+CALMEST_P (0.0) to the rate at Real-time 1.0 (1.0). All of it is "low" either way.
+
 Factors come from XGBoost's own SHAP values (pred_contribs): each feature's push toward "hazard" is turned into a
 share of the score, so the factors add up to the score. Labels state the fact behind them, like rules-v1.
 
@@ -43,10 +48,21 @@ def fit_scale(real_time_scores: np.ndarray, labels: np.ndarray, step: float = 0.
     return {"scores": scores.tolist(), "rates": np.round(iso.predict(scores), 5).tolist()}
 
 
+LOW_END_SCORE = 1.0  # below this the score spreads the odds on a log scale (see the module docstring)
+CALMEST_P = 0.0003  # scores 0.0: about the calmest 0.5% of 2023-2025 site-days by the US model's odds
+
+
 def score_on_scale(p: float, scale: dict) -> float:
     """The lowest Real-time score whose historical hazard-day rate reaches p; 10 above the top of the scale.
+    Under LOW_END_SCORE, ln(p / CALMEST_P) / ln(rate at LOW_END_SCORE / CALMEST_P) of the way to it.
     `scale` = {"scores": [0.0, 0.1, ..., 10.0], "rates": [non-decreasing hazard-day rates]}."""
-    i = int(np.searchsorted(np.asarray(scale["rates"]), p, side="left"))
+    rates = np.asarray(scale["rates"])
+    low_rate = float(rates[scale["scores"].index(LOW_END_SCORE)]) if LOW_END_SCORE in scale["scores"] else 0.0
+    if p < low_rate and low_rate > CALMEST_P:
+        if p <= CALMEST_P:
+            return 0.0
+        return round(min(LOW_END_SCORE, LOW_END_SCORE * math.log(p / CALMEST_P) / math.log(low_rate / CALMEST_P)), 1)
+    i = int(np.searchsorted(rates, p, side="left"))
     return 10.0 if i >= len(scale["scores"]) else round(float(scale["scores"][i]), 1)
 
 

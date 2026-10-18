@@ -5,7 +5,8 @@ Every run writes two scorers side by side, so the dashboard's Real-time / Predic
 - scorer 'rules' (Real-time), rules-v2 (planit/hazards.py): every hazard on one 0-10 scale anchored to published
   work rules (the NWS heat index on OSHA's bands, wind chill, visibility, lightning, forecast thunderstorms and
   storm energy, wind gusts against lift limits, rain rate, 24 h rain, saturated ground, smoke (PM2.5 AQI from
-  `air_quality`), NWS alerts by event, nearby wildfires and felt earthquakes (alerts the worker scores). The
+  `air_quality`), fire weather (dry air with wind after 3 dry days), NWS alerts by event, nearby wildfires and felt
+  earthquakes (alerts the worker scores). The
   site score is the worst kind of hazard plus a little for other serious ones; each factor carries a recommended
   action. Its weather is the NWS forecast and station observations (`nws_weather`, every 30 min) laid over
   Open-Meteo (merge_weather()), which still supplies soil moisture, CAPE and hourly rain.
@@ -13,8 +14,8 @@ Every run writes two scorers side by side, so the dashboard's Real-time / Predic
   model scores each hour on the 24 hours around it (the "day" it learned from), on the Real-time scale (a Predictive
   5 is as likely to be a hazard day as a Real-time 5, see ml/model.py), with the OSHA heat floor, plus alert points
   and a floor at the Real-time severity of any NWS warning, lightning, wildfire or earthquake alert in force that
-  hour (combine()), and of smoke (smoke_floor()). The floors are per hour, so the forecast goes back down when the
-  heat, the warning or the smoke ends.
+  hour (combine()), and of smoke and fire weather (smoke_floor(), fire_weather_floor()). The floors are per hour, so
+  the forecast goes back down when the heat, the warning, the smoke or the dry wind ends.
 
 Rows carry the scorer's version ('rules-v2', 'xgb-2026-10-17').
 
@@ -80,6 +81,7 @@ class HourInputs:
     snow_24h_in: float | None = None
     ice_24h_in: float | None = None
     us_aqi_pm2_5: float | None = None  # smoke: US AQI for PM2.5 (`air_quality`, Open-Meteo / CAMS)
+    humidity_pct: float | None = None  # with gusts and 72 h rain: fire weather
     is_forecast: bool = False
     alerts: list[dict] = field(default_factory=list)  # see alerts_at()
 
@@ -97,8 +99,13 @@ def rule_hazards(x: HourInputs) -> list[hazards.Hazard | None]:
         hazards.rain_24h(x.rain_24h_in),
         hazards.ground(x.soil_moisture, x.rain_72h_in),
         hazards.smoke(x.us_aqi_pm2_5),
+        fire_weather(x),
         *(hazards.alert(a) for a in x.alerts),
     ]
+
+
+def fire_weather(x: HourInputs) -> hazards.Hazard | None:
+    return hazards.fire_weather(x.humidity_pct, x.gust_mph, x.rain_72h_in, x.snow_24h_in)
 
 
 def score_hour(x: HourInputs) -> tuple[float, list[dict]]:
@@ -206,6 +213,7 @@ def build_inputs(weather: list[dict], alerts: list[dict], hours: list[datetime],
             snow_24h_in=_total(last_24h, "snowfall_in"),
             ice_24h_in=_total(last_24h, "ice_in"),
             us_aqi_pm2_5=aqi_at(air or [], hour),
+            humidity_pct=row["humidity_pct"],
             is_forecast=hour > hours[0], alerts=alerts_at(alerts, hour),
         )
     return out
@@ -245,15 +253,25 @@ def combine(weather_score: float, weather_factors: list[dict], alerts: list[dict
     return round(score, 1), factors[:3]
 
 
-def smoke_floor(score: float, factors: list[dict], us_aqi_pm2_5: float | None) -> tuple[float, list[dict]]:
-    """ML scorer: never below the Real-time smoke severity at this hour. The model has never seen air quality, so
-    like the OSHA heat floor this keeps Predictive from calling a smoky day calm; smoke takes up the difference."""
-    smoke = hazards.smoke(us_aqi_pm2_5)
-    if smoke is None or smoke.severity <= score:
+def rule_floor(score: float, factors: list[dict], hazard: hazards.Hazard | None) -> tuple[float, list[dict]]:
+    """ML scorer: never below a Real-time hazard the model can't weigh at this hour; it takes up the difference."""
+    if hazard is None or hazard.severity <= score:
         return score, factors
-    factor = {"key": "smoke", "label": smoke.label, "contribution": round(smoke.severity - score, 1),
-              "action": smoke.action}
-    return round(smoke.severity, 1), sorted([*factors, factor], key=lambda f: f["contribution"], reverse=True)[:3]
+    factor = {"key": hazard.key, "label": hazard.label, "contribution": round(hazard.severity - score, 1),
+              "action": hazard.action}
+    return round(hazard.severity, 1), sorted([*factors, factor], key=lambda f: f["contribution"], reverse=True)[:3]
+
+
+def smoke_floor(score: float, factors: list[dict], us_aqi_pm2_5: float | None) -> tuple[float, list[dict]]:
+    """Never below the Real-time smoke severity. The model has never seen air quality, so like the OSHA heat floor
+    this keeps Predictive from calling a smoky day calm."""
+    return rule_floor(score, factors, hazards.smoke(us_aqi_pm2_5))
+
+
+def fire_weather_floor(score: float, factors: list[dict], x: HourInputs | None) -> tuple[float, list[dict]]:
+    """Never below the Real-time fire weather severity: NOAA rarely logs a dry, gusty day as a hazard day, so the
+    model learned to call them calm, though a spark from hot work spreads fastest then."""
+    return rule_floor(score, factors, fire_weather(x) if x else None)
 
 
 def window_features(weather: list[dict], hour: datetime, site: dict | None = None) -> dict | None:
@@ -308,15 +326,20 @@ def ml_model():
 
 def ml_scores(model, weather: list[dict], alerts: list[dict], hours: list[datetime],
               site: dict | None = None, air: list[dict] | None = None) -> dict[datetime, tuple]:
-    """(score, factors) per hour from the ML model, plus alert points, the alert floor and the smoke floor."""
+    """(score, factors) per hour from the ML model, plus alert points, the alert floor, and the smoke and fire
+    weather floors (from this hour's Open-Meteo readings, the source the model sees)."""
     import pandas as pd
 
     rows = [(hour, f) for hour in hours if (f := window_features(weather, hour, site)) is not None]
     if not rows:
         return {}
     frame = pd.DataFrame([f for _, f in rows], columns=model.features).astype(float)
-    return {hour: smoke_floor(*combine(score, factors, alerts_at(alerts, hour)), aqi_at(air or [], hour))
-            for (hour, _), (score, factors) in zip(rows, model.explain(frame), strict=True)}
+    inputs = build_inputs(weather, [], hours, air)
+    out = {}
+    for (hour, _), (score, factors) in zip(rows, model.explain(frame), strict=True):
+        scored = smoke_floor(*combine(score, factors, alerts_at(alerts, hour)), aqi_at(air or [], hour))
+        out[hour] = fire_weather_floor(*scored, inputs.get(hour))
+    return out
 
 
 # --- Writing ------------------------------------------------------------------------------------------------
