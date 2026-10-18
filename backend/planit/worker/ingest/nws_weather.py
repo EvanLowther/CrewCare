@@ -228,12 +228,14 @@ def upsert(rows: list[tuple]) -> int:
     return len(rows)
 
 
-def poll() -> int:
-    """Forecast + latest observation for every linked site (linking new sites first). Returns rows written."""
+def poll(site_ids: list[int] | None = None) -> int:
+    """Forecast + latest observation for every linked site, or just `site_ids` (linking new sites first). Returns
+    rows written."""
     link_sites()
     with connection() as conn:
         sites = conn.execute("SELECT id, nws_grid_id, nws_grid_x, nws_grid_y, nws_station FROM sites "
-                             "WHERE nws_grid_id IS NOT NULL ORDER BY id").fetchall()
+                             "WHERE nws_grid_id IS NOT NULL AND (%(ids)s::int[] IS NULL OR id = ANY(%(ids)s)) "
+                             "ORDER BY id", {"ids": site_ids}).fetchall()
     now = datetime.now(UTC)
     total, failed = 0, 0
     with _client() as client:

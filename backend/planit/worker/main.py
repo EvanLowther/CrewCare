@@ -14,7 +14,10 @@ from datetime import UTC, datetime
 from apscheduler.schedulers.blocking import BlockingScheduler
 
 from planit.ml import score
-from planit.worker import jobs
+from planit.worker import (
+    jobs,
+    site_setup,  # noqa: F401  registers the 'site_setup' job handler
+)
 from planit.worker.briefing import generate
 from planit.worker.ingest import air_quality, earthquakes, nws, nws_weather, open_meteo, usgs, wildfire
 from planit.worker.rules import flood, lightning

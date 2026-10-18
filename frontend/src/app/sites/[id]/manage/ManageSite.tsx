@@ -67,8 +67,8 @@ export function ManageSite({ id, isNew }: { id: number; isNew: boolean }) {
         <h1 className="mt-2 text-2xl font-semibold tracking-tight text-ink">Manage {site.name}</h1>
         {isNew && (
           <p className="mt-2 rounded-lg border border-line bg-accent-soft px-3 py-2 text-sm text-ink">
-            Site created. Add your crew below so they can see it and report hazards. Weather and risk scores appear
-            within about 30 minutes.
+            Site created. Add your crew below so they can see it and report hazards. Live weather and both risk scores
+            (Real-time and Predictive) appear within about a minute.
           </p>
         )}
       </div>

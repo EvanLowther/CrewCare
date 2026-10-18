@@ -59,7 +59,7 @@ That lets each person build and test their half alone.
 | `hazard_reports`, `photos` | table | API | Crew reports. Photos stored as resized JPEG bytes. |
 | `briefings` | table | worker | One per site per day, generated 6 PM site-local. |
 | `storm_events` | table | Person A loader | NOAA Storm Events, labels for ML training: Florida 2023-2025, every state 2024-2025. |
-| `job_requests` | table | API (demo buttons) | Requests the worker runs: `lightning_replay`, `generate_briefings`. 002. |
+| `job_requests` | table | API (demo buttons, new sites) | Requests the worker runs: `lightning_replay`, `generate_briefings`, and `site_setup` (008: a site that was just created or moved gets its weather and scores at once). 002. |
 | `users`, `site_members` | table | API | Who signed in, their role, and which sites they're on. 006, see AUTH.md. |
 
 Changing the schema: add `db/migrations/002_<name>.sql`. Never edit a migration that has been applied.
