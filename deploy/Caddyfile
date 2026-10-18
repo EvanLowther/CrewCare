@@ -1,5 +1,8 @@
 # Installed to /etc/caddy/Caddyfile by deploy/bootstrap.sh, with PLANIT_HOST replaced by the real hostname.
-# Caddy gets and renews the HTTPS certificate on its own.
+# Caddy gets and renews the HTTPS certificate on its own. deploy.sh reinstalls it when this file changes.
+#
+# Every deploy restarts the API (and the website when it changed), which takes a few seconds. lb_try_duration makes
+# Caddy hold a request and keep retrying the connection instead of answering 502 Bad Gateway, so nobody sees an error.
 PLANIT_HOST {
 	encode zstd gzip
 
@@ -8,10 +11,16 @@ PLANIT_HOST {
 		request_body {
 			max_size 20MB
 		}
-		reverse_proxy 127.0.0.1:8000
+		reverse_proxy 127.0.0.1:8000 {
+			lb_try_duration 30s
+			lb_try_interval 250ms
+		}
 	}
 
 	handle {
-		reverse_proxy 127.0.0.1:3000
+		reverse_proxy 127.0.0.1:3000 {
+			lb_try_duration 30s
+			lb_try_interval 250ms
+		}
 	}
 }

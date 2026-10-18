@@ -31,7 +31,7 @@
 ### Person A (data + ML)
 - [ ] Merge `a/lightning`: lightning stop-work rule, 30-minute countdown, replay, and the `simulate` demo script
       (lightning, hurricane, flood, blizzard). Rebase on `main` and renumber its `006_simulated_weather.sql` to
-      `009` (006 to 008 are taken). `worker/rules/lightning.py` on `main` is still a stub, so the demo button's
+      `010` (006 to 009 are taken). `worker/rules/lightning.py` on `main` is still a stub, so the demo button's
       replay does nothing yet
 - [ ] River flood rule with NWS flood stages; must cover the Mississippi (`ingest/usgs.py` and `rules/flood.py`
       are stubs)
@@ -49,8 +49,6 @@
 - [ ] `mock.py` sample sites across the country and timezones (it still has 12 Florida sites); contract tests pass
 - [ ] Map: marker clustering; Alaska and Hawaii reachable
 - [ ] `?state=` on `/api/sites` and `/api/alerts`; state and hazard filters on the ranked list
-- [ ] Icons and colours for factor kinds (smoke, wildfire, earthquake, winter, cold, ...) where factors are listed
-- [ ] Crew report types for national hazards (ice, smoke, snakes/bears, sinkhole, ...)
 
 ## Already done
 
@@ -79,3 +77,6 @@
 - Address search for new sites; maps survive navigating back; Real-time is the default view (#30)
 - Hosted on Vultr over HTTPS, auto-deploying `main` (#19, #20)
 - Briefings API (private sites stay private) and page: tomorrow or today, riskiest first, "Generate now" for admins
+- Icons and colours per hazard kind (heat, cold, snow/ice, smoke, wildfire, earthquake, ...) on factors and alerts;
+  17 crew report types (lightning, ice, snow, cold stress, smoke, sinkhole, fallen tree, gas leak, quake damage, ...);
+  alerts disappear the moment they end; deleting a site works again; no more "Can't reach the API" during deploys

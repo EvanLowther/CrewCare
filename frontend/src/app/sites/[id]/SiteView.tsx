@@ -31,7 +31,8 @@ import { useMe } from "@/components/MeProvider";
 import { ModelSwitch } from "@/components/ModelSwitch";
 import { Card, CardHeader, EmptyState, ErrorBanner, PageBody, SeverityBadge } from "@/components/ui";
 import { api, type Alert, type Conditions, type HazardReport, type RiskPoint, type Scorer, type SiteDetail } from "@/lib/api";
-import { ALERT_ICONS, ALERT_LABELS, SEVERITY_RANK } from "@/lib/alerts";
+import { alertEndsAt, alertLabel, inForce, SEVERITY_RANK } from "@/lib/alerts";
+import { alertKind, factorKind, HAZARD_KINDS, kindChipStyle } from "@/lib/hazardKinds";
 import { relativeTime, round, siteHour, siteTime } from "@/lib/format";
 import { HAZARD_LABELS, REPORT_SEVERITY_COLORS } from "@/lib/reports";
 import { levelFor, RISK_COLORS, RISK_GUIDANCE, RISK_LABELS, RISK_TEXT } from "@/lib/risk";
@@ -82,7 +83,7 @@ export function SiteView({ id, initialModel }: { id: string; initialModel: Score
     );
   }
   if (!data) {
-    return <PageBody>{error ? <ErrorBanner message={error} /> : <p className="text-sm text-muted">Loading site…</p>}</PageBody>;
+    return <PageBody>{error ? <ErrorBanner message={error} retrying /> : <p className="text-sm text-muted">Loading site…</p>}</PageBody>;
   }
   return <SiteDetailView detail={data} error={error} model={model} onModelChange={setModel} />;
 }
@@ -137,14 +138,10 @@ function SiteDetailView({
     <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-5 px-0 pb-10 sm:px-6 sm:pt-5">
       {error && (
         <div className="px-4 sm:px-0">
-          <ErrorBanner message={error} />
+          <ErrorBanner message={error} retrying />
         </div>
       )}
-      {lightning && (
-        <div className="px-4 pt-4 sm:px-0 sm:pt-0">
-          <StopWorkBanner alert={lightning} timeZone={tz} />
-        </div>
-      )}
+      {lightning && <StopWorkBanner alert={lightning} timeZone={tz} />}
 
       <div className="flex flex-wrap gap-5">
         <section
@@ -234,8 +231,17 @@ function SiteDetailView({
               factors.map((f) => {
                 const max = Math.max(...factors.map((x) => x.contribution), 0.1);
                 const color = risk ? RISK_COLORS[risk.level] : RISK_COLORS[levelFor(f.contribution)];
+                const kind = factorKind(f.key, f.label);
+                const KindIcon = HAZARD_KINDS[kind].icon;
                 return (
-                  <div key={f.key} className="grid grid-cols-[minmax(0,1fr)_44px] items-center gap-2.5">
+                  <div key={f.key} className="grid grid-cols-[24px_minmax(0,1fr)_44px] items-center gap-2.5">
+                    <span
+                      className="flex h-6 w-6 items-center justify-center rounded-md"
+                      style={kindChipStyle(kind)}
+                      title={HAZARD_KINDS[kind].label}
+                    >
+                      <KindIcon className="h-3.5 w-3.5" aria-label={HAZARD_KINDS[kind].label} />
+                    </span>
                     <div className="flex flex-col gap-1.5">
                       <span className="text-sm">{f.label}</span>
                       <span className="relative h-1 rounded-sm bg-line-soft">
@@ -523,7 +529,9 @@ function Metric({ icon: Icon, label, value, unit }: { icon: LucideIcon; label: s
   );
 }
 
-function SiteAlerts({ alerts, timeZone }: { alerts: Alert[]; timeZone: string }) {
+function SiteAlerts({ alerts: all, timeZone }: { alerts: Alert[]; timeZone: string }) {
+  const now = useNow(15_000);
+  const alerts = all.filter((a) => inForce(a, now));
   if (alerts.length === 0) {
     return (
       <QuietRow
@@ -541,16 +549,17 @@ function SiteAlerts({ alerts, timeZone }: { alerts: Alert[]; timeZone: string })
   return (
     <ul className="divide-y divide-line border-t border-line">
       {sorted.map((a) => {
-        const Icon = ALERT_ICONS[a.type];
-        const ends = a.all_clear_at ?? (a.meta as { ends?: string | null }).ends ?? null;
+        const kind = alertKind(a);
+        const Icon = HAZARD_KINDS[kind].icon;
+        const ends = alertEndsAt(a);
         return (
           <li key={a.id} className="flex gap-3 px-5 py-3">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={kindChipStyle(kind)}>
               <Icon className="h-4 w-4" aria-hidden />
             </span>
             <div className="min-w-0 text-sm">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium text-ink">{ALERT_LABELS[a.type]}</span>
+                <span className="font-medium text-ink">{alertLabel(a)}</span>
                 <SeverityBadge severity={a.severity} />
               </div>
               <p className="mt-1 text-ink-2">{a.message}</p>
@@ -570,28 +579,31 @@ function SiteAlerts({ alerts, timeZone }: { alerts: Alert[]; timeZone: string })
 function StopWorkBanner({ alert, timeZone }: { alert: Alert; timeZone: string }) {
   const now = useNow(1000);
   const left = Math.max(0, new Date(alert.all_clear_at!).getTime() - now);
+  if (left === 0) return null; // all clear: gone at 0:00, not stuck there until the next refresh
   const mm = Math.floor(left / 60_000);
   const ss = Math.floor((left % 60_000) / 1000).toString().padStart(2, "0");
   const meta = alert.meta as { strike_count?: number; nearest_strike_mi?: number };
 
   return (
-    <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-[rgb(255_74_74/0.5)] bg-[rgb(255_74_74/0.14)] px-5 py-4">
-      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-risk-extreme text-on-accent">
-        <OctagonAlert className="h-5 w-5" aria-hidden />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="font-semibold text-[#ffb3b3]">{alert.title}</p>
-        <p className="text-sm text-ink-2">
-          {meta.strike_count ? `${meta.strike_count} strikes` : "Lightning"}
-          {meta.nearest_strike_mi ? `, nearest ${meta.nearest_strike_mi} mi` : ""} · all clear at{" "}
-          {siteTime(alert.all_clear_at!, timeZone)} if no new strikes
-        </p>
-      </div>
-      <div className="text-right">
-        <p className="tabular font-display text-4xl font-extrabold text-ink">
-          {mm}:{ss}
-        </p>
-        <p className="text-xs text-muted">until all clear</p>
+    <div className="px-4 pt-4 sm:px-0 sm:pt-0">
+      <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-[rgb(255_74_74/0.5)] bg-[rgb(255_74_74/0.14)] px-5 py-4">
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-risk-extreme text-on-accent">
+          <OctagonAlert className="h-5 w-5" aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-[#ffb3b3]">{alert.title}</p>
+          <p className="text-sm text-ink-2">
+            {meta.strike_count ? `${meta.strike_count} strikes` : "Lightning"}
+            {meta.nearest_strike_mi ? `, nearest ${meta.nearest_strike_mi} mi` : ""} · all clear at{" "}
+            {siteTime(alert.all_clear_at!, timeZone)} if no new strikes
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="tabular font-display text-4xl font-extrabold text-ink">
+            {mm}:{ss}
+          </p>
+          <p className="text-xs text-muted">until all clear</p>
+        </div>
       </div>
     </div>
   );

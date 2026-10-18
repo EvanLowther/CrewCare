@@ -1,11 +1,17 @@
 "use client";
 
 import {
+  Activity,
   ArrowRight,
   Camera,
   CheckCircle2,
+  CircleDashed,
+  CloudLightning,
+  CloudSnow,
   Crosshair,
+  FlaskConical,
   Flame,
+  Haze,
   HeartPulse,
   ImagePlus,
   Loader2,
@@ -14,8 +20,12 @@ import {
   MapPin,
   Mountain,
   PawPrint,
+  Snowflake,
+  ThermometerSnowflake,
+  TreePine,
   TriangleAlert,
   Waves,
+  Wind,
   Zap,
   type LucideIcon,
 } from "lucide-react";
@@ -33,13 +43,24 @@ const ReportPinMap = dynamic(() => import("./ReportPinMap"), {
   loading: () => <div className="flex h-full items-center justify-center text-sm text-muted">Loading map…</div>,
 });
 
-const HAZARDS: { value: HazardType; label: string; icon: LucideIcon }[] = [
-  { value: "wildlife", label: "Wildlife", icon: PawPrint },
+// Grouped so the common ones come first; "Other" stays last.
+const HAZARDS: { value: HazardType; label: string; icon: LucideIcon; hint?: string }[] = [
+  { value: "lightning", label: "Lightning", icon: CloudLightning, hint: "Thunder heard or lightning seen" },
   { value: "flooding", label: "Flooding", icon: Waves },
-  { value: "unstable_ground", label: "Soft ground", icon: Mountain },
-  { value: "downed_line", label: "Downed line", icon: Zap },
+  { value: "high_wind", label: "High wind", icon: Wind },
   { value: "heat_illness", label: "Heat illness", icon: HeartPulse },
+  { value: "cold_stress", label: "Cold stress", icon: ThermometerSnowflake, hint: "Frostbite, shivering, numbness" },
+  { value: "ice", label: "Ice", icon: Snowflake, hint: "Icy roads, walkways or equipment" },
+  { value: "snow", label: "Snow / drifts", icon: CloudSnow },
+  { value: "smoke", label: "Smoke", icon: Haze, hint: "Wildfire smoke or bad air" },
   { value: "fire", label: "Fire", icon: Flame },
+  { value: "wildlife", label: "Wildlife", icon: PawPrint, hint: "Snakes, gators, bears, wasps…" },
+  { value: "downed_line", label: "Downed line", icon: Zap },
+  { value: "fallen_tree", label: "Fallen tree", icon: TreePine, hint: "Trees or debris blocking access" },
+  { value: "unstable_ground", label: "Soft ground", icon: Mountain },
+  { value: "sinkhole", label: "Sinkhole", icon: CircleDashed, hint: "Sinkhole, washout or collapse" },
+  { value: "earthquake_damage", label: "Quake damage", icon: Activity, hint: "Cracks or damage after a quake" },
+  { value: "gas_leak", label: "Gas leak / spill", icon: FlaskConical, hint: "Gas smell, chemical or fuel spill" },
   { value: "other", label: "Other", icon: TriangleAlert },
 ];
 
@@ -327,14 +348,14 @@ function SignedInReportForm({ initialSiteId, isAdmin, reporter }: { initialSiteI
 
           <fieldset>
             <legend className="mb-2 text-xs font-medium text-muted">Hazard</legend>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4">
               {HAZARDS.map(({ value, label, icon: Icon }) => (
                 <button
                   key={value}
                   type="button"
                   aria-pressed={hazard === value}
                   onClick={() => setHazard(value)}
-                  className={`flex flex-col items-center gap-1.5 rounded-lg border px-2 py-3 text-xs transition-colors ${
+                  className={`flex flex-col items-center gap-1.5 rounded-lg border px-1.5 py-3 text-center text-xs leading-tight transition-colors ${
                     hazard === value ? "border-accent bg-accent-soft text-ink" : "border-line text-ink-2 hover:bg-raised"
                   }`}
                 >
@@ -343,6 +364,9 @@ function SignedInReportForm({ initialSiteId, isAdmin, reporter }: { initialSiteI
                 </button>
               ))}
             </div>
+            {hazard && HAZARDS.find((h) => h.value === hazard)?.hint && (
+              <p className="mt-2 text-xs text-muted">{HAZARDS.find((h) => h.value === hazard)?.hint}</p>
+            )}
           </fieldset>
 
           <fieldset>

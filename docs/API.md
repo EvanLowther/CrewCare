@@ -56,7 +56,8 @@ Lightning alert (from `GET /api/alerts`). The frontend counts down to `all_clear
 ```
 
 `POST /api/reports` form fields: `site_id`, `latitude` + `longitude` (the pin), `hazard_type`
-(`wildlife | flooding | unstable_ground | downed_line | heat_illness | fire | other`),
+(`wildlife | flooding | unstable_ground | downed_line | heat_illness | fire | other | lightning | high_wind | ice |
+snow | cold_stress | smoke | sinkhole | fallen_tree | gas_leak | earthquake_damage`),
 `severity` (`low | medium | high`), `gps_latitude` + `gps_longitude` (the phone's fix; required except for admins),
 optional `gps_accuracy_m`, `description`, `photo`. The reporter's name comes from their login.
 
