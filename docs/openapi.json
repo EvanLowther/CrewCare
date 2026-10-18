@@ -617,6 +617,50 @@
         }
       }
     },
+    "/api/reports/{report_id}/confirm": {
+      "patch": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Confirm Report",
+        "description": "Confirm a report: it then counts fully in the site's score. The site's managers and admins only.",
+        "operationId": "confirm_report_api_reports__report_id__confirm_patch",
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HazardReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/photos/{photo_id}": {
       "get": {
         "tags": [
@@ -2205,6 +2249,31 @@
             ],
             "title": "Resolved At",
             "description": "When a manager marked it resolved"
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At",
+            "description": "When a site manager confirmed it"
+          },
+          "confirmed_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed By Name",
+            "description": "Who confirmed it"
           }
         },
         "type": "object",

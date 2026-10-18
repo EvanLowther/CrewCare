@@ -173,6 +173,8 @@ class HazardReport(BaseModel):
     created_at: datetime
     expires_at: datetime | None
     resolved_at: datetime | None = Field(default=None, description="When a manager marked it resolved")
+    confirmed_at: datetime | None = Field(default=None, description="When a site manager confirmed it")
+    confirmed_by_name: str | None = Field(default=None, description="Who confirmed it")
 
 
 class ReportList(BaseModel):

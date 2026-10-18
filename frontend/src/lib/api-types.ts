@@ -161,6 +161,26 @@ export interface paths {
         patch: operations["resolve_report_api_reports__report_id__resolve_patch"];
         trace?: never;
     };
+    "/api/reports/{report_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Confirm Report
+         * @description Confirm a report: it then counts fully in the site's score. The site's managers and admins only.
+         */
+        patch: operations["confirm_report_api_reports__report_id__confirm_patch"];
+        trace?: never;
+    };
     "/api/photos/{photo_id}": {
         parameters: {
             query?: never;
@@ -880,6 +900,16 @@ export interface components {
              * @description When a manager marked it resolved
              */
             resolved_at?: string | null;
+            /**
+             * Confirmed At
+             * @description When a site manager confirmed it
+             */
+            confirmed_at?: string | null;
+            /**
+             * Confirmed By Name
+             * @description Who confirmed it
+             */
+            confirmed_by_name?: string | null;
         };
         /** Health */
         Health: {
@@ -1877,6 +1907,37 @@ export interface operations {
         };
     };
     resolve_report_api_reports__report_id__resolve_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HazardReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_report_api_reports__report_id__confirm_patch: {
         parameters: {
             query?: never;
             header?: never;

@@ -310,7 +310,9 @@ and snow depth 2% each. The national features (snowfall, wind chill, location) r
 - **Briefings:** at 6 PM in each site's time zone, tomorrow's work day (6 AM - 6 PM) in a few sentences: the risk,
   peak heat, storm hours, gusts, snow, smoke, warnings in force and the precautions to take.
 - **Crew reports:** a phone form with live GPS and a draggable pin, to put a hazard (wildlife, flooding, downed line,
-  ...) on the site map.
+  ...) on the site map. Reports count in both scores by type and severity: weather data confirms the ones it can
+  check (lightning, wind, flooding, ice, snow, smoke, heat, cold) and never rejects one, and a manager can confirm
+  any report. Medium and high reports alert the site's team.
 - **Your own sites:** a manager adds a job site by address or pin and picks its crew. Within about a minute it has
   live NWS weather, smoke, nearby alerts and both scores. The model is national (it knows latitude and longitude),
   so a new location needs no retraining.
@@ -351,7 +353,7 @@ smoke, fire weather and OSHA heat floors on top, hour by hour.
 ## What's not done yet
 
 - **On a branch, not merged:** a `simulate` script for demos (hurricane, flood, blizzard). Demo buttons come later.
-- **Not built:** crew reports raising the score, satellite fire detections (NASA FIRMS, which see new fires sooner than
+- **Not built:** satellite fire detections (NASA FIRMS, which see new fires sooner than
   NIFC's reports), fire perimeters, and debris flows.
 
 ## Limitations

@@ -20,7 +20,7 @@ from planit.worker import (
 )
 from planit.worker.briefing import generate
 from planit.worker.ingest import air_quality, earthquakes, glm, nws, nws_weather, open_meteo, river, wildfire
-from planit.worker.rules import flood, lightning
+from planit.worker.rules import crew_reports, flood, lightning
 
 log = logging.getLogger("planit.worker")
 
@@ -37,6 +37,7 @@ JOBS = {
     "glm": (glm.poll, 20),  # live lightning: a new GOES GLM file every 20 s from each satellite
     "lightning": (lightning.evaluate, 15),  # stop-work alerts and the 30-minute all-clear
     "flood": (flood.evaluate, 900),  # river flood-risk warnings
+    "crew_reports": (crew_reports.evaluate, 60),  # medium and high crew reports -> alerts for the site's team
     "score": (score.score_all, 300),
     "briefing": (generate.run_due, 300),  # sends each site's briefing at 6 PM site-local time
     "jobs": (jobs.poll, 2),  # demo buttons: job_requests rows inserted by the API

@@ -24,7 +24,8 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import type { Alert } from "./api";
+import type { Alert, HazardType } from "./api";
+import { HAZARD_ICONS } from "./reports";
 
 export type HazardKind =
   | "heat"
@@ -133,8 +134,35 @@ function nwsKind(event: string): HazardKind {
 }
 
 /** `label` matters for NWS alert factors (key "alert_nws"), whose label is the NWS event ("Freeze Warning"). */
+// Crew report factors ("report_<type>", backend/planit/hazards.py crew_report) -> the danger they share a kind with.
+const REPORT_KINDS: Partial<Record<HazardType, HazardKind>> = {
+  flooding: "flood",
+  fire: "wildfire",
+  lightning: "lightning",
+  high_wind: "wind",
+  heat_illness: "heat",
+  ice: "winter",
+  snow: "winter",
+  cold_stress: "cold",
+  smoke: "smoke",
+  earthquake_damage: "earthquake",
+};
+
+function reportType(key: string): HazardType | null {
+  const type = key.startsWith("report_") ? key.slice("report_".length) : null;
+  return type && type in HAZARD_ICONS ? (type as HazardType) : null;
+}
+
+/** The icon for a risk factor: a crew report shows its report type's own icon (paw for wildlife, ...). */
+export function factorIcon(key: string, label = ""): LucideIcon {
+  const type = reportType(key);
+  return type ? HAZARD_ICONS[type] : HAZARD_KINDS[factorKind(key, label)].icon;
+}
+
 export function factorKind(key: string, label = ""): HazardKind {
   if (key in FACTOR_KINDS) return FACTOR_KINDS[key];
+  const type = reportType(key);
+  if (type) return REPORT_KINDS[type] ?? "crew_report";
   if (key === "alert_nws") return nwsKind(label);
   if (key.startsWith("alert_")) {
     const type = key.slice("alert_".length) as Alert["type"];
