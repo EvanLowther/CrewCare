@@ -32,7 +32,7 @@ import { useMe } from "@/components/MeProvider";
 import { ModelSwitch } from "@/components/ModelSwitch";
 import { PastHazards } from "@/components/PastHazards";
 import { Card, CardHeader, EmptyState, ErrorBanner, PageBody, SeverityBadge } from "@/components/ui";
-import { api, type Alert, type Conditions, type HazardReport, type RiskPoint, type Scorer, type SiteDetail } from "@/lib/api";
+import { api, type Alert, type Conditions, type HazardReport, type RiskLevel, type RiskPoint, type Scorer, type ScorePoint, type SiteDetail } from "@/lib/api";
 import { alertEndsAt, alertLabel, inForce, SEVERITY_RANK } from "@/lib/alerts";
 import { alertKind, factorKind, HAZARD_KINDS, kindChipStyle } from "@/lib/hazardKinds";
 import { relativeTime, round, siteHour, siteTime } from "@/lib/format";
@@ -223,7 +223,7 @@ function SiteDetailView({
             })}
           </div>
 
-          <ScoreToday history={history} timeZone={tz} now={now} />
+          <ScoreToday history={history} recent={detail.recent_scores ?? []} timeZone={tz} now={now} />
 
           <section aria-label="What's driving it" className="flex flex-col gap-2">
             <h2 className="text-xs font-semibold text-ink-2">What&apos;s driving it</h2>
@@ -429,38 +429,101 @@ function SiteDetailView({
 }
 
 /** Today's scored hours as thin bars, the latest on the right. */
-function ScoreToday({ history, timeZone, now }: { history: RiskPoint[]; timeZone: string; now: number }) {
-  const points = history
-    .filter((p) => p.kind === "current" && new Date(p.ts).getTime() <= now)
-    .sort((a, b) => a.ts.localeCompare(b.ts))
-    .slice(-12);
+type Point = { ts: string; score: number; level: RiskLevel };
+
+/**
+ * The score over the last 12 hours, one point per 5-minute scoring pass (recent_scores), so you see it rise and
+ * fall within an hour. Until there are snapshots (just after the first deploy), the hourly scores stand in.
+ */
+function ScoreToday({ history, recent, timeZone, now }: { history: RiskPoint[]; recent: ScorePoint[]; timeZone: string; now: number }) {
+  const [hover, setHover] = useState<number | null>(null);
+  const fiveMin = recent.length >= 2;
+  const points: Point[] = fiveMin
+    ? recent
+    : history
+        .filter((p) => p.kind === "current" && new Date(p.ts).getTime() <= now)
+        .sort((a, b) => a.ts.localeCompare(b.ts))
+        .slice(-12);
   if (points.length === 0) return null;
-  const hourLabel = (iso: string) => siteHour(iso, timeZone).replace(" AM", "a").replace(" PM", "p");
+
+  const times = points.map((p) => new Date(p.ts).getTime());
+  const end = Math.max(times[times.length - 1], Math.min(now, times[times.length - 1] + 10 * 60_000));
+  const start = Math.min(times[0], end - 60 * 60_000); // at least an hour wide
+  const x = (t: number) => ((t - start) / (end - start)) * 100;
+  const y = (score: number) => 100 - score * 10;
+  const ticks: number[] = [];
+  const firstHour = Math.ceil(start / 3_600_000) * 3_600_000;
+  const everyH = Math.max(1, Math.ceil((end - start) / 3_600_000 / 6)); // at most ~6 labels
+  for (let t = firstHour; t <= end; t += everyH * 3_600_000) ticks.push(t);
+  const hourLabel = (t: number) => siteHour(new Date(t).toISOString(), timeZone).replace(" AM", "a").replace(" PM", "p");
+  const last = points[points.length - 1];
+  const shown = hover !== null ? points[hover] : last;
+  const shownIdx = hover ?? points.length - 1;
+
+  function onMove(e: React.PointerEvent<HTMLDivElement>) {
+    const box = e.currentTarget.getBoundingClientRect();
+    const t = start + ((e.clientX - box.left) / box.width) * (end - start);
+    let best = 0;
+    for (let i = 1; i < times.length; i++) if (Math.abs(times[i] - t) < Math.abs(times[best] - t)) best = i;
+    setHover(best);
+  }
+
   return (
-    <section aria-label="Score, last 12 scored hours" className="rounded-[14px] border border-line bg-[rgb(8_11_17/0.8)] px-3.5 pt-3.5 pb-2.5">
-      <div className="mb-2.5 flex justify-between text-xs">
-        <span className="font-semibold">Score, recent hours</span>
-        <span className="eyebrow">Hourly · site time</span>
+    <section aria-label="Score over the last 12 hours" className="rounded-[14px] border border-line bg-[rgb(8_11_17/0.8)] px-3.5 pt-3.5 pb-2.5">
+      <div className="mb-2.5 flex items-baseline justify-between gap-2 text-xs">
+        <span className="font-semibold">{fiveMin ? "Score, last 12 hours" : "Score, recent hours"}</span>
+        <span className="eyebrow whitespace-nowrap">{fiveMin ? "5-min · site time" : "Hourly · site time"}</span>
       </div>
-      <div className="relative flex h-[104px] items-end justify-between gap-1.5 border-b border-line">
-        <div className="absolute inset-x-0 bottom-[75%] border-t border-dashed border-[#3a2226]" aria-hidden />
-        {points.map((p) => {
-          const color = RISK_COLORS[levelFor(p.score)];
-          return (
-            <div key={p.ts} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
-              <span className="font-mono text-[9px] text-ink-2">{p.score.toFixed(1)}</span>
-              <div className="w-[3px] rounded-sm" style={{ height: `${p.score * 8}px`, background: color, boxShadow: `0 0 8px ${color}` }} />
-            </div>
-          );
-        })}
+      <div
+        className="relative h-[104px] touch-none border-b border-line"
+        onPointerMove={onMove}
+        onPointerDown={onMove}
+        onPointerLeave={() => setHover(null)}
+      >
+        {/* Extreme starts at 7.5. */}
+        <div className="absolute inset-x-0 border-t border-dashed border-[#3a2226]" style={{ top: `${y(7.5)}%` }} aria-hidden />
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full overflow-visible" aria-hidden>
+          {points.slice(1).map((p, i) => (
+            <line
+              key={p.ts}
+              x1={x(times[i])}
+              y1={y(points[i].score)}
+              x2={x(times[i + 1])}
+              y2={y(p.score)}
+              stroke={RISK_COLORS[p.level]}
+              strokeWidth={2}
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+        </svg>
+        {/* The point being read: the latest, or the one under the finger / cursor. */}
+        <span
+          className="pointer-events-none absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-[#080b11]"
+          style={{ left: `${x(times[shownIdx])}%`, top: `${y(shown.score)}%`, background: RISK_COLORS[shown.level], boxShadow: `0 0 8px ${RISK_COLORS[shown.level]}` }}
+          aria-hidden
+        />
+        <span
+          className="pointer-events-none absolute -translate-y-full rounded-md bg-raised px-1.5 py-0.5 font-mono text-[10px] whitespace-nowrap text-ink"
+          style={{
+            left: `${Math.min(Math.max(x(times[shownIdx]), 12), 88)}%`,
+            top: `calc(${y(shown.score)}% - 8px)`,
+            transform: "translate(-50%, -100%)",
+          }}
+        >
+          {shown.score.toFixed(1)} · {siteTime(shown.ts, timeZone)}
+        </span>
       </div>
-      <div className="flex justify-between gap-1.5 pt-1.5">
-        {points.map((p) => (
-          <span key={p.ts} className="flex-1 text-center font-mono text-[9px] text-muted">
-            {hourLabel(p.ts)}
+      <div className="relative h-4 pt-1.5">
+        {ticks.map((t) => (
+          <span key={t} className="absolute -translate-x-1/2 font-mono text-[9px] text-muted" style={{ left: `${x(t)}%` }}>
+            {hourLabel(t)}
           </span>
         ))}
       </div>
+      <p className="sr-only">
+        Latest score {last.score.toFixed(1)} at {siteTime(last.ts, timeZone)}; {points.length} {fiveMin ? "5-minute" : "hourly"} scores shown.
+      </p>
     </section>
   );
 }

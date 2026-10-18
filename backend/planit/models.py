@@ -56,6 +56,13 @@ class RiskPoint(BaseModel):
     kind: Literal["current", "forecast"]
 
 
+class ScorePoint(BaseModel):
+    """One 5-minute scoring pass."""
+    ts: datetime = Field(description="When it was scored")
+    score: float
+    level: RiskLevel
+
+
 # --- Weather ----------------------------------------------------------------
 
 class Conditions(BaseModel):
@@ -190,6 +197,8 @@ class SiteDetail(BaseModel):
     alerts: list[Alert] = Field(description="Active alerts for this site")
     reports: list[HazardReport] = Field(description="Active crew reports within 5 miles")
     risk_history: list[RiskPoint] = Field(description="Past 24 h + next 24 h forecast")
+    recent_scores: list[ScorePoint] = Field(
+        default_factory=list, description="Every 5-minute score of the last 12 hours, oldest first (same scorer)")
 
 
 # --- Users, roles and site membership (docs/AUTH.md) --------------------------

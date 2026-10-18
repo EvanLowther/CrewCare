@@ -61,6 +61,7 @@ That lets each person build and test their half alone.
 | `storm_events` | table | Person A loader | NOAA Storm Events, labels for ML training: Florida 2023-2025, every state 2024-2025. |
 | `job_requests` | table | API (demo buttons, new sites) | Requests the worker runs: `lightning_replay`, `generate_briefings`, and `site_setup` (008: a site that was just created or moved gets its weather and scores at once). 002. |
 | `users`, `site_members` | table | API | Who signed in, their role, and which sites they're on. 006, see AUTH.md. |
+| `score_snapshots` | hypertable | trigger | Every 5-minute current score (both scorers), copied by a trigger on `hazard_scores`, which keeps only the hour's latest; the site page charts the last 12 h. Kept 14 days. 013. |
 | `notifications`, `push_subscriptions` | table | triggers, API | Crew reports, danger alerts and briefings for each site member, written by triggers on `hazard_reports`, `alerts` and `briefings`; streamed to open pages and pushed to devices by the API (`api/push.py`). 011. |
 
 Changing the schema: add `db/migrations/002_<name>.sql`. Never edit a migration that has been applied.
