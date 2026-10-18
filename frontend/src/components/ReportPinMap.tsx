@@ -5,6 +5,7 @@ import L from "leaflet";
 import { useEffect, useMemo, useRef } from "react";
 import { Circle, MapContainer, Marker, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import type { SiteSummary } from "@/lib/api";
+import { useIsShown } from "@/lib/useIsShown";
 
 const BASE_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}";
 const LABEL_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}";
@@ -65,6 +66,8 @@ export default function ReportPinMap({
   onMove: (p: LatLng) => void;
 }) {
   const markerRef = useRef<L.Marker>(null);
+  // Only while the page is on screen, so returning to it builds a fresh map (see useIsShown).
+  const shown = useIsShown();
   const handlers = useMemo(
     () => ({
       dragend() {
@@ -75,6 +78,7 @@ export default function ReportPinMap({
     [onMove],
   );
 
+  if (!shown) return null;
   return (
     <MapContainer
       center={position ? [position.lat, position.lng] : US_CENTER}

@@ -282,6 +282,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/geocode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Geocode Address
+         * @description US addresses or places matching `q`, best first, for placing a new site. Managers and admins only.
+         */
+        get: operations["geocode_address_api_geocode_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/users": {
         parameters: {
             query?: never;
@@ -584,6 +604,26 @@ export interface components {
             ok: boolean;
             /** Message */
             message: string;
+        };
+        /** GeocodeList */
+        GeocodeList: {
+            /**
+             * Results
+             * @description Best match first; US addresses and places only
+             */
+            results: components["schemas"]["GeocodeResult"][];
+        };
+        /** GeocodeResult */
+        GeocodeResult: {
+            /**
+             * Label
+             * @example 1600 Pennsylvania Avenue NW, Washington, DC
+             */
+            label: string;
+            /** Latitude */
+            latitude: number;
+            /** Longitude */
+            longitude: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1572,6 +1612,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    geocode_address_api_geocode_get: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GeocodeList"];
                 };
             };
             /** @description Validation Error */
