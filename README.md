@@ -1,4 +1,4 @@
-# Crew Care
+# CrewCare
 
 > Which job sites are dangerous for field crews today, and tomorrow? A live 0-10 hazard score for 160 US power plants,
 > one from work rules and one learned from weather history.
@@ -8,12 +8,17 @@
 It's 6:45 AM in August at a job site in the Everglades. By noon the heat index will pass 110°F, thunderstorms are
 building to the west, the access road is mud after a week of rain, and someone saw an alligator yesterday. Every one
 of those hazards was knowable in advance, but the data is spread across a dozen agencies and apps, and the go/no-go
-call gets made on instinct. Crew Care puts it on one map: for every site it pulls the conditions crews work in,
+call gets made on instinct. CrewCare puts it on one map: for every site it pulls the conditions crews work in,
 fires stop-work alerts, and scores the hazard level now and for the next 24 hours. We test whether a model trained on
 weather history can (1) tell hazard days from normal ones on years it has never seen, (2) work in every region of the
 country, and (3) catch what published work rules miss.
 
-**Finding in one line:** weather history predicts crew-hazard days well (ROC-AUC 0.885 on unseen years), one national
+Why it matters: hot weather alone injures about 15,000 workers a year in California, and only about 850 of those
+injuries are recorded as heat-related; injury risk rises 6-9% on days above 90°F and 10-15% above 100°F
+([UCLA, 11 million workers' comp claims](https://luskin.ucla.edu/high-temperatures-increase-workers-injury-risk-whether-theyre-outdoors-or-inside)).
+
+**Finding in one line:** weather history predicts crew-hazard days well (on unseen years, PR-AUC 6.1x the base rate,
+ROC-AUC 0.883), one national
 model holds up in every region and is better at Florida than the Florida-only model, but the work rules still beat it on
 wind and hurricanes and neither can see wildfire, so the dashboard shows both scores.
 
@@ -113,6 +118,11 @@ flowchart TD
     FRAME --> MODEL["<b>XGBoost</b><br/>probability of a hazard day"]
     MODEL --> SCORE["<b>0-10 Predictive score</b><br/>+ top factors (SHAP)"]
 ```
+
+Inside the model: 300 gradient-boosted decision trees (depth 4, learning rate 0.05), each fitted to the errors of the
+ones before it. The splits drawn are the real first two levels of trees 1, 2 and 300.
+
+![How the Predictive score works](docs/images/crewcare_predictive.png)
 - **Test design:** every number below is out of sample. In the test bench each year is scored by a model trained on the
   other years (2023, 2024, 2025). The saved model's own check trains on 2023-2024 and tests on 2025.
 
@@ -124,16 +134,21 @@ forecast (soil moisture, storm energy) to these.
 | | Florida model, `xgb-2026-10-17` | **National model, `xgb-2026-10-17-us`** |
 |---|---|---|
 | Training data | 60 sites, 65,760 site-days | **160 sites, 138,860 site-days** |
-| ROC-AUC (0.5 = guessing) | 0.854 | **0.885** |
-| PR-AUC (guessing = the hazard rate) | 0.226 (guessing 0.03) | **0.328** (guessing 0.05) |
-| ...on the same 60 Florida sites | 0.226 | **0.303** |
-| When it said "high", a real hazard day | 16% | 20% (Florida sites: 18%) |
-| Hazard days it flagged "high" or above | 54% | **76%** (Florida sites: 72%) |
+| PR-AUC (guessing = the hazard rate) | 0.226 (guessing 0.03) | **0.312** (guessing 0.051): 6.1x |
+| ...on the same 60 Florida sites | 0.226 | **0.290** |
+| ROC-AUC (0.5 = guessing) | 0.854 | **0.883** |
+| When it said "high", a real hazard day | 16% | 18% (Florida sites: 15%) |
+| Hazard days it flagged "high" or above | 54% | **78%** (Florida sites: 76%) |
 
-The last two rows are at the dashboard's "high" level, on the national model's new scale: the same as the Real-time
-score's (see [One scale for both scores](#one-scale-for-both-scores)). That scale catches more hazard days and accepts
-more false alarms than the Florida model's did. ROC-AUC and PR-AUC rank days by probability, so the scale doesn't
-change them.
+PR-AUC comes first because hazard days are rare (5.1%): ROC-AUC also rewards ranking the 132,000 calm days, which is
+easy, while PR-AUC only asks how well the model finds the dangerous ones. The national column scores the dashboard's
+Predictive score (the model on the Real-time scale with the OSHA heat floor; re-run 2026-10-18 with the current scale
+and floors); the model's raw probabilities score a little higher (ROC-AUC 0.885, PR-AUC 0.336, see
+[Why XGBoost](#why-xgboost)). The last two rows are at the dashboard's "high" level, on the same scale as the
+Real-time score's (see [One scale for both scores](#one-scale-for-both-scores)), which catches more hazard days and
+accepts more false alarms than the Florida model's did.
+
+![How accurate is the Predictive model?](docs/images/crewcare_accuracy.png)
 
 ```mermaid
 ---
@@ -148,16 +163,16 @@ xychart-beta
     title "Finding hazard days on the 60 Florida sites (PR-AUC, higher is better)"
     x-axis ["rules-v1 (weather only)", "Florida model", "National model"]
     y-axis "PR-AUC" 0 --> 0.35
-    bar [0.180, 0.226, 0.303]
+    bar [0.180, 0.226, 0.290]
 ```
 
 | # | Question | Verdict |
 |---|---|---|
-| Q1 | Can daily weather tell hazard days from normal ones on years the model never saw? | **Supported.** ROC-AUC 0.885; PR-AUC 0.328 against 0.051 for guessing |
+| Q1 | Can daily weather tell hazard days from normal ones on years the model never saw? | **Supported.** PR-AUC 0.312 against 0.051 for guessing (95% CI 5.6-6.6x); ROC-AUC 0.883 (0.876-0.890) |
 | Q2 | Does one national model hold up in every region, or does each need its own? | **One model.** ROC-AUC 0.871-0.905 in all five regions; region-only models don't beat it, except slightly in the West |
-| Q3 | Does training on all 50 states help Florida? | **Supported.** Same 60 sites: PR-AUC 0.226 -> 0.303 |
-| Q4 | Do the dashboard levels mean something, and the same on both scores? | **Supported.** Each Predictive level is as often a real hazard day as the same Real-time level (moderate 4.2% vs 4.3%, extreme 26% vs 21%); "low" 0.5% |
-| Q5 | Do the OSHA / NWS work rules match the model? | **Partly.** Rules win on wind and hurricanes, the model on floods, winter and storms; so we show both |
+| Q3 | Does training on all 50 states help Florida? | **Supported.** Same 60 sites: PR-AUC 0.226 -> 0.290 |
+| Q4 | Do the dashboard levels mean something, and the same on both scores? | **Supported.** Each Predictive level is as often a real hazard day as the same Real-time level (moderate 4.2% vs 4.3%, extreme 26% vs 22%); "low" 0.5%; trend test z = 129 |
+| Q5 | Do the OSHA / NWS work rules match the model? | **Partly.** Rules win on wind (McNemar p = 3e-6), the model on floods, winter, storms, heat and cold (all p < 1e-5); hurricanes and fire are ties; so we show both |
 | Q6 | Can weather alone see wildfire? | **Not supported.** 37% of fire and dust days flagged; the Hughes Fire was missed |
 
 **These are not blind tests.** We chose the features, the hazard event types and the test cases after seeing the
@@ -166,6 +181,26 @@ The 2025 check of the saved model is the cleanest number (ROC-AUC 0.883, PR-AUC 
 
 **Variants tested:** rules-v1, rules-v2 (on daily history), the Florida XGBoost model, the national model alone, the
 national model with the OSHA heat floor (what the dashboard shows), and the four model types below.
+
+### Statistical tests
+
+Leave-one-year-out cross-validation (each year scored by a model trained only on the others), then a cluster
+bootstrap that resamples whole sites (500 resamples), because days at the same site aren't independent. All on the
+dashboard's Predictive score unless noted; re-run 2026-10-18.
+
+| Test | Result |
+|---|---|
+| PR-AUC, 95% CI | 0.312 (0.295-0.331), 6.1x the 5.1% base rate (5.6-6.6x) |
+| ROC-AUC, 95% CI | 0.883 (0.876-0.890); by held-out year 0.868 (2023), 0.892 (2024), 0.881 (2025) |
+| Mann-Whitney U | AUC = U / (n1 n0): the chance a random hazard day outranks a random normal day; p < 1e-300 |
+| Recall / precision at "high" or above | 77.8% (75.8-79.7%) / 17.9% (16.7-19.1%) |
+| Predictive minus Real-time | ROC-AUC +0.181 (0.169-0.193), PR-AUC +0.168 (0.149-0.187) |
+| XGBoost minus logistic regression (probabilities) | ROC-AUC +0.081 (0.071-0.091), PR-AUC +0.104 (0.088-0.122) |
+| Exact McNemar, hazard days flagged by one score only | all hazard days: 2,231 Predictive only vs 529 Real-time only, p < 1e-200; per hazard in [By hazard](#by-hazard) |
+| Brier score (probabilities) | 0.0399 vs 0.0485 for climatology: Brier skill score 0.18 |
+| Calibration slope / intercept | 1.03 / 0.11 (1 / 0 is perfect) |
+| Hosmer-Lemeshow (10 bins) | chi2 = 59.5, df 8, rejects perfect calibration: at n = 138,860 it flags a slight over-prediction on the calmest days (predicted 0.36% vs 0.22% in the 3rd decile) |
+| Cochran-Armitage trend across the 4 levels | z = 129; extreme days 55x as likely to be hazard days as low days |
 
 ### Why XGBoost
 
@@ -220,15 +255,15 @@ xychart-beta
     title "Share of days that were real hazard days, by Predictive level (%)"
     x-axis ["low", "moderate", "high", "extreme"]
     y-axis "Hazard days (%)" 0 --> 30
-    bar [0.5, 4.2, 8.2, 25.6]
+    bar [0.5, 4.2, 8.4, 26.0]
 ```
 
 | Level | Real-time: real hazard days | Predictive: real hazard days | Predictive: share of all days |
 |---|---|---|---|
-| low (0-2.4) | 1.1% | 0.5% | 57% |
+| low (0-2.4) | 1.0% | 0.5% | 57% |
 | moderate (2.5-4.9) | 4.3% | 4.2% | 20% |
-| high (5-7.4) | 7.4% | 8.2% | 10% |
-| extreme (7.5-10) | 21.4% | 25.6% | 12% |
+| high (5-7.4) | 7.4% | 8.4% | 10% |
+| extreme (7.5-10) | 21.6% | 26.0% | 12% |
 
 Same odds per level, but Predictive picks out more high-odds days than the rules can, so it says "extreme" on 12% of
 days against Real-time's 4%, mostly in summer. On top of the model, per hour:
@@ -246,8 +281,8 @@ days against Real-time's 4%, mostly in summer. On top of the model, per hour:
   its odds on a log scale instead (0.03% scores 0.0, the odds at Real-time 1.0 score 1.0). Before, a quarter of all
   days scored exactly 0. Either way it's "low".
 
-The rescale made the Predictive score more cautious: at "high or above" it catches 76% of hazard days (61% before),
-and 1 flag in 5 is a real hazard day (1 in 4 before). The probabilities themselves are unchanged and still calibrated:
+The rescale made the Predictive score more cautious: at "high or above" it catches 78% of hazard days (61% before),
+and 18% of its flags are real hazard days (1 in 4 before). The probabilities themselves are unchanged and still calibrated:
 the riskiest tenth of days were predicted at 27% and turned out 29%.
 
 ### One national model, or one per region?
@@ -270,18 +305,19 @@ where fire, dust and dry air matter most, is the one to re-check with more histo
 
 ### By hazard
 
-| Hazard (NOAA event types) | Days | Predictive | Real-time data |
-|---|---|---|---|
-| Heat | 626 | **92%** | 63% |
-| Tropical (hurricane, tropical storm, surge) | 349 | 93% | **96%** |
-| Winter (winter storm, heavy snow, blizzard, ice) | 611 | **82%** | 54% |
-| Flood (flash flood, flood, heavy rain) | 1,969 | **80%** | 46% |
-| Wind (strong, high wind) | 317 | 80% | **92%** |
-| Storm (thunderstorm wind, hail, lightning, tornado) | 3,550 | **77%** | 51% |
-| Cold (cold, extreme cold / wind chill) | 177 | **66%** | 44% |
-| Fire / dust (wildfire, dust storm) | 169 | **37%** | 32% |
+| Hazard (NOAA event types) | Days | Predictive | Real-time data | McNemar p |
+|---|---|---|---|---|
+| Heat | 626 | **92%** | 63% | 6e-42 |
+| Tropical (hurricane, tropical storm, surge) | 349 | 93% | 96% | 0.11 (tie) |
+| Winter (winter storm, heavy snow, blizzard, ice) | 611 | **82%** | 56% | 8e-27 |
+| Flood (flash flood, flood, heavy rain) | 1,969 | **80%** | 46% | 3e-127 |
+| Wind (strong, high wind) | 317 | 80% | **92%** | 3e-6 |
+| Storm (thunderstorm wind, hail, lightning, tornado) | 3,550 | **77%** | 51% | 1e-135 |
+| Cold (cold, extreme cold / wind chill) | 177 | **66%** | 44% | 1e-5 |
+| Fire / dust (wildfire, dust storm) | 169 | 37% | 32% | 0.4 (tie) |
 
-In this test the rules only see daily weather history. Live, they also get NWS warnings, lightning and storm energy.
+McNemar compares the two scores on the same hazard days: only the days one flagged and the other didn't count. Bold
+marks a significant winner. In this test the rules only see daily weather history. Live, they also get NWS warnings, lightning and storm energy.
 
 **What the model looks at** (share of XGBoost gain): rain per hour 32%, rain in 24 h 18%, snowfall 8%, heat index 6%,
 wind chill 6%, gusts 6%, latitude 5%, month 4%, low temperature 4%, longitude 3%, 3-day rain, soil moisture, dry air
@@ -312,7 +348,14 @@ and snow depth 2% each. The national features (snowfall, wind chill, location) r
 - **Crew reports:** a phone form with live GPS and a draggable pin, to put a hazard (wildlife, flooding, downed line,
   ...) on the site map. Reports count in both scores by type and severity: weather data confirms the ones it can
   check (lightning, wind, flooding, ice, snow, smoke, heat, cold) and never rejects one, and a manager can confirm
-  any report. Medium and high reports alert the site's team.
+  any report. Medium and high reports alert the site's team. Only a site's members can report on it, from within 5
+  miles of it (phone GPS and pin); admins can report anywhere.
+- **Notifications:** crew reports, danger alerts and the 6 PM briefing reach each site's members within about 2
+  seconds, as pop-ups on every page, a bell inbox, and push to phones and browsers.
+- **Past hazards:** the site page and the new-site form list crew reports within 5 miles (resolved ones too) and NOAA
+  Storm Events within 25 miles, so the next project at a location starts with what happened there before.
+- **Sign-in and roles:** Auth0 login with admin, manager and crew roles. Private job sites are visible only to their
+  members; managers run their own sites and crews; admins see everything.
 - **Your own sites:** a manager adds a job site by address or pin and picks its crew. Within about a minute it has
   live NWS weather, smoke, nearby alerts and both scores. The model is national (it knows latitude and longitude),
   so a new location needs no retraining.
@@ -335,6 +378,10 @@ as likely on those days. A site's score is its worst hazard plus a little for ot
 **Predictive** is the model above on the same 0-10 scale, with the NWS warning, lightning, wildfire, earthquake,
 smoke, fire weather and OSHA heat floors on top, hour by hour.
 
+A worked example, scored with `hazards.py`: the Sperry Tech scenario of an August morning in the Everglades.
+
+![How the Real-time score works](docs/images/crewcare_realtime.png)
+
 | Tool | What it does here |
 |---|---|
 | **Tiger Data (TimescaleDB + PostGIS)** | Hypertables for weather, NWS weather, lightning strikes and scores; a continuous aggregate (`time_bucket`, 1 day) for the model's daily features; `ST_DWithin` for strikes within 10 miles of a site |
@@ -347,7 +394,7 @@ smoke, fire weather and OSHA heat floors on top, hour by hour.
 | **NOAA Storm Events** | The labels: what actually happened, where and when |
 | **EIA-860M** | Every US power plant, with coordinates, utility and type |
 | **Vultr** | Hosts the live site: one Ubuntu server running the site, API and worker behind Caddy (HTTPS), auto-deploying `main` |
-| **Auth0** | |
+| **Auth0** | Sign-in and roles (admin, manager, crew): private job sites, site membership, the admin page, and who may file a crew report for a site |
 | **Gemini** | Writes each site's 6 PM next-day briefing from its facts (20 sites per call); a summary is kept only if every number in it is in the facts, otherwise the template is used |
 
 ## What's not done yet
@@ -355,6 +402,9 @@ smoke, fire weather and OSHA heat floors on top, hour by hour.
 - **On a branch, not merged:** a `simulate` script for demos (hurricane, flood, blizzard). Demo buttons come later.
 - **Not built:** satellite fire detections (NASA FIRMS, which see new fires sooner than
   NIFC's reports), fire perimeters, and debris flows.
+- **Next:** longer weather history, with storm energy (CAPE) in it (the archive backfill has none, so the model only
+  sees rain per hour as its storm signal); photo checks on crew reports with an image model; an offline mode that
+  caches scores, briefings and reports on crew and manager devices for sites that lose their connection.
 
 ## Limitations
 
