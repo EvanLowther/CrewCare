@@ -340,6 +340,7 @@ smoke, fire weather and OSHA heat floors on top, hour by hour.
 | **Open-Meteo** | Hourly weather history for training; soil moisture, storm energy and the model's live inputs; air quality (PM2.5 AQI, CAMS model) for smoke |
 | **NIFC (WFIGS)** | Every active US wildfire in one national request: location, acres, % contained |
 | **USGS Earthquakes** | Every M2.5+ quake of the last day in one feed, scored by the shaking expected at each site |
+| **NOAA GOES GLM** | Live lightning: every flash over the Americas from GOES-East and GOES-West, a file every 20 s; any flash within 10 mi of a site starts its stop-work countdown |
 | **NOAA Storm Events** | The labels: what actually happened, where and when |
 | **EIA-860M** | Every US power plant, with coordinates, utility and type |
 | **Vultr** | Hosts the live site: one Ubuntu server running the site, API and worker behind Caddy (HTTPS), auto-deploying `main` |
@@ -348,8 +349,7 @@ smoke, fire weather and OSHA heat floors on top, hour by hour.
 
 ## What's not done yet
 
-- **On a branch, not merged:** the lightning stop-work rule with its 30-minute countdown, and a `simulate` script for
-  demos (lightning, hurricane, flood, blizzard). Demo buttons in the app come later.
+- **On a branch, not merged:** a `simulate` script for demos (hurricane, flood, blizzard). Demo buttons come later.
 - **Not built:** crew reports raising the score, the
   river flood rule with NWS flood stages, satellite fire detections (NASA FIRMS, which see new fires sooner than
   NIFC's reports), fire perimeters, and debris flows.
