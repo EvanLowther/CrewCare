@@ -1240,6 +1240,55 @@ export interface components {
              */
             kind: "current" | "forecast";
         };
+        /**
+         * RiverStatus
+         * @description The NWS river gauge within 2 mi of a site (NOAA NWPS) and its latest reading.
+         */
+        RiverStatus: {
+            /**
+             * Gauge Id
+             * @example BTRL1
+             */
+            gauge_id: string;
+            /**
+             * Gauge Name
+             * @example Mississippi River at Baton Rouge
+             */
+            gauge_name: string;
+            /**
+             * River
+             * @example Mississippi River
+             */
+            river: string | null;
+            /**
+             * Ts
+             * @description Time of the latest reading
+             */
+            ts: string | null;
+            /** Stage Ft */
+            stage_ft: number | null;
+            /**
+             * Forecast Stage Ft
+             * @description Highest NWS forecast stage in the next 48 h
+             */
+            forecast_stage_ft: number | null;
+            /**
+             * Category
+             * @description no_flooding, action, minor (flood stage), moderate or major
+             */
+            category: string | null;
+            /** Action Stage Ft */
+            action_stage_ft: number | null;
+            /**
+             * Flood Stage Ft
+             * @description NWS minor flood stage
+             */
+            flood_stage_ft: number | null;
+            /** Moderate Stage Ft */
+            moderate_stage_ft: number | null;
+            /** Major Stage Ft */
+            major_stage_ft: number | null;
+        };
         /** RoleUpdate */
         RoleUpdate: {
             /**
@@ -1275,6 +1324,8 @@ export interface components {
             last_24h: components["schemas"]["Last24h"] | null;
             /** @description Latest air-quality hour, for smoke */
             air_quality?: components["schemas"]["AirQuality"] | null;
+            /** @description River gauge within 2 mi, for river sites */
+            river?: components["schemas"]["RiverStatus"] | null;
             /**
              * Forecast
              * @description Next 48 hours, hourly

@@ -18,7 +18,8 @@ import logging
 from planit.db import connection
 from planit.ml import score
 from planit.worker import jobs
-from planit.worker.ingest import air_quality, earthquakes, nws, nws_weather, open_meteo, wildfire
+from planit.worker.ingest import air_quality, earthquakes, nws, nws_weather, open_meteo, river, wildfire
+from planit.worker.rules import flood
 
 log = logging.getLogger(__name__)
 
@@ -34,7 +35,8 @@ def run(site_id: int) -> bool:
     nws_weather.poll(site_ids=[site_id])  # links the grid and alert zones first
     open_meteo.poll(site_ids=[site_id], past_days=SETUP_PAST_DAYS)
     air_quality.poll(site_ids=[site_id])
-    for poll in (nws.poll, wildfire.poll, earthquakes.poll):  # alerts for its location
+    river.poll(site_ids=[site_id])  # its nearest flood-staged river gauge, if any
+    for poll in (nws.poll, wildfire.poll, earthquakes.poll, flood.evaluate):  # alerts for its location
         try:
             poll()
         except Exception:  # an alert source being down mustn't stop the scores

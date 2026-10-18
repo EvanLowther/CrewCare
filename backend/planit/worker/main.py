@@ -19,7 +19,7 @@ from planit.worker import (
     site_setup,  # noqa: F401  registers the 'site_setup' job handler
 )
 from planit.worker.briefing import generate
-from planit.worker.ingest import air_quality, earthquakes, glm, nws, nws_weather, open_meteo, usgs, wildfire
+from planit.worker.ingest import air_quality, earthquakes, glm, nws, nws_weather, open_meteo, river, wildfire
 from planit.worker.rules import flood, lightning
 
 log = logging.getLogger("planit.worker")
@@ -33,10 +33,10 @@ JOBS = {
     "air_quality": (air_quality.poll, 7200),  # smoke: PM2.5 AQI, ~1,900 Open-Meteo calls a day
     "wildfire": (wildfire.poll, 900),  # one national NIFC request
     "earthquakes": (earthquakes.poll, 120),  # one USGS feed request
-    "usgs": (usgs.poll, 900),
+    "river": (river.poll, 900),  # NWS river gauges next to sites: stage and 48 h forecast
     "glm": (glm.poll, 20),  # live lightning: a new GOES GLM file every 20 s from each satellite
     "lightning": (lightning.evaluate, 15),  # stop-work alerts and the 30-minute all-clear
-    "flood": (flood.evaluate, 900),
+    "flood": (flood.evaluate, 900),  # river flood-risk warnings
     "score": (score.score_all, 300),
     "briefing": (generate.run_due, 300),  # sends each site's briefing at 6 PM site-local time
     "jobs": (jobs.poll, 2),  # demo buttons: job_requests rows inserted by the API

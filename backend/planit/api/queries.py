@@ -24,6 +24,7 @@ from planit.models import (
     Risk,
     RiskFactor,
     RiskPoint,
+    RiverStatus,
     SiteDetail,
     SiteSummary,
 )
@@ -214,6 +215,16 @@ def get_site(site_id: int, scorer: str | None = None, user: CurrentUser | None =
             (site_id,),
         ).fetchone()
 
+        river = conn.execute(
+            "SELECT g.gauge_id, g.name AS gauge_name, g.river, l.ts, l.stage_ft, l.forecast_stage_ft, l.category, "
+            "g.action_stage_ft, g.flood_stage_ft, g.moderate_stage_ft, g.major_stage_ft "
+            "FROM sites s JOIN river_gauges g ON g.gauge_id = s.usgs_gauge_id "
+            "LEFT JOIN LATERAL (SELECT ts, stage_ft, forecast_stage_ft, category FROM river_levels "
+            "                   WHERE gauge_id = g.gauge_id AND ts > now() - interval '2 days' "
+            "                   ORDER BY ts DESC LIMIT 1) l ON true WHERE s.id = %s",
+            (site_id,),
+        ).fetchone()
+
         past_day = conn.execute(
             "SELECT precip_in, temp_f, humidity_pct, gust_mph FROM weather "
             "WHERE site_id = %s AND NOT is_forecast AND ts > now() - interval '24 hours' AND ts <= now()",
@@ -255,6 +266,7 @@ def get_site(site_id: int, scorer: str | None = None, user: CurrentUser | None =
         conditions=_conditions(current) if current else None,
         last_24h=_last_24h(past_day),
         air_quality=AirQuality(**{k: v if k == "ts" else _float(v) for k, v in air.items()}) if air else None,
+        river=RiverStatus(**{k: _float(v) if k.endswith("_ft") else v for k, v in river.items()}) if river else None,
         forecast=[_conditions(r) for r in forecast],
         alerts=[Alert(**r) for r in alerts],
         reports=[

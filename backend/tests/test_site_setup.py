@@ -26,6 +26,8 @@ def record(monkeypatch, exists=True):
     monkeypatch.setattr(site_setup.nws_weather, "poll", lambda **kw: calls.append(("nws_weather", kw)))
     monkeypatch.setattr(site_setup.open_meteo, "poll", lambda **kw: calls.append(("open_meteo", kw)))
     monkeypatch.setattr(site_setup.air_quality, "poll", lambda **kw: calls.append(("air_quality", kw)))
+    monkeypatch.setattr(site_setup.river, "poll", lambda **kw: calls.append(("river", kw)))
+    monkeypatch.setattr(site_setup.flood, "evaluate", lambda: calls.append(("flood", {})))
     monkeypatch.setattr(site_setup.nws, "poll", lambda: calls.append(("nws", {})))
     monkeypatch.setattr(site_setup.wildfire, "poll", lambda: calls.append(("wildfire", {})))
 
@@ -39,11 +41,12 @@ def record(monkeypatch, exists=True):
 def test_setup_fetches_only_that_site_with_rain_history_then_scores(monkeypatch):
     calls = record(monkeypatch)
     assert jobs.HANDLERS["site_setup"]({"site_id": 9000001}) is not False
-    assert calls[:3] == [("nws_weather", {"site_ids": [9000001]}),
+    assert calls[:4] == [("nws_weather", {"site_ids": [9000001]}),
                          ("open_meteo", {"site_ids": [9000001], "past_days": site_setup.SETUP_PAST_DAYS}),
-                         ("air_quality", {"site_ids": [9000001]})]
-    # Alerts for its location, and the scores even though the quake feed failed.
-    assert [name for name, _ in calls[3:]] == ["nws", "wildfire", "score"]
+                         ("air_quality", {"site_ids": [9000001]}),
+                         ("river", {"site_ids": [9000001]})]  # its nearest flood-staged river gauge
+    # Alerts for its location (river flood risk too), and the scores even though the quake feed failed.
+    assert [name for name, _ in calls[4:]] == ["nws", "wildfire", "flood", "score"]
     assert site_setup.SETUP_PAST_DAYS >= 4  # the model's 12 h window + 3 days of rain before it
 
 
