@@ -36,3 +36,8 @@ def test_rejects_gps_out_of_range():
 def test_every_hazard_type_has_an_expiry_rule():
     types = HazardReport.model_fields["hazard_type"].annotation.__args__
     assert set(types) == set(EXPIRES_AFTER)
+
+
+def test_past_reports_need_a_site():
+    assert client.get("/api/reports?include_past=true").status_code == 422
+    assert client.get("/api/reports?site_id=9001&include_past=true").status_code == 200

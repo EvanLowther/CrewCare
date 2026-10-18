@@ -39,7 +39,7 @@ EXPIRES_AFTER: dict[str, timedelta | None] = {
 }
 
 _REPORT_COLS = ("r.id, r.site_id, r.latitude, r.longitude, r.hazard_type, r.severity, r.description, "
-                "r.reporter_name, r.photo_id, r.status, r.created_at, r.expires_at")
+                "r.reporter_name, r.photo_id, r.status, r.created_at, r.expires_at, r.resolved_at")
 
 
 def _report(row: dict) -> HazardReport:
@@ -91,13 +91,14 @@ def create_report(*, user: CurrentUser, site_id: int, latitude: float, longitude
     return _report(dict(row))
 
 
-def list_reports(site_id: int | None = None, user: CurrentUser | None = None) -> list[HazardReport]:
+def list_reports(site_id: int | None = None, user: CurrentUser | None = None, include_past: bool = False
+                 ) -> list[HazardReport]:
     """Active, unexpired reports on sites `user` may see (plus legacy ones with no site), newest first; with
-    `site_id`, only those filed on that site."""
+    `site_id`, only those filed on that site. `include_past` (with a site) adds resolved and expired ones."""
     visible, params = visible_sites_sql(user)
+    current = "" if include_past else "r.status = 'active' AND (r.expires_at IS NULL OR r.expires_at > now()) AND "
     sql = (f"SELECT {_REPORT_COLS} FROM hazard_reports r LEFT JOIN sites s ON s.id = r.site_id "
-           "WHERE r.status = 'active' AND (r.expires_at IS NULL OR r.expires_at > now()) "
-           f"AND (s.id IS NULL OR {visible})")
+           f"WHERE {current}(s.id IS NULL OR {visible})")
     if site_id is not None:
         sql += " AND r.site_id = %(site_id)s"
         params["site_id"] = site_id

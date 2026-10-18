@@ -79,6 +79,8 @@ What's left, measured against the Sperry Tech brief (`.github/sperry tech.pdf`).
 - Notifications for each site's members: crew reports, danger alerts and the 6 PM briefing, live within ~2 s as
   pop-ups on every page, a bell inbox, and push to phones and browsers (Android/desktop; iPhone from the Home
   Screen). A `crew_report` alert with `meta.report_id` shares its report's notification (no double ping)
+- My sites page: the sites you're on (admins: any site), each one's crew reports active then past; managers
+  manage the site and resolve reports there. Report hazard stays in the top bar
 - Past hazards on the site page and new-site form: crew reports within 5 mi (resolved too) and NOAA Storm Events
   within 25 mi
 - Icons and colours per hazard kind (heat, cold, snow/ice, smoke, wildfire, earthquake, ...) on factors and alerts;

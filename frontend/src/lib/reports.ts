@@ -1,4 +1,45 @@
+import {
+  Activity,
+  CircleDashed,
+  CloudLightning,
+  CloudSnow,
+  FlaskConical,
+  Flame,
+  Haze,
+  HeartPulse,
+  Mountain,
+  PawPrint,
+  Snowflake,
+  ThermometerSnowflake,
+  TreePine,
+  TriangleAlert,
+  Waves,
+  Wind,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 import type { HazardType, ReportSeverity } from "./api";
+
+/** One icon per crew report type (the report form's buttons and report lists). */
+export const HAZARD_ICONS: Record<HazardType, LucideIcon> = {
+  lightning: CloudLightning,
+  flooding: Waves,
+  high_wind: Wind,
+  heat_illness: HeartPulse,
+  cold_stress: ThermometerSnowflake,
+  ice: Snowflake,
+  snow: CloudSnow,
+  smoke: Haze,
+  fire: Flame,
+  wildlife: PawPrint,
+  downed_line: Zap,
+  fallen_tree: TreePine,
+  unstable_ground: Mountain,
+  sinkhole: CircleDashed,
+  earthquake_damage: Activity,
+  gas_leak: FlaskConical,
+  other: TriangleAlert,
+};
 
 export const HAZARD_LABELS: Record<HazardType, string> = {
   wildlife: "Wildlife",
