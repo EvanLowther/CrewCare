@@ -541,7 +541,7 @@ function SiteAlerts({ alerts: all, timeZone }: { alerts: Alert[]; timeZone: stri
           </span>
         }
         title="No active alerts"
-        detail="No NWS warnings, nearby wildfires or felt earthquakes"
+        detail="No lightning within 10 miles, NWS warnings, nearby wildfires or felt earthquakes"
       />
     );
   }
