@@ -301,6 +301,8 @@ and snow depth 2% each. The national features (snowfall, wind chill, location) r
 - **Site page:** current conditions, the next 48 hours, the score's top factors with a recommended action for each
   (for example "Ground aerial lifts and bucket trucks" above 28 mph gusts), active alerts and the score history.
 - **Alerts:** every active warning, refreshed every 10 seconds.
+- **Briefings:** at 6 PM in each site's time zone, tomorrow's work day (6 AM - 6 PM) in a few sentences: the risk,
+  peak heat, storm hours, gusts, snow, smoke, warnings in force and the precautions to take.
 - **Crew reports:** a phone form with live GPS and a draggable pin, to put a hazard (wildlife, flooding, downed line,
   ...) on the site map.
 
@@ -330,13 +332,13 @@ smoke and OSHA heat floors on top, hour by hour.
 | **EIA-860M** | Every US power plant, with coordinates, utility and type |
 | **Vultr** | Hosts the live site: one Ubuntu server running the site, API and worker behind Caddy (HTTPS), auto-deploying `main` |
 | **Auth0** | |
-| **Gemini** | |
+| **Gemini** | Writes each site's 6 PM next-day briefing from its facts (20 sites per call); a summary is kept only if every number in it is in the facts, otherwise the template is used |
 
 ## What's not done yet
 
 - **On a branch, not merged:** the lightning stop-work rule with its 30-minute countdown, and a `simulate` script for
   demos (lightning, hurricane, flood, blizzard). Demo buttons in the app come later.
-- **Not built:** the 6 PM next-day briefing (Gemini, with a template fallback), crew reports raising the score, the
+- **Not built:** crew reports raising the score, the
   river flood rule with NWS flood stages, satellite fire detections (NASA FIRMS, which see new fires sooner than
   NIFC's reports), fire perimeters, and debris flows.
 
