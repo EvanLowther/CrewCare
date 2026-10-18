@@ -201,9 +201,10 @@ def blend_soil_moisture(hourly: dict) -> dict:
     return {**hourly, "soil_moisture_0_to_7cm": blended}
 
 
-def poll() -> int:
-    """Last 24 h of observations + 3-day forecast for every site. Hours after now are stored as forecast."""
-    sites = load_sites()
+def poll(site_ids: list[int] | None = None, past_days: int = 1) -> int:
+    """Last `past_days` of observations + 3-day forecast for every site (or just `site_ids`). Hours after now are
+    stored as forecast. A new site asks for more past days (worker/site_setup.py) so it has rain history at once."""
+    sites = [s for s in load_sites() if site_ids is None or s["id"] in site_ids]
     now = datetime.now(UTC)
     variables = {**FORECAST_VARS, "soil_moisture_0_to_7cm": "soil_moisture"}
     total = 0
@@ -212,7 +213,7 @@ def poll() -> int:
             params = {
                 "latitude": ",".join(str(s["latitude"]) for s in batch),
                 "longitude": ",".join(str(s["longitude"]) for s in batch),
-                "past_days": 1,
+                "past_days": past_days,
                 "forecast_days": 3,
                 "hourly": ",".join([*FORECAST_VARS, *FORECAST_SOIL_LAYERS]),
                 **UNITS,

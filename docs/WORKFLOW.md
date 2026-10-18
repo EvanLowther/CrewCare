@@ -18,8 +18,8 @@
 ## To do
 
 ### Together
-- [ ] Full demo run on the hosted site with real data: dashboard (both models, hour slider), a site page, alerts,
-      a crew report from a phone, admin
+- [ ] Full demo run on the hosted site with real data: dashboard (both models), a site page, alerts, briefings,
+      adding a site as a manager (scores within a minute), a crew report from a phone, admin
 - [ ] Decide the rest of the national alert types (`winter`, `cold`, `landslide`): NWS winter and cold warnings
       still arrive as `nws`. Needs `AlertType` in models.py, the alerts CHECK and frontend icons together
 - [ ] Feature freeze, bug fixes
@@ -31,7 +31,7 @@
 ### Person A (data + ML)
 - [ ] Merge `a/lightning`: lightning stop-work rule, 30-minute countdown, replay, and the `simulate` demo script
       (lightning, hurricane, flood, blizzard). Rebase on `main` and renumber its `006_simulated_weather.sql` to
-      `008` (006 is taken by auth). `worker/rules/lightning.py` on `main` is still a stub, so the demo button's
+      `009` (006 to 008 are taken). `worker/rules/lightning.py` on `main` is still a stub, so the demo button's
       replay does nothing yet
 - [ ] River flood rule with NWS flood stages; must cover the Mississippi (`ingest/usgs.py` and `rules/flood.py`
       are stubs)
@@ -67,11 +67,13 @@
 - 6 PM next-day briefing per site in its own timezone: facts from the scores, forecasts, smoke and alerts; Gemini
   writes the summary, the template covers it without a key
 - `job_requests` so demo buttons reach the worker through the database (#14)
+- New or moved sites get set up at once (`site_setup` job): NWS grid and zones, 5 days of Open-Meteo history,
+  air quality, alerts and both scores within about a minute; the national model needs no retraining for them
 
 **App (Person B)**
 - Real sites, site detail, alerts and reports queries (#4)
-- Dashboard map and ranked list, Real-time / Predictive switch, forecast-hour slider, site page with top factors
-  and actions, lightning banner with countdown, alerts feed (#1, #11, #16, #28)
+- Dashboard map and ranked list, Real-time / Predictive switch, site page with top factors and actions, lightning
+  banner with countdown, alerts feed (#1, #11, #16, #28); the forecast-hour slider was removed again
 - Crew report form with live GPS and a draggable pin (#18)
 - Login and roles with Auth0: admin / manager / crew, private sites, site management, admin page (#25, #27)
 - Address search for new sites; maps survive navigating back; Real-time is the default view (#30)

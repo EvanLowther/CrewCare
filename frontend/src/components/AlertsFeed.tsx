@@ -21,7 +21,7 @@ export function AlertsFeed({ alerts, limit }: { alerts: Alert[]; limit?: number 
   const shown = limit ? sorted.slice(0, limit) : sorted;
 
   if (shown.length === 0) {
-    return <EmptyState icon={BellOff} title="No active alerts" detail="NWS warnings and stop-work alerts show up here within 5 minutes." />;
+    return <EmptyState icon={BellOff} title="No active alerts" detail="NWS warnings, nearby wildfires and felt earthquakes show up here within a few minutes." />;
   }
 
   return (
