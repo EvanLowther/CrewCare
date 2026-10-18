@@ -4,6 +4,7 @@ import { LogIn, LogOut, Menu, Plus, Search, TriangleAlert, X } from "lucide-reac
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Suspense, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { api, type SiteSummary } from "@/lib/api";
 import { DEV_AUTH, DEV_USERS, devUser, setDevUser, SIGN_OUT_HREF, signInHref } from "@/lib/auth";
 import { usePolling } from "@/lib/usePolling";
@@ -280,6 +281,19 @@ export function TopNav() {
   const [open, setOpen] = useState(false);
   const alertCount = useAlertCount();
 
+  // While the phone menu is open: Escape closes it and the page behind it doesn't scroll.
+  useEffect(() => {
+    if (!open) return;
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.body.style.overflow = overflow;
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+
   return (
     <header className="sticky top-0 z-[1050] border-b border-line-soft bg-page/95 backdrop-blur">
       <div className="flex items-center gap-3 px-3 py-2.5 sm:px-6 xl:gap-5">
@@ -330,24 +344,28 @@ export function TopNav() {
         </button>
       </div>
 
-      {open && (
-        <div className="fixed inset-0 z-[1200] xl:hidden" role="dialog" aria-modal="true" aria-label="Menu">
-          <button type="button" aria-label="Close menu" className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} />
-          <aside className="absolute inset-y-0 right-0 flex w-80 max-w-[88vw] flex-col gap-6 border-l border-line bg-card px-4 py-4">
-            <div className="flex items-center justify-between">
-              <span className="eyebrow">Menu</span>
-              <button type="button" onClick={() => setOpen(false)} aria-label="Close menu" className="flex h-11 w-11 items-center justify-center text-ink-2">
-                <X className="h-5 w-5" aria-hidden />
-              </button>
-            </div>
-            <SiteSearch onNavigate={() => setOpen(false)} />
-            <NavLinks vertical onNavigate={() => setOpen(false)} />
-            <div className="mt-auto">
-              <Account />
-            </div>
-          </aside>
-        </div>
-      )}
+      {/* Rendered into <body>: the header's backdrop blur would otherwise make this "fixed" menu only as tall as
+          the header, with the links spilling out below it on no background. */}
+      {open &&
+        createPortal(
+          <div className="fixed inset-0 z-[1200] xl:hidden" role="dialog" aria-modal="true" aria-label="Menu">
+            <button type="button" aria-label="Close menu" className="absolute inset-0 bg-black/70" onClick={() => setOpen(false)} />
+            <aside className="absolute inset-y-0 right-0 flex w-80 max-w-[88vw] flex-col gap-6 overflow-y-auto border-l border-line bg-card px-4 py-4 shadow-2xl">
+              <div className="flex items-center justify-between">
+                <span className="eyebrow">Menu</span>
+                <button type="button" onClick={() => setOpen(false)} aria-label="Close menu" className="flex h-11 w-11 items-center justify-center text-ink-2">
+                  <X className="h-5 w-5" aria-hidden />
+                </button>
+              </div>
+              <SiteSearch onNavigate={() => setOpen(false)} />
+              <NavLinks vertical onNavigate={() => setOpen(false)} />
+              <div className="mt-auto">
+                <Account />
+              </div>
+            </aside>
+          </div>,
+          document.body,
+        )}
     </header>
   );
 }
