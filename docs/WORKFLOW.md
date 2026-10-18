@@ -21,33 +21,40 @@
 
 ## To do
 
+What's left, measured against the Sperry Tech brief (`.github/sperry tech.pdf`). ⭐ = the brief asks for it by name.
+
 ### Together
+- [ ] Check Gemini on the hosted site: press "Generate now" on Briefings as an admin; they should say "Gemini"
 - [ ] Full demo run on the hosted site with real data: dashboard (both models), a site page, alerts, briefings,
-      adding a site as a manager (scores within a minute), a crew report from a phone, admin
-- [ ] Decide the rest of the national alert types (`winter`, `cold`, `landslide`): NWS winter and cold warnings
-      still arrive as `nws`. Needs `AlertType` in models.py, the alerts CHECK and frontend icons together
+      adding a site as a manager, a crew report from a phone, admin
 - [ ] Feature freeze, bug fixes
 - [ ] Refresh the demo data, record a backup video, README + pitch, rehearse
-- [ ] Fill in the README's Auth0 and Gemini rows in the tools table
-- [ ] Put the Gemini key on the server (`PLANIT_GEMINI_API_KEY` in `/opt/planit/.env`, then
-      `systemctl restart planit-worker planit-api`); until then every briefing is the template
+- [ ] Fill in the README's Auth0 row in the tools table
 
-### Person A (data + ML)
-- [ ] Lightning stop-work, live: merge `a/lightning` (the rule, 30-minute countdown and replay; rebase on `main` and
-      renumber its `006_simulated_weather.sql` to `010`), then feed it real strikes from GOES GLM (NOAA, free,
-      ~20 s delay). `worker/rules/lightning.py` on `main` is still a stub, so no site gets a lightning alert today
-- [ ] Crew reports raise the score: an active report near a site (downed line, flooding, heat illness, ...) becomes
-      a hazard in both scores, like fire and quake alerts do
+### Person A (worker + ML)
+- [ ] ⭐ Lightning stop-work, live: merge `a/lightning` (the rule, the 30-minute all-clear that restarts with each
+      strike, replay; rebase on `main` and renumber its `006_simulated_weather.sql` to `010`), then feed it real
+      strikes from GOES GLM (NOAA, free, ~20 s delay). `worker/rules/lightning.py` on `main` is still a stub, so no
+      site gets a lightning alert today. The site page's countdown banner is already built
+- [ ] ⭐ River flood-risk warning: "sites along rivers, such as the Mississippi, get a flood-risk warning after a
+      night of heavy rain". Tag the sites within a few miles of big rivers (Mississippi, Ohio, Missouri, ...), and
+      raise a `flood` alert when the night's rain passes ~1-2 in (`rules/flood.py` is a stub). River gauges later
+- [ ] ⭐ Crew reports in the risk picture: an active report near a site (wildlife, downed line, flooding, heat
+      illness, ...) becomes a hazard in both scores, like fire and quake alerts, and a `crew_report` alert for that
+      site so its team hears about it (the alert type exists; nothing creates it yet)
 
-Later, only if there's time: a river flood rule with NWS flood stages for sites on big rivers (NWS Flood Warnings
-already reach both scores).
-
-### Person B (app)
-- [ ] Demo buttons in the app for admins: lightning replay (`POST /api/demo/lightning-replay` exists), then flood
+### Person B (API + app)
+- [ ] ⭐ Share crew reports instantly: when a `crew_report` alert (from Person A) or any danger alert lands on one of
+      your sites, show it right away (toast on every page, browser notification if allowed), not on the next poll
+- [ ] ⭐ Send the 6 PM briefing: email each site's members their site's briefing when it's written (an email API
+      such as Resend; key in the server's `.env`). Heads-up to Person A: it hooks into `worker/briefing/generate.py`
+- [ ] ⭐ Past hazards for a location ("a database of location hazards for future project owners"): on the site page
+      and the new-site form, list past crew reports within 5 mi (resolved ones too) and NOAA Storm Events within
+      25 mi (`storm_events`, 2024-2025)
+- [ ] Demo buttons for admins: lightning replay (`POST /api/demo/lightning-replay` exists) once lightning is merged
 - [ ] Test the report form on a phone on the hosted URL (camera, GPS)
-- [ ] `mock.py` sample sites across the country and timezones (it still has 12 Florida sites); contract tests pass
-- [ ] Map: marker clustering; Alaska and Hawaii reachable
-- [ ] `?state=` on `/api/sites` and `/api/alerts`; state and hazard filters on the ranked list
+- [ ] If there's time: map marker clustering with Alaska and Hawaii in view; state and hazard filters on the
+      ranked list; `mock.py` sample sites across the country
 
 ## Already done
 
