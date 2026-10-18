@@ -84,9 +84,11 @@ const FACTOR_KINDS: Record<string, HazardKind> = {
   thunderstorm: "storm",
   downpour: "rain",
   rain_24h: "rain",
+  rain_3d: "rain",
   soil_moisture: "ground",
   visibility: "visibility",
   smoke: "smoke",
+  fire_weather: "wildfire",
   location: "location",
   season: "season",
 };
