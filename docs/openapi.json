@@ -3001,6 +3001,147 @@
         ],
         "title": "RiskPoint"
       },
+      "RiverStatus": {
+        "properties": {
+          "gauge_id": {
+            "type": "string",
+            "title": "Gauge Id",
+            "examples": [
+              "BTRL1"
+            ]
+          },
+          "gauge_name": {
+            "type": "string",
+            "title": "Gauge Name",
+            "examples": [
+              "Mississippi River at Baton Rouge"
+            ]
+          },
+          "river": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "River",
+            "examples": [
+              "Mississippi River"
+            ]
+          },
+          "ts": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ts",
+            "description": "Time of the latest reading"
+          },
+          "stage_ft": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage Ft"
+          },
+          "forecast_stage_ft": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast Stage Ft",
+            "description": "Highest NWS forecast stage in the next 48 h"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category",
+            "description": "no_flooding, action, minor (flood stage), moderate or major"
+          },
+          "action_stage_ft": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Stage Ft"
+          },
+          "flood_stage_ft": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flood Stage Ft",
+            "description": "NWS minor flood stage"
+          },
+          "moderate_stage_ft": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Moderate Stage Ft"
+          },
+          "major_stage_ft": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Major Stage Ft"
+          }
+        },
+        "type": "object",
+        "required": [
+          "gauge_id",
+          "gauge_name",
+          "river",
+          "ts",
+          "stage_ft",
+          "forecast_stage_ft",
+          "category",
+          "action_stage_ft",
+          "flood_stage_ft",
+          "moderate_stage_ft",
+          "major_stage_ft"
+        ],
+        "title": "RiverStatus",
+        "description": "The NWS river gauge within 2 mi of a site (NOAA NWPS) and its latest reading."
+      },
       "RoleUpdate": {
         "properties": {
           "role": {
@@ -3101,6 +3242,17 @@
               }
             ],
             "description": "Latest air-quality hour, for smoke"
+          },
+          "river": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RiverStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "River gauge within 2 mi, for river sites"
           },
           "forecast": {
             "items": {

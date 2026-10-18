@@ -31,6 +31,7 @@ from planit.models import (
     Risk,
     RiskFactor,
     RiskPoint,
+    RiverStatus,
     SiteDetail,
     SiteSummary,
     User,
@@ -213,6 +214,10 @@ def site_detail(site_id: int) -> SiteDetail | None:
         # Smoke from the Everglades fire reaches the Martin site (its Air Quality Alert above); the rest is clean.
         air_quality=AirQuality(ts=hour, us_aqi=128 if site_id == 9003 else 41,
                                us_aqi_pm2_5=128 if site_id == 9003 else 33, pm2_5_ugm3=46.5 if site_id == 9003 else 8.0),
+        # Fort Myers sits on the Caloosahatchee (its flood alert above): rising toward action stage.
+        river=RiverStatus(gauge_id="FMYF1", gauge_name="Caloosahatchee River at Fort Myers", river="Caloosahatchee River",
+                          ts=hour, stage_ft=9.2, forecast_stage_ft=10.4, category="no_flooding", action_stage_ft=10.0,
+                          flood_stage_ft=11.5, moderate_stage_ft=13.0, major_stage_ft=15.0) if site_id == 9008 else None,
         forecast=[_conditions(site_id, hour + timedelta(hours=h)) for h in range(1, 49)],
         alerts=[a for a in _alerts() if a.site_id == site_id],
         reports=[r for r in _reports() if r.site_id == site_id],
