@@ -23,6 +23,13 @@ the sign-in routes). Without it, reads return only public reference sites.
 | POST | `/api/demo/lightning-replay` | `DemoAck` | Admins. Demo: storm near a site |
 | GET | `/api/geocode?q=` | `GeocodeList` | Managers. US address search (OpenStreetMap) for placing a new site |
 | GET | `/api/me` | `Me` | Signed-in user and their sites; plus site, member, user and admin routes in AUTH.md |
+| GET | `/api/notifications?after=` | `NotificationList` | Signed in. Crew reports, danger alerts and briefings on your sites, newest first |
+| POST | `/api/notifications/read` | `NotificationList` | Signed in. `{"ids": [...]}`, or `{}` for all |
+| GET | `/api/notifications/stream?after=` | text/event-stream | Signed in. `notification` events within ~2 s; read with fetch (sends the token); reconnects every 2 min |
+| GET | `/api/notifications/push-key` | `PushKey` | VAPID public key for Web Push (null when push is off) |
+| POST | `/api/notifications/subscriptions` | 204 | Signed in. This device's `PushSubscription.toJSON()`; `/subscriptions/delete` with `{endpoint}` to stop |
+| GET | `/api/sites/{id}/history` | `LocationHistory` | Crew reports within 5 mi (resolved too) and NOAA Storm Events within 25 mi |
+| GET | `/api/history?lat=&lon=` | `LocationHistory` | Managers. The same for any spot (new-site form) |
 
 ## Examples
 

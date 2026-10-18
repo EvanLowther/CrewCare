@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     auth_dev: bool = False
     # Signs photo URLs so <img> tags (which can't send a token) only load photos the viewer may see.
     photo_signing_key: str = "dev-only-photo-key"
+    # Web Push (phone and desktop notifications). Generate a pair with `python scripts/vapid_keys.py`; without them
+    # push is off and notifications still show in the app.
+    vapid_public_key: str | None = None
+    vapid_private_key: str | None = None
+    vapid_subject: str = "https://github.com/EvanLowther/planit-control"
 
     # Hazard rules
     lightning_radius_mi: float = 10.0

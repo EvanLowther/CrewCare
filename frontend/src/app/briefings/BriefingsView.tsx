@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CloudLightning, FileText, Haze, RefreshCw, Snowflake, ThermometerSun, Wind } from "lucide-react";
 import { useMe } from "@/components/MeProvider";
 import { ScopeSwitch } from "@/components/ScopeSwitch";
@@ -43,6 +43,19 @@ export function BriefingsView() {
   const fetchBriefings = useCallback(() => api.briefings(localDate(day === "tomorrow" ? 1 : 0)), [day]);
   const { data, error } = usePolling(fetchBriefings, 30_000);
   const briefings = (data?.briefings ?? []).filter((b) => scope.includes(b.site_id));
+
+  // ?site=621 (from a briefing notification): scroll to that site's briefing and mark it.
+  const [focusSite, setFocusSite] = useState<number | null>(null);
+  useEffect(() => {
+    const site = Number(new URLSearchParams(window.location.search).get("site"));
+    // Read once in the browser (the page is prerendered, so not during render).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (site) setFocusSite(site);
+  }, []);
+  const focusShown = focusSite !== null && briefings.some((b) => b.site_id === focusSite);
+  useEffect(() => {
+    if (focusShown) document.getElementById(`briefing-${focusSite}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [focusShown, focusSite]);
 
   const [ack, setAck] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -112,7 +125,7 @@ export function BriefingsView() {
         ) : (
           <ul className="divide-y divide-line border-t border-line">
             {briefings.map((b) => (
-              <BriefingRow key={b.id} briefing={b} />
+              <BriefingRow key={b.id} briefing={b} focused={b.site_id === focusSite} />
             ))}
           </ul>
         )}
@@ -121,7 +134,7 @@ export function BriefingsView() {
   );
 }
 
-function BriefingRow({ briefing: b }: { briefing: Briefing }) {
+function BriefingRow({ briefing: b, focused }: { briefing: Briefing; focused: boolean }) {
   const f = b.details as Facts;
   const score = f.risk_score ?? null;
   const chips = [
@@ -136,7 +149,7 @@ function BriefingRow({ briefing: b }: { briefing: Briefing }) {
   ].filter((c) => c !== null);
 
   return (
-    <li className="flex gap-4 px-5 py-4">
+    <li id={`briefing-${b.site_id}`} className={`flex scroll-mt-24 gap-4 px-5 py-4 ${focused ? "bg-accent-soft" : ""}`}>
       <ScoreChip score={score} level={score === null ? null : levelFor(score)} />
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3">

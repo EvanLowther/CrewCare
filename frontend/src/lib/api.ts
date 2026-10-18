@@ -28,6 +28,11 @@ export type SiteMember = S["SiteMember"];
 export type AdminUser = S["AdminUser"];
 export type SiteCreate = S["SiteCreate"];
 export type SiteUpdate = S["SiteUpdate"];
+export type Notification = S["Notification"];
+export type NotificationList = S["NotificationList"];
+export type LocationHistory = S["LocationHistory"];
+export type PastReport = S["PastReport"];
+export type PastStormEvent = S["PastStormEvent"];
 /** Whose risk scores to show: the XGBoost model or rules-v2 (both are stored for every site-hour). */
 export type Scorer = "ml" | "rules";
 
@@ -134,4 +139,49 @@ export const api = {
   geocode: (q: string) => get<S["GeocodeList"]>(`/api/geocode?q=${encodeURIComponent(q)}`),
   adminUsers: () => get<S["AdminUserList"]>("/api/admin/users"),
   setRole: (userId: string, role: UserRole) => request<AdminUser>("PATCH", `/api/admin/users/${userId}`, { role }),
+
+  // Notifications and push (crew reports, danger alerts and briefings on your sites)
+  notifications: () => get<NotificationList>("/api/notifications"),
+  markRead: (ids?: number[]) => post<NotificationList>("/api/notifications/read", ids ? { ids } : {}),
+  pushKey: () => get<S["PushKey"]>("/api/notifications/push-key"),
+  subscribePush: (sub: S["PushSubscriptionIn"]) => post<void>("/api/notifications/subscriptions", sub),
+  unsubscribePush: (endpoint: string) => post<void>("/api/notifications/subscriptions/delete", { endpoint }),
+
+  // Past hazards near a site, or any spot (new-site form)
+  siteHistory: (siteId: number) => get<LocationHistory>(`/api/sites/${siteId}/history`),
+  placeHistory: (lat: number, lon: number) =>
+    get<LocationHistory>(`/api/history?lat=${lat.toFixed(5)}&lon=${lon.toFixed(5)}`),
 };
+
+/**
+ * Reads /api/notifications/stream (server-sent events) with fetch, since EventSource can't send the sign-in
+ * token. Calls `onNotification` for each new one and resolves when the server ends the stream (every couple of
+ * minutes) or `signal` aborts; rejects if it can't connect.
+ */
+export async function streamNotifications(
+  after: number | null,
+  onNotification: (n: Notification) => void,
+  signal: AbortSignal,
+): Promise<void> {
+  const res = await fetch(`${API_URL}/api/notifications/stream${after !== null ? `?after=${after}` : ""}`, {
+    headers: { ...(await authHeaders()), Accept: "text/event-stream" },
+    cache: "no-store",
+    signal,
+  });
+  if (!res.ok || !res.body) throw new ApiError(res.status, fallbackMessage(res.status));
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) return;
+    buffer += value;
+    let end: number;
+    while ((end = buffer.indexOf("\n\n")) >= 0) {
+      const block = buffer.slice(0, end);
+      buffer = buffer.slice(end + 2);
+      const event = block.match(/^event: (.*)$/m)?.[1];
+      const data = block.match(/^data: (.*)$/m)?.[1];
+      if (event === "notification" && data) onNotification(JSON.parse(data) as Notification);
+    }
+  }
+}

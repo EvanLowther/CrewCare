@@ -342,6 +342,169 @@ export interface paths {
         patch: operations["set_role_api_admin_users__user_id__patch"];
         trace?: never;
     };
+    "/api/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Notifications
+         * @description Your latest 30 (newest first) and how many are unread. With `after`, only newer ones.
+         */
+        get: operations["list_notifications_api_notifications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Read
+         * @description Mark `ids` read, or all of them when `ids` is omitted.
+         */
+        post: operations["mark_read_api_notifications_read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream
+         * @description Server-sent events: `notification` events (a Notification) as they're written, within ~2 s.
+         *
+         *     Read it with fetch (EventSource can't send the sign-in token). Pass the newest id you have as `after` when
+         *     reconnecting; the stream closes itself after a couple of minutes, so reconnect then too.
+         */
+        get: operations["stream_api_notifications_stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/push-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Push Key
+         * @description The server's public VAPID key for PushManager.subscribe, or null when push isn't set up.
+         */
+        get: operations["push_key_api_notifications_push_key_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Subscribe
+         * @description Send your notifications to this device (the browser's PushSubscription.toJSON()).
+         */
+        post: operations["subscribe_api_notifications_subscriptions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/subscriptions/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unsubscribe
+         * @description Stop sending to this device.
+         */
+        post: operations["unsubscribe_api_notifications_subscriptions_delete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sites/{site_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Site History
+         * @description Crew reports within 5 mi of the site (resolved and expired too) and NOAA Storm Events within 25 mi.
+         */
+        get: operations["site_history_api_sites__site_id__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Place History
+         * @description The same for any spot, for the new-site form (managers and admins).
+         */
+        get: operations["place_history_api_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -634,6 +797,13 @@ export interface components {
             /** Message */
             message: string;
         };
+        /** EventTypeCount */
+        EventTypeCount: {
+            /** Event Type */
+            event_type: string;
+            /** Count */
+            count: number;
+        };
         /** GeocodeList */
         GeocodeList: {
             /**
@@ -750,6 +920,53 @@ export interface components {
              */
             interval_seconds: number;
         };
+        /** LocationHistory */
+        LocationHistory: {
+            /**
+             * Report Radius Mi
+             * @default 5
+             */
+            report_radius_mi: number;
+            /**
+             * Storm Radius Mi
+             * @default 25
+             */
+            storm_radius_mi: number;
+            /**
+             * Reports
+             * @description Crew reports within report_radius_mi, newest first (max 50)
+             */
+            reports: components["schemas"]["PastReport"][];
+            /**
+             * Storm Events
+             * @description NOAA Storm Events within storm_radius_mi, newest first (max 50)
+             */
+            storm_events: components["schemas"]["PastStormEvent"][];
+            /**
+             * Storm Event Count
+             * @description All of them, not just the 50 listed
+             */
+            storm_event_count: number;
+            /**
+             * Storm Event Types
+             * @description Most common first
+             */
+            storm_event_types: components["schemas"]["EventTypeCount"][];
+            /**
+             * Storm Years
+             * @description Years the NOAA data covers
+             * @example 2024-2025
+             */
+            storm_years: string;
+        };
+        /** MarkRead */
+        MarkRead: {
+            /**
+             * Ids
+             * @description Omit to mark all of them read
+             */
+            ids?: number[] | null;
+        };
         /** Me */
         Me: {
             /** @description Null when signed out */
@@ -791,6 +1008,152 @@ export interface components {
              * @enum {string}
              */
             role: "manager" | "crew";
+        };
+        /**
+         * Notification
+         * @description Something that happened on one of your sites: a crew report, a danger alert or the 6 PM briefing.
+         */
+        Notification: {
+            /**
+             * Id
+             * @description Increases over time; pass the newest as `after` to get only newer ones
+             */
+            id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "crew_report" | "alert" | "briefing";
+            /** Site Id */
+            site_id: number | null;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "info" | "warning" | "danger";
+            /**
+             * Title
+             * @example Sinkhole reported at Big Bend
+             */
+            title: string;
+            /** Body */
+            body?: string | null;
+            /**
+             * Link
+             * @description Page to open, e.g. /sites/621
+             */
+            link?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Read */
+            read: boolean;
+        };
+        /** NotificationList */
+        NotificationList: {
+            /**
+             * Notifications
+             * @description Newest first
+             */
+            notifications: components["schemas"]["Notification"][];
+            /** Unread */
+            unread: number;
+        };
+        /** PastReport */
+        PastReport: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Site Id */
+            site_id: number | null;
+            /** Site Name */
+            site_name: string | null;
+            /**
+             * Hazard Type
+             * @enum {string}
+             */
+            hazard_type: "wildlife" | "flooding" | "unstable_ground" | "downed_line" | "heat_illness" | "fire" | "other" | "lightning" | "high_wind" | "ice" | "snow" | "cold_stress" | "smoke" | "sinkhole" | "fallen_tree" | "gas_leak" | "earthquake_damage";
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "low" | "medium" | "high";
+            /** Description */
+            description: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "resolved" | "expired";
+            /** Distance Mi */
+            distance_mi: number;
+        };
+        /** PastStormEvent */
+        PastStormEvent: {
+            /** Event Id */
+            event_id: number;
+            /**
+             * Event Type
+             * @example Thunderstorm Wind
+             * @example Flash Flood
+             */
+            event_type: string;
+            /**
+             * Begin Ts
+             * Format: date-time
+             */
+            begin_ts: string;
+            /**
+             * Place
+             * @description NOAA's county or zone name, and state
+             */
+            place: string | null;
+            /** Distance Mi */
+            distance_mi: number;
+            /** Injuries */
+            injuries: number;
+            /** Deaths */
+            deaths: number;
+            /** Damage Usd */
+            damage_usd: number;
+        };
+        /** PushKey */
+        PushKey: {
+            /**
+             * Public Key
+             * @description VAPID key for PushManager.subscribe; null when push is off
+             */
+            public_key: string | null;
+        };
+        /**
+         * PushSubscriptionIn
+         * @description What the browser's PushSubscription.toJSON() returns.
+         */
+        PushSubscriptionIn: {
+            /** Endpoint */
+            endpoint: string;
+            keys: components["schemas"]["PushSubscriptionKeys"];
+        };
+        /** PushSubscriptionKeys */
+        PushSubscriptionKeys: {
+            /** P256Dh */
+            p256dh: string;
+            /** Auth */
+            auth: string;
+        };
+        /** PushUnsubscribe */
+        PushUnsubscribe: {
+            /** Endpoint */
+            endpoint: string;
         };
         /** ReportList */
         ReportList: {
@@ -1727,6 +2090,246 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminUser"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_notifications_api_notifications_get: {
+        parameters: {
+            query?: {
+                after?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_read_api_notifications_read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkRead"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stream_api_notifications_stream_get: {
+        parameters: {
+            query?: {
+                after?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    push_key_api_notifications_push_key_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushKey"];
+                };
+            };
+        };
+    };
+    subscribe_api_notifications_subscriptions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushSubscriptionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unsubscribe_api_notifications_subscriptions_delete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushUnsubscribe"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    site_history_api_sites__site_id__history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationHistory"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    place_history_api_history_get: {
+        parameters: {
+            query: {
+                lat: number;
+                lon: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationHistory"];
                 };
             };
             /** @description Validation Error */

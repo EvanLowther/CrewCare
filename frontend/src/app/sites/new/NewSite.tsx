@@ -22,6 +22,7 @@ export function NewSite() {
   return (
     <SiteForm
       submitLabel="Create site"
+      showHistory
       onSubmit={async (v) => {
         const created = await api.createSite({ name: v.name, description: v.description || null, latitude: v.latitude, longitude: v.longitude });
         await refresh();

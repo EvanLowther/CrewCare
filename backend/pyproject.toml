@@ -16,6 +16,7 @@ dependencies = [
     "google-genai>=1.0",
     "pyjwt[crypto]>=2.9",
     "tzfpy>=0.15",
+    "pywebpush>=2.0",
     "h5py>=3.11",  # GOES lightning files are NetCDF4 (HDF5): worker/ingest/glm.py
 ]
 
