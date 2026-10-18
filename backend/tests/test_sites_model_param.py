@@ -20,3 +20,10 @@ def test_model_param_accepts_ml_and_rules():
 
 def test_model_param_rejects_unknown_scorers():
     assert client.get("/api/sites?model=random-forest").status_code == 422
+
+
+def test_hours_ahead_is_0_to_24():
+    for hours in (0, 6, 24):
+        assert client.get(f"/api/sites?hours_ahead={hours}").status_code == 200
+    for hours in (-1, 25):
+        assert client.get(f"/api/sites?hours_ahead={hours}").status_code == 422

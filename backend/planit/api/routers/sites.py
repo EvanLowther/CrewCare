@@ -18,12 +18,17 @@ MODEL_QUERY = Query(None, description="Whose risk scores: 'ml' (XGBoost, Predict
                           "Real-time). Default: ml.")
 
 
+HOURS_AHEAD_QUERY = Query(0, ge=0, le=24, description="Score each site with its forecast this many hours from now "
+                          "(the dashboard's time slider). 0: the current score.")
+
+
 @router.get("", response_model=SiteList)
-def list_sites(user: OptionalUser, model: Scorer | None = MODEL_QUERY) -> SiteList:
+def list_sites(user: OptionalUser, model: Scorer | None = MODEL_QUERY,
+               hours_ahead: int = HOURS_AHEAD_QUERY) -> SiteList:
     """Sites the viewer may see (reference sites, plus their own; admins see all), highest risk first."""
     if use_mock():
         return SiteList(sites=mock.site_summaries(), updated_at=datetime.now(UTC))
-    return SiteList(sites=queries.list_sites(model, user), updated_at=datetime.now(UTC))
+    return SiteList(sites=queries.list_sites(model, user, hours_ahead), updated_at=datetime.now(UTC))
 
 
 @router.get("/{site_id}", response_model=SiteDetail)

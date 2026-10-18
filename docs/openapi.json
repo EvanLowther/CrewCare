@@ -35,6 +35,20 @@
               "title": "Model"
             },
             "description": "Whose risk scores: 'ml' (XGBoost, Predictive) or 'rules' (rules-v2, Real-time). Default: ml."
+          },
+          {
+            "name": "hours_ahead",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 24,
+              "minimum": 0,
+              "description": "Score each site with its forecast this many hours from now (the dashboard's time slider). 0: the current score.",
+              "default": 0,
+              "title": "Hours Ahead"
+            },
+            "description": "Score each site with its forecast this many hours from now (the dashboard's time slider). 0: the current score."
           }
         ],
         "responses": {

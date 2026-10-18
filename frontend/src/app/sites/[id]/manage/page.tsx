@@ -1,12 +1,15 @@
 import { Suspense } from "react";
 import { ManageSite } from "./ManageSite";
+import { PageBody } from "@/components/ui";
 
 // Owner: Person B. A site's managers edit it, choose who's on it, and (its creator) delete it.
 export default function ManageSitePage(props: PageProps<"/sites/[id]/manage">) {
   return (
-    <Suspense fallback={<p className="text-sm text-muted">Loading site…</p>}>
-      <ManageLoader params={props.params} searchParams={props.searchParams} />
-    </Suspense>
+    <PageBody>
+      <Suspense fallback={<p className="text-sm text-muted">Loading site…</p>}>
+        <ManageLoader params={props.params} searchParams={props.searchParams} />
+      </Suspense>
+    </PageBody>
   );
 }
 

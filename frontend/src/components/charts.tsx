@@ -18,9 +18,9 @@ import type { Conditions, RiskLevel, RiskPoint } from "@/lib/api";
 import { siteDay, siteHour } from "@/lib/format";
 import { RISK_LABELS } from "@/lib/risk";
 
-const ACCENT = "#6e7bff";
-const GRID = "#1f2a58";
-const MUTED = "#7a84ae";
+const ACCENT = "#9ad7ff";
+const GRID = "#1c2433";
+const MUTED = "#7c879b";
 const AXIS_TICK = { fill: MUTED, fontSize: 11 };
 const HOUR = 3_600_000;
 
@@ -111,8 +111,8 @@ export function RiskHistoryChart({ points, timeZone, now }: { points: RiskPoint[
             );
           }}
         />
-        <Area dataKey="past" type="monotone" stroke={ACCENT} strokeWidth={2} fill="url(#riskWash)" connectNulls={false} isAnimationActive={false} dot={false} activeDot={{ r: 4, stroke: "#111a3d", strokeWidth: 2, fill: ACCENT }} />
-        <Area dataKey="future" type="monotone" stroke={ACCENT} strokeWidth={2} strokeDasharray="5 4" fill="url(#riskWash)" fillOpacity={0.5} connectNulls={false} isAnimationActive={false} dot={false} activeDot={{ r: 4, stroke: "#111a3d", strokeWidth: 2, fill: ACCENT }} />
+        <Area dataKey="past" type="monotone" stroke={ACCENT} strokeWidth={2} fill="url(#riskWash)" connectNulls={false} isAnimationActive={false} dot={false} activeDot={{ r: 4, stroke: "#0a0d13", strokeWidth: 2, fill: ACCENT }} />
+        <Area dataKey="future" type="monotone" stroke={ACCENT} strokeWidth={2} strokeDasharray="5 4" fill="url(#riskWash)" fillOpacity={0.5} connectNulls={false} isAnimationActive={false} dot={false} activeDot={{ r: 4, stroke: "#0a0d13", strokeWidth: 2, fill: ACCENT }} />
       </AreaChart>
     </ResponsiveContainer>
   );
@@ -166,7 +166,7 @@ export function HeatIndexChart({ forecast, timeZone }: { forecast: Conditions[];
             return <ChartTooltip title={`${siteDay(iso, timeZone)} ${siteHour(iso, timeZone)}`} rows={[{ label: "heat index", value: row.heat === null ? "–" : `${Math.round(row.heat)}°F` }]} />;
           }}
         />
-        <Area dataKey="heat" type="monotone" stroke={ACCENT} strokeWidth={2} fill="url(#heatWash)" isAnimationActive={false} dot={false} activeDot={{ r: 4, stroke: "#111a3d", strokeWidth: 2, fill: ACCENT }} />
+        <Area dataKey="heat" type="monotone" stroke={ACCENT} strokeWidth={2} fill="url(#heatWash)" isAnimationActive={false} dot={false} activeDot={{ r: 4, stroke: "#0a0d13", strokeWidth: 2, fill: ACCENT }} />
       </AreaChart>
     </ResponsiveContainer>
   );
@@ -196,7 +196,7 @@ export function RainChanceChart({ forecast, timeZone }: { forecast: Conditions[]
         />
         <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tick={AXIS_TICK} axisLine={false} tickLine={false} width={44} tickFormatter={(v: number) => `${v}%`} />
         <Tooltip
-          cursor={{ fill: "rgb(110 123 255 / 0.08)" }}
+          cursor={{ fill: "rgb(154 215 255 / 0.08)" }}
           content={({ active, payload }) => {
             const row = payload?.[0]?.payload as (typeof rows)[number] | undefined;
             if (!active || !row) return null;

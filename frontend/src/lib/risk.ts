@@ -1,23 +1,31 @@
 import type { RiskLevel } from "./api";
 
 // Keep the bands in sync with backend/planit/ml/score.py level_for().
-// Status colors from the dataviz palette (dark-surface steps). Always shown with a label or number,
-// never color alone. RISK_INK is the text color that reads on each fill.
+// Status colors for the near-black "Skyline" theme (also --color-risk-* in globals.css). Always shown with a label
+// or number, never color alone. RISK_INK is the text color that reads on each fill (dark on all four).
 export const RISK_COLORS: Record<RiskLevel, string> = {
-  low: "#0ca30c",
-  moderate: "#fab219",
-  high: "#ec835a",
-  extreme: "#d03b3b",
+  low: "#3fbf7f",
+  moderate: "#f5b83d",
+  high: "#f0804f",
+  extreme: "#ff4a4a",
 };
 
 export const RISK_INK: Record<RiskLevel, string> = {
-  low: "#0b1130",
-  moderate: "#0b1130",
-  high: "#0b1130",
-  extreme: "#ffffff",
+  low: "#06080c",
+  moderate: "#06080c",
+  high: "#06080c",
+  extreme: "#06080c",
 };
 
-export const NO_SCORE_COLOR = "#4a5380";
+/** Lighter tint of each level for text on the dark page (e.g. "EXTREME" next to a score). */
+export const RISK_TEXT: Record<RiskLevel, string> = {
+  low: "#7fdcae",
+  moderate: "#ffd27a",
+  high: "#ffad85",
+  extreme: "#ff8a8a",
+};
+
+export const NO_SCORE_COLOR = "#4a5368";
 export const NO_SCORE_INK = "#ffffff";
 
 export const RISK_LABELS: Record<RiskLevel, string> = {
