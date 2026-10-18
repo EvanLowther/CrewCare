@@ -36,7 +36,7 @@ That lets each person build and test their half alone.
   model's inputs (the model is trained on Open-Meteo's archive, so it keeps seeing the same source), ~1,800 of its
   10,000 free calls a day.
 - **API** reads all of those and writes `hazard_reports` and `photos` (crew uploads), `users`, `site_members` and
-  the sites managers create (docs/AUTH.md), plus `job_requests` for the demo buttons: the worker's `jobs` poller
+  the sites managers create (docs/AUTH.md), `notifications` read marks and `push_subscriptions`, plus `job_requests` for the demo buttons: the worker's `jobs` poller
   picks those up within ~2 s (migration 002). Every read is filtered to the sites the viewer may see.
 - **Frontend** talks only to the API, always through its own origin: the browser calls `/api/...` on port 3000
   and `frontend/next.config.ts` forwards it to FastAPI on port 8000. So the site works at `localhost`, `127.0.0.1`
@@ -61,6 +61,7 @@ That lets each person build and test their half alone.
 | `storm_events` | table | Person A loader | NOAA Storm Events, labels for ML training: Florida 2023-2025, every state 2024-2025. |
 | `job_requests` | table | API (demo buttons, new sites) | Requests the worker runs: `lightning_replay`, `generate_briefings`, and `site_setup` (008: a site that was just created or moved gets its weather and scores at once). 002. |
 | `users`, `site_members` | table | API | Who signed in, their role, and which sites they're on. 006, see AUTH.md. |
+| `notifications`, `push_subscriptions` | table | triggers, API | Crew reports, danger alerts and briefings for each site member, written by triggers on `hazard_reports`, `alerts` and `briefings`; streamed to open pages and pushed to devices by the API (`api/push.py`). 011. |
 
 Changing the schema: add `db/migrations/002_<name>.sql`. Never edit a migration that has been applied.
 

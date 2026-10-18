@@ -29,6 +29,7 @@ import { useCallback, useState } from "react";
 import { HeatIndexChart, RainChanceChart, RiskHistoryChart } from "@/components/charts";
 import { useMe } from "@/components/MeProvider";
 import { ModelSwitch } from "@/components/ModelSwitch";
+import { PastHazards } from "@/components/PastHazards";
 import { Card, CardHeader, EmptyState, ErrorBanner, PageBody, SeverityBadge } from "@/components/ui";
 import { api, type Alert, type Conditions, type HazardReport, type RiskPoint, type Scorer, type SiteDetail } from "@/lib/api";
 import { alertEndsAt, alertLabel, inForce, SEVERITY_RANK } from "@/lib/alerts";
@@ -415,6 +416,7 @@ function SiteDetailView({
             </div>
           </Card>
         </div>
+        <PastHazards siteId={site.id} />
         <p className="font-mono text-[10px] tracking-[0.08em] text-muted">
           {risk ? `${risk.model_version.toUpperCase()} · ` : ""}UPDATED {siteTime(new Date(now).toISOString(), tz)} SITE TIME
         </p>

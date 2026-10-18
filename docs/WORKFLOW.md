@@ -33,9 +33,9 @@ What's left, measured against the Sperry Tech brief (`.github/sperry tech.pdf`).
 
 ### Person A (worker + ML)
 - [ ] ⭐ Lightning stop-work, live: merge `a/lightning` (the rule, the 30-minute all-clear that restarts with each
-      strike, replay; rebase on `main` and renumber its `006_simulated_weather.sql` to `010`), then feed it real
-      strikes from GOES GLM (NOAA, free, ~20 s delay). `worker/rules/lightning.py` on `main` is still a stub, so no
-      site gets a lightning alert today. The site page's countdown banner is already built
+      strike, replay; rebase on `main` and renumber its `006_simulated_weather.sql` to `010`; 011 is notifications),
+      then feed it real strikes from GOES GLM (NOAA, free, ~20 s delay). `worker/rules/lightning.py` on `main` is
+      still a stub, so no site gets a lightning alert today. The site page's countdown banner is already built
 - [ ] ⭐ River flood-risk warning: "sites along rivers, such as the Mississippi, get a flood-risk warning after a
       night of heavy rain". Tag the sites within a few miles of big rivers (Mississippi, Ohio, Missouri, ...), and
       raise a `flood` alert when the night's rain passes ~1-2 in (`rules/flood.py` is a stub). River gauges later
@@ -44,13 +44,6 @@ What's left, measured against the Sperry Tech brief (`.github/sperry tech.pdf`).
       site so its team hears about it (the alert type exists; nothing creates it yet)
 
 ### Person B (API + app)
-- [ ] ⭐ Share crew reports instantly: when a `crew_report` alert (from Person A) or any danger alert lands on one of
-      your sites, show it right away (toast on every page, browser notification if allowed), not on the next poll
-- [ ] ⭐ Send the 6 PM briefing: email each site's members their site's briefing when it's written (an email API
-      such as Resend; key in the server's `.env`). Heads-up to Person A: it hooks into `worker/briefing/generate.py`
-- [ ] ⭐ Past hazards for a location ("a database of location hazards for future project owners"): on the site page
-      and the new-site form, list past crew reports within 5 mi (resolved ones too) and NOAA Storm Events within
-      25 mi (`storm_events`, 2024-2025)
 - [ ] Demo buttons for admins: lightning replay (`POST /api/demo/lightning-replay` exists) once lightning is merged
 - [ ] Test the report form on a phone on the hosted URL (camera, GPS)
 - [ ] If there's time: map marker clustering with Alaska and Hawaii in view; state and hazard filters on the
@@ -85,6 +78,11 @@ What's left, measured against the Sperry Tech brief (`.github/sperry tech.pdf`).
 - Address search for new sites; maps survive navigating back; Real-time is the default view (#30)
 - Hosted on Vultr over HTTPS, auto-deploying `main` (#19, #20)
 - Briefings API (private sites stay private) and page: tomorrow or today, riskiest first, "Generate now" for admins
+- Notifications for each site's members: crew reports, danger alerts and the 6 PM briefing, live within ~2 s as
+  pop-ups on every page, a bell inbox, and push to phones and browsers (Android/desktop; iPhone from the Home
+  Screen). A `crew_report` alert with `meta.report_id` shares its report's notification (no double ping)
+- Past hazards on the site page and new-site form: crew reports within 5 mi (resolved too) and NOAA Storm Events
+  within 25 mi
 - Icons and colours per hazard kind (heat, cold, snow/ice, smoke, wildfire, earthquake, ...) on factors and alerts;
   17 crew report types (lightning, ice, snow, cold stress, smoke, sinkhole, fallen tree, gas leak, quake damage, ...);
   alerts disappear the moment they end; deleting a site works again; no more "Can't reach the API" during deploys

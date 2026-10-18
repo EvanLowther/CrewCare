@@ -22,6 +22,7 @@ HazardType = Literal["wildlife", "flooding", "unstable_ground", "downed_line", "
 ReportSeverity = Literal["low", "medium", "high"]
 UserRole = Literal["admin", "manager", "crew"]
 SiteRole = Literal["manager", "crew"]
+NotificationKind = Literal["crew_report", "alert", "briefing"]
 
 
 # --- Risk -------------------------------------------------------------------
@@ -276,6 +277,90 @@ class Briefing(BaseModel):
 class BriefingList(BaseModel):
     for_date: date
     briefings: list[Briefing]
+
+
+# --- Notifications ----------------------------------------------------------
+
+class Notification(BaseModel):
+    """Something that happened on one of your sites: a crew report, a danger alert or the 6 PM briefing."""
+    id: int = Field(description="Increases over time; pass the newest as `after` to get only newer ones")
+    kind: NotificationKind
+    site_id: int | None
+    severity: AlertSeverity
+    title: str = Field(examples=["Sinkhole reported at Big Bend"])
+    body: str | None = None
+    link: str | None = Field(default=None, description="Page to open, e.g. /sites/621")
+    created_at: datetime
+    read: bool
+
+
+class NotificationList(BaseModel):
+    notifications: list[Notification] = Field(description="Newest first")
+    unread: int
+
+
+class MarkRead(BaseModel):
+    ids: list[int] | None = Field(default=None, description="Omit to mark all of them read")
+
+
+class PushKey(BaseModel):
+    public_key: str | None = Field(description="VAPID key for PushManager.subscribe; null when push is off")
+
+
+class PushSubscriptionKeys(BaseModel):
+    p256dh: str
+    auth: str
+
+
+class PushSubscriptionIn(BaseModel):
+    """What the browser's PushSubscription.toJSON() returns."""
+    endpoint: str = Field(max_length=2000)
+    keys: PushSubscriptionKeys
+
+
+class PushUnsubscribe(BaseModel):
+    endpoint: str = Field(max_length=2000)
+
+
+# --- Past hazards near a place ------------------------------------------------
+
+class PastReport(BaseModel):
+    id: UUID
+    site_id: int | None
+    site_name: str | None
+    hazard_type: HazardType
+    severity: ReportSeverity
+    description: str | None
+    created_at: datetime
+    status: Literal["active", "resolved", "expired"]
+    distance_mi: float
+
+
+class PastStormEvent(BaseModel):
+    event_id: int
+    event_type: str = Field(examples=["Thunderstorm Wind", "Flash Flood"])
+    begin_ts: datetime
+    place: str | None = Field(description="NOAA's county or zone name, and state")
+    distance_mi: float
+    injuries: int
+    deaths: int
+    damage_usd: int
+
+
+class EventTypeCount(BaseModel):
+    event_type: str
+    count: int
+
+
+class LocationHistory(BaseModel):
+    report_radius_mi: float = 5.0
+    storm_radius_mi: float = 25.0
+    reports: list[PastReport] = Field(description="Crew reports within report_radius_mi, newest first (max 50)")
+    storm_events: list[PastStormEvent] = Field(
+        description="NOAA Storm Events within storm_radius_mi, newest first (max 50)")
+    storm_event_count: int = Field(description="All of them, not just the 50 listed")
+    storm_event_types: list[EventTypeCount] = Field(description="Most common first")
+    storm_years: str = Field(examples=["2024-2025"], description="Years the NOAA data covers")
 
 
 # --- Demo controls ----------------------------------------------------------

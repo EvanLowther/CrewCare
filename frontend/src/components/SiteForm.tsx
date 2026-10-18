@@ -4,6 +4,7 @@ import { Crosshair, Loader2, MapPin, Search } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useCallback, useState } from "react";
 import { api, type S } from "@/lib/api";
+import { PastHazards } from "./PastHazards";
 import type { LatLng } from "./ReportPinMap";
 
 const PinMap = dynamic(() => import("./ReportPinMap"), {
@@ -16,15 +17,17 @@ export type SiteFormValues = { name: string; description: string; latitude: numb
 const inputClass =
   "w-full rounded-lg border border-line bg-raised px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none";
 
-/** Name, description and a map pin. Used to create a site and to edit one. */
+/** Name, description and a map pin. Used to create a site and to edit one. `showHistory`: past hazards near the pin. */
 export function SiteForm({
   initial,
   submitLabel,
   onSubmit,
+  showHistory = false,
 }: {
   initial?: SiteFormValues;
   submitLabel: string;
   onSubmit: (values: SiteFormValues) => Promise<void>;
+  showHistory?: boolean;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
@@ -93,103 +96,106 @@ export function SiteForm({
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <div className="flex flex-col overflow-hidden rounded-xl border border-line">
-        <div className="flex items-center justify-between gap-2 px-4 py-3">
-          <p className="flex items-center gap-1.5 text-sm text-ink">
-            <MapPin className="h-4 w-4 text-accent" aria-hidden /> Where is the site?
-          </p>
-          <button
-            type="button"
-            onClick={locate}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs text-ink-2 hover:text-ink"
+    <div className="flex flex-col gap-4">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="flex flex-col overflow-hidden rounded-xl border border-line">
+          <div className="flex items-center justify-between gap-2 px-4 py-3">
+            <p className="flex items-center gap-1.5 text-sm text-ink">
+              <MapPin className="h-4 w-4 text-accent" aria-hidden /> Where is the site?
+            </p>
+            <button
+              type="button"
+              onClick={locate}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs text-ink-2 hover:text-ink"
+            >
+              {locating ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Crosshair className="h-3.5 w-3.5" aria-hidden />}
+              My location
+            </button>
+          </div>
+          <form
+            className="flex gap-2 border-t border-line px-4 py-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              findAddress();
+            }}
           >
-            {locating ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Crosshair className="h-3.5 w-3.5" aria-hidden />}
-            My location
-          </button>
+            <label className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-line bg-raised px-3 py-1.5 text-sm focus-within:border-accent">
+              <Search className="h-4 w-4 shrink-0 text-muted" aria-hidden />
+              <input
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Enter an address or place"
+                aria-label="Site address"
+                className="w-full bg-transparent text-ink placeholder:text-muted focus:outline-none"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={searching || address.trim().length < 3}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-accent-strong px-3 py-1.5 text-xs font-medium text-white hover:bg-accent disabled:opacity-40"
+            >
+              {searching && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />}
+              Find
+            </button>
+          </form>
+          {matches && matches.length > 1 && (
+            <ul className="max-h-32 overflow-y-auto border-t border-line text-xs">
+              {matches.map((m) => (
+                <li key={`${m.latitude},${m.longitude}`}>
+                  <button
+                    type="button"
+                    onClick={() => placeAt(m)}
+                    className={`block w-full truncate px-4 py-1.5 text-left hover:bg-raised ${
+                      pin && pin.lat === m.latitude && pin.lng === m.longitude ? "text-ink" : "text-ink-2"
+                    }`}
+                    title={m.label}
+                  >
+                    {m.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="h-72 border-t border-line sm:h-80">
+            <PinMap position={pin} gps={null} accuracyM={null} recenterKey={recenterKey} sites={[]} onMove={setPin} />
+          </div>
+          <p className="px-4 py-2 text-xs text-muted">
+            {pin ? `${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)} · drag the pin or tap the map to fine-tune it` : "Enter an address, tap the map, or use your location"}
+          </p>
         </div>
-        <form
-          className="flex gap-2 border-t border-line px-4 py-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            findAddress();
-          }}
-        >
-          <label className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-line bg-raised px-3 py-1.5 text-sm focus-within:border-accent">
-            <Search className="h-4 w-4 shrink-0 text-muted" aria-hidden />
-            <input
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="Enter an address or place"
-              aria-label="Site address"
-              className="w-full bg-transparent text-ink placeholder:text-muted focus:outline-none"
+
+        <div className="space-y-4">
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-medium text-muted">Site name</span>
+            <input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} placeholder="e.g. Riverside substation rebuild" className={inputClass} />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-medium text-muted">Description (shown on the site page)</span>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={5}
+              maxLength={2000}
+              placeholder="What's being built, access notes, hazards crews should know about…"
+              className={inputClass}
             />
           </label>
+          {error && <p className="rounded-lg bg-[rgb(255_74_74/0.12)] px-3 py-2 text-sm text-[#ff9b9b]">{error}</p>}
           <button
-            type="submit"
-            disabled={searching || address.trim().length < 3}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-accent-strong px-3 py-1.5 text-xs font-medium text-white hover:bg-accent disabled:opacity-40"
+            type="button"
+            onClick={submit}
+            disabled={!ready}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent-strong px-4 py-2.5 text-sm font-semibold text-on-accent hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {searching && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />}
-            Find
+            {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+            {submitLabel}
           </button>
-        </form>
-        {matches && matches.length > 1 && (
-          <ul className="max-h-32 overflow-y-auto border-t border-line text-xs">
-            {matches.map((m) => (
-              <li key={`${m.latitude},${m.longitude}`}>
-                <button
-                  type="button"
-                  onClick={() => placeAt(m)}
-                  className={`block w-full truncate px-4 py-1.5 text-left hover:bg-raised ${
-                    pin && pin.lat === m.latitude && pin.lng === m.longitude ? "text-ink" : "text-ink-2"
-                  }`}
-                  title={m.label}
-                >
-                  {m.label}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="h-72 border-t border-line sm:h-80">
-          <PinMap position={pin} gps={null} accuracyM={null} recenterKey={recenterKey} sites={[]} onMove={setPin} />
+          {!ready && !saving && (
+            <p className="text-center text-xs text-muted">{name.trim().length < 2 ? "Give the site a name" : "Put the pin on the site"}</p>
+          )}
         </div>
-        <p className="px-4 py-2 text-xs text-muted">
-          {pin ? `${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)} · drag the pin or tap the map to fine-tune it` : "Enter an address, tap the map, or use your location"}
-        </p>
       </div>
-
-      <div className="space-y-4">
-        <label className="block">
-          <span className="mb-1.5 block text-xs font-medium text-muted">Site name</span>
-          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} placeholder="e.g. Riverside substation rebuild" className={inputClass} />
-        </label>
-        <label className="block">
-          <span className="mb-1.5 block text-xs font-medium text-muted">Description (shown on the site page)</span>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={5}
-            maxLength={2000}
-            placeholder="What's being built, access notes, hazards crews should know about…"
-            className={inputClass}
-          />
-        </label>
-        {error && <p className="rounded-lg bg-[rgb(255_74_74/0.12)] px-3 py-2 text-sm text-[#ff9b9b]">{error}</p>}
-        <button
-          type="button"
-          onClick={submit}
-          disabled={!ready}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent-strong px-4 py-2.5 text-sm font-semibold text-on-accent hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
-          {submitLabel}
-        </button>
-        {!ready && !saving && (
-          <p className="text-center text-xs text-muted">{name.trim().length < 2 ? "Give the site a name" : "Put the pin on the site"}</p>
-        )}
-      </div>
+      {showHistory && <PastHazards point={pin} />}
     </div>
   );
 }
