@@ -54,7 +54,7 @@ day) and `--only-missing` fetches just the sites that have no history yet.
 │   │   │   ├── model.py          probability -> 0-10 score, SHAP factors, OSHA heat floor
 │   │   │   ├── evaluate.py       leave-one-year-out test bench, by region, hazard and level
 │   │   │   ├── compare.py        model types on identical inputs; national vs one model per region
-│   │   │   ├── score.py          writes both scores for every site, now + 24 h, every 5 min
+│   │   │   ├── score.py          writes both scores for every site, now + 48 h, every 5 min
 │   │   │   └── models/           trained models + their test metrics
 │   │   ├── worker/
 │   │   │   ├── ingest/           Open-Meteo, NWS weather, NWS alerts (one national request)
