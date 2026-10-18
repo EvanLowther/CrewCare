@@ -16,7 +16,9 @@ RiskLevel = Literal["low", "moderate", "high", "extreme"]
 AlertType = Literal["lightning", "flood", "heat", "storm", "wind", "wildfire", "air_quality", "earthquake",
                     "crew_report", "nws"]
 AlertSeverity = Literal["info", "warning", "danger"]
-HazardType = Literal["wildlife", "flooding", "unstable_ground", "downed_line", "heat_illness", "fire", "other"]
+HazardType = Literal["wildlife", "flooding", "unstable_ground", "downed_line", "heat_illness", "fire", "other",
+                     "lightning", "high_wind", "ice", "snow", "cold_stress", "smoke", "sinkhole", "fallen_tree",
+                     "gas_leak", "earthquake_damage"]
 ReportSeverity = Literal["low", "medium", "high"]
 UserRole = Literal["admin", "manager", "crew"]
 SiteRole = Literal["manager", "crew"]

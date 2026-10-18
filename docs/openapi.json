@@ -1326,7 +1326,17 @@
               "downed_line",
               "heat_illness",
               "fire",
-              "other"
+              "other",
+              "lightning",
+              "high_wind",
+              "ice",
+              "snow",
+              "cold_stress",
+              "smoke",
+              "sinkhole",
+              "fallen_tree",
+              "gas_leak",
+              "earthquake_damage"
             ],
             "title": "Hazard Type"
           },
@@ -1742,7 +1752,17 @@
               "downed_line",
               "heat_illness",
               "fire",
-              "other"
+              "other",
+              "lightning",
+              "high_wind",
+              "ice",
+              "snow",
+              "cold_stress",
+              "smoke",
+              "sinkhole",
+              "fallen_tree",
+              "gas_leak",
+              "earthquake_damage"
             ],
             "title": "Hazard Type"
           },

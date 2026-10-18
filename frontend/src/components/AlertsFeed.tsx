@@ -3,26 +3,30 @@
 import { BellOff } from "lucide-react";
 import Link from "next/link";
 import type { Alert } from "@/lib/api";
-import { ALERT_ICONS, ALERT_LABELS, SEVERITY_RANK } from "@/lib/alerts";
+import { alertEndsAt, alertLabel, inForce, SEVERITY_RANK } from "@/lib/alerts";
+import { alertKind, HAZARD_KINDS, kindChipStyle } from "@/lib/hazardKinds";
 import { relativeTime } from "@/lib/format";
+import { useNow } from "@/lib/useNow";
 import { EmptyState, SeverityBadge } from "./ui";
 
-function endsAt(alert: Alert): string | null {
-  if (alert.all_clear_at) return alert.all_clear_at;
-  const ends = (alert.meta as { ends?: string | null }).ends;
-  return ends ?? null;
+function NoAlerts() {
+  return <EmptyState icon={BellOff} title="No active alerts" detail="NWS warnings, nearby wildfires and felt earthquakes show up here within a few minutes." />;
 }
 
 /** Table of alerts, most severe first. Rows link to the site page. */
 export function AlertsFeed({ alerts, limit }: { alerts: Alert[]; limit?: number }) {
-  const sorted = [...alerts].sort(
+  // The clock is only read once there are alerts: the empty page is prerendered, where Date.now() isn't allowed.
+  return alerts.length === 0 ? <NoAlerts /> : <AlertsTable alerts={alerts} limit={limit} />;
+}
+
+function AlertsTable({ alerts, limit }: { alerts: Alert[]; limit?: number }) {
+  const now = useNow(15_000);
+  const sorted = alerts.filter((a) => inForce(a, now)).sort(
     (a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] || b.started_at.localeCompare(a.started_at),
   );
   const shown = limit ? sorted.slice(0, limit) : sorted;
 
-  if (shown.length === 0) {
-    return <EmptyState icon={BellOff} title="No active alerts" detail="NWS warnings, nearby wildfires and felt earthquakes show up here within a few minutes." />;
-  }
+  if (shown.length === 0) return <NoAlerts />;
 
   return (
     <div className="overflow-x-auto">
@@ -39,8 +43,9 @@ export function AlertsFeed({ alerts, limit }: { alerts: Alert[]; limit?: number 
         </thead>
         <tbody className="divide-y divide-line">
           {shown.map((alert) => {
-            const Icon = ALERT_ICONS[alert.type];
-            const ends = endsAt(alert);
+            const kind = alertKind(alert);
+            const Icon = HAZARD_KINDS[kind].icon;
+            const ends = alertEndsAt(alert);
             return (
               <tr key={alert.id} className="transition-colors hover:bg-raised">
                 <td className="px-5 py-3">
@@ -50,10 +55,10 @@ export function AlertsFeed({ alerts, limit }: { alerts: Alert[]; limit?: number 
                 </td>
                 <td className="px-3 py-3">
                   <span className="inline-flex items-center gap-2 whitespace-nowrap text-ink-2">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md" style={kindChipStyle(kind)}>
                       <Icon className="h-3.5 w-3.5" aria-hidden />
                     </span>
-                    {ALERT_LABELS[alert.type]}
+                    {alertLabel(alert)}
                   </span>
                 </td>
                 <td className="px-3 py-3">

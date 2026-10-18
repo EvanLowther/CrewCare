@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, Marker, Popup, TileLayer, Tooltip, useMap, useMapEvents, ZoomControl } from "react-leaflet";
 import { api, type Alert, type HazardReport, type Scorer, type SiteSummary } from "@/lib/api";
 import { ALERT_ICONS, ALERT_LABELS, SEVERITY_STYLES } from "@/lib/alerts";
+import { factorKind, HAZARD_KINDS } from "@/lib/hazardKinds";
 import { relativeTime } from "@/lib/format";
 import { HAZARD_ICON_PATHS, HAZARD_LABELS, REPORT_SEVERITY_COLORS } from "@/lib/reports";
 import { NO_SCORE_COLOR, RISK_COLORS, RISK_GUIDANCE, RISK_LABELS, RISK_TEXT } from "@/lib/risk";
@@ -312,14 +313,20 @@ function SiteCard({ site, model }: { site: SiteSummary; model?: Scorer }) {
       )}
       {risk && risk.factors.length > 0 && (
         <ul className="flex flex-col gap-1 text-xs text-ink">
-          {risk.factors.slice(0, 3).map((f) => (
-            <li key={f.key} className="flex justify-between gap-3">
-              <span>{f.label}</span>
-              <span className="tabular font-mono" style={{ color: RISK_TEXT[risk.level] }}>
-                +{f.contribution.toFixed(1)}
-              </span>
-            </li>
-          ))}
+          {risk.factors.slice(0, 3).map((f) => {
+            const kind = HAZARD_KINDS[factorKind(f.key, f.label)];
+            return (
+              <li key={f.key} className="flex justify-between gap-3">
+                <span className="flex items-start gap-1.5">
+                  <kind.icon className="mt-px h-3.5 w-3.5 shrink-0" style={{ color: kind.color }} aria-label={kind.label} />
+                  {f.label}
+                </span>
+                <span className="tabular font-mono" style={{ color: RISK_TEXT[risk.level] }}>
+                  +{f.contribution.toFixed(1)}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
       <Link

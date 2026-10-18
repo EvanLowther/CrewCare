@@ -28,7 +28,7 @@ export function AlertsView() {
           </div>
         }
       />
-      {error && <ErrorBanner message={error} />}
+      {error && <ErrorBanner message={error} retrying />}
       <Card className="overflow-hidden">
         <CardHeader title="Active alerts" icon={Siren} subtitle="Most severe first · click a site to open it" />
         <AlertsFeed alerts={alerts} />

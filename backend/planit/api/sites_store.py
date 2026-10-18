@@ -12,6 +12,7 @@ from uuid import UUID
 
 import httpx
 from fastapi import HTTPException
+from psycopg import sql
 from psycopg.types.json import Jsonb
 from tzfpy import get_tz
 
@@ -23,9 +24,18 @@ from planit.models import AdminUser, Me, MySite, SiteCreate, SiteMember, SiteUpd
 
 log = logging.getLogger("planit.sites")
 
-# Tables with a site_id that a deleted site's rows must leave first (sites.id has no ON DELETE CASCADE).
-_SITE_CHILD_TABLES = ("hazard_scores", "weather", "nws_weather", "air_quality", "alerts", "nws_alerts",
-                      "briefings", "hazard_reports")
+# Every table whose foreign key points at sites without ON DELETE CASCADE (weather, scores, alerts, ...). Read from
+# the catalog so a table a later migration adds (e.g. air_quality in 007) can't make deleting a site fail.
+# TimescaleDB chunks carry copies of the hypertables' keys; deleting from the hypertable covers them.
+_SITE_CHILD_TABLES_SQL = """
+    SELECT DISTINCT n.nspname AS schema, t.relname AS tbl, a.attname AS col
+    FROM pg_constraint c
+    JOIN pg_class t ON t.oid = c.conrelid
+    JOIN pg_namespace n ON n.oid = t.relnamespace
+    JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
+    WHERE c.contype = 'f' AND c.confrelid = 'sites'::regclass AND c.confdeltype <> 'c'
+      AND left(n.nspname, 12) <> '_timescaledb'
+"""
 # Cleared when a site moves, so the worker looks its NWS grid up again (migration 005).
 _NWS_LOOKUP_COLS = ("nws_grid_id", "nws_grid_x", "nws_grid_y", "nws_station", "nws_zone", "nws_county_zone")
 UNKNOWN_STATE = "XX"
@@ -130,8 +140,9 @@ def delete_site(site_id: int, user: CurrentUser) -> None:
             raise HTTPException(403, "Only the manager who created this site (or an admin) can delete it")
         if site["is_reference"] and not user.is_admin:
             raise HTTPException(403, "Reference sites can only be deleted by an admin")
-        for table in _SITE_CHILD_TABLES:
-            conn.execute(f"DELETE FROM {table} WHERE site_id = %s", (site_id,))
+        for child in conn.execute(_SITE_CHILD_TABLES_SQL).fetchall():
+            conn.execute(sql.SQL("DELETE FROM {} WHERE {} = %s").format(
+                sql.Identifier(child["schema"], child["tbl"]), sql.Identifier(child["col"])), (site_id,))
         conn.execute("DELETE FROM sites WHERE id = %s", (site_id,))
 
 
