@@ -20,7 +20,7 @@ async function SiteLoader({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
-  // ?model=rules (Real-time) or ml (Predictive), carried over from the dashboard's switch; default Predictive.
-  const model: Scorer = query.model === "rules" ? "rules" : "ml";
+  // ?model=rules (Real-time data) or ml (Predictive), carried over from the dashboard's switch; default Real-time data.
+  const model: Scorer = query.model === "ml" ? "ml" : "rules";
   return <SiteView id={id} initialModel={model} />;
 }

@@ -39,7 +39,7 @@ const isDesktop = () => window.matchMedia(DESKTOP).matches;
 const PANEL = "rounded-2xl border border-line bg-panel backdrop-blur";
 
 export function Dashboard() {
-  const [model, setModel] = useState<Scorer>("ml");
+  const [model, setModel] = useState<Scorer>("rules"); // Real-time data first on every load
   const [hoursAhead, setHoursAhead] = useState(0);
   const { me } = useMe();
   const scope = useSiteScope();

@@ -234,6 +234,16 @@ class SiteUpdate(BaseModel):
     description: str | None = Field(default=None, max_length=2000)
 
 
+class GeocodeResult(BaseModel):
+    label: str = Field(examples=["1600 Pennsylvania Avenue NW, Washington, DC"])
+    latitude: float
+    longitude: float
+
+
+class GeocodeList(BaseModel):
+    results: list[GeocodeResult] = Field(description="Best match first; US addresses and places only")
+
+
 # --- Briefings --------------------------------------------------------------
 
 class Briefing(BaseModel):

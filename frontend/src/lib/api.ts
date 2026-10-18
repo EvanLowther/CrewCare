@@ -3,7 +3,7 @@
 import type { components } from "./api-types";
 import { authHeaders } from "./auth";
 
-type S = components["schemas"];
+export type S = components["schemas"];
 export type SiteSummary = S["SiteSummary"];
 export type SiteList = S["SiteList"];
 export type SiteDetail = S["SiteDetail"];
@@ -119,6 +119,7 @@ export const api = {
   removeMember: (siteId: number, userId: string) =>
     request<S["SiteMemberList"]>("DELETE", `/api/sites/${siteId}/members/${userId}`),
   searchUsers: (q: string) => get<S["UserList"]>(`/api/users?q=${encodeURIComponent(q)}`),
+  geocode: (q: string) => get<S["GeocodeList"]>(`/api/geocode?q=${encodeURIComponent(q)}`),
   adminUsers: () => get<S["AdminUserList"]>("/api/admin/users"),
   setRole: (userId: string, role: UserRole) => request<AdminUser>("PATCH", `/api/admin/users/${userId}`, { role }),
 };

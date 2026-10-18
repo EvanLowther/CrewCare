@@ -63,3 +63,4 @@ def test_demo_buttons_are_admin_only():
 def test_admin_pages_are_admin_only():
     assert client.get("/api/admin/users", headers=as_("manager")).status_code == 403
     assert client.get("/api/users?q=ab", headers=as_("crew")).status_code == 403
+    assert client.get("/api/geocode?q=Gainesville", headers=as_("crew")).status_code == 403

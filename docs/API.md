@@ -21,6 +21,7 @@ the sign-in routes). Without it, reads return only public reference sites.
 | GET | `/api/briefings?for_date=` | `BriefingList` | Defaults to tomorrow |
 | POST | `/api/briefings/generate` | `DemoAck` | Admins. Demo: generate now instead of 6 PM |
 | POST | `/api/demo/lightning-replay` | `DemoAck` | Admins. Demo: storm near a site |
+| GET | `/api/geocode?q=` | `GeocodeList` | Managers. US address search (OpenStreetMap) for placing a new site |
 | GET | `/api/me` | `Me` | Signed-in user and their sites; plus site, member, user and admin routes in AUTH.md |
 
 ## Examples

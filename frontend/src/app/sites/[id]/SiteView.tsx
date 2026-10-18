@@ -44,7 +44,7 @@ const SiteMap = dynamic(() => import("@/components/SiteMap"), {
 });
 
 const OTHER: Record<Scorer, Scorer> = { ml: "rules", rules: "ml" };
-const SCORER_NAMES: Record<Scorer, string> = { ml: "Predictive", rules: "Real-time rules" };
+const SCORER_NAMES: Record<Scorer, string> = { ml: "Predictive", rules: "Real-time data" };
 
 export function SiteView({ id, initialModel }: { id: string; initialModel: Scorer }) {
   const [model, setModel] = useState<Scorer>(initialModel);

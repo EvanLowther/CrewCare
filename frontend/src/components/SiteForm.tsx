@@ -1,8 +1,9 @@
 "use client";
 
-import { Crosshair, Loader2, MapPin } from "lucide-react";
+import { Crosshair, Loader2, MapPin, Search } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useCallback, useState } from "react";
+import { api, type S } from "@/lib/api";
 import type { LatLng } from "./ReportPinMap";
 
 const PinMap = dynamic(() => import("./ReportPinMap"), {
@@ -32,6 +33,32 @@ export function SiteForm({
   const [locating, setLocating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [address, setAddress] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [matches, setMatches] = useState<S["GeocodeResult"][] | null>(null);
+
+  /** Look the typed address up and drop the pin on the best match (other matches stay listed to pick from). */
+  async function findAddress() {
+    const q = address.trim();
+    if (q.length < 3) return;
+    setSearching(true);
+    setError(null);
+    try {
+      const { results } = await api.geocode(q);
+      setMatches(results);
+      if (results[0]) placeAt(results[0]);
+      else setError("No US address matches that. Try adding the city and state, or tap the map.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't look up that address");
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function placeAt(hit: S["GeocodeResult"]) {
+    setPin({ lat: hit.latitude, lng: hit.longitude });
+    setRecenterKey((k) => k + 1);
+  }
 
   const locate = useCallback(() => {
     if (!navigator.geolocation) return setError("This browser can't share its location. Tap the map instead.");
@@ -81,11 +108,55 @@ export function SiteForm({
             My location
           </button>
         </div>
+        <form
+          className="flex gap-2 border-t border-line px-4 py-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            findAddress();
+          }}
+        >
+          <label className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-line bg-raised px-3 py-1.5 text-sm focus-within:border-accent">
+            <Search className="h-4 w-4 shrink-0 text-muted" aria-hidden />
+            <input
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Enter an address or place"
+              aria-label="Site address"
+              className="w-full bg-transparent text-ink placeholder:text-muted focus:outline-none"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={searching || address.trim().length < 3}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-accent-strong px-3 py-1.5 text-xs font-medium text-white hover:bg-accent disabled:opacity-40"
+          >
+            {searching && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />}
+            Find
+          </button>
+        </form>
+        {matches && matches.length > 1 && (
+          <ul className="max-h-32 overflow-y-auto border-t border-line text-xs">
+            {matches.map((m) => (
+              <li key={`${m.latitude},${m.longitude}`}>
+                <button
+                  type="button"
+                  onClick={() => placeAt(m)}
+                  className={`block w-full truncate px-4 py-1.5 text-left hover:bg-raised ${
+                    pin && pin.lat === m.latitude && pin.lng === m.longitude ? "text-ink" : "text-ink-2"
+                  }`}
+                  title={m.label}
+                >
+                  {m.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
         <div className="h-72 border-t border-line sm:h-80">
           <PinMap position={pin} gps={null} accuracyM={null} recenterKey={recenterKey} sites={[]} onMove={setPin} />
         </div>
         <p className="px-4 py-2 text-xs text-muted">
-          {pin ? `${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)} · drag the pin or tap the map to move it` : "Tap the map, or use your location"}
+          {pin ? `${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)} · drag the pin or tap the map to fine-tune it` : "Enter an address, tap the map, or use your location"}
         </p>
       </div>
 

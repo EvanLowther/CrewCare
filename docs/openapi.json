@@ -877,6 +877,52 @@
         }
       }
     },
+    "/api/geocode": {
+      "get": {
+        "tags": [
+          "auth",
+          "sites"
+        ],
+        "summary": "Geocode Address",
+        "description": "US addresses or places matching `q`, best first, for placing a new site. Managers and admins only.",
+        "operationId": "geocode_address_api_geocode_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 200,
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeocodeList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/users": {
       "get": {
         "tags": [
@@ -1562,6 +1608,49 @@
           "message"
         ],
         "title": "DemoAck"
+      },
+      "GeocodeList": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/GeocodeResult"
+            },
+            "type": "array",
+            "title": "Results",
+            "description": "Best match first; US addresses and places only"
+          }
+        },
+        "type": "object",
+        "required": [
+          "results"
+        ],
+        "title": "GeocodeList"
+      },
+      "GeocodeResult": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "examples": [
+              "1600 Pennsylvania Avenue NW, Washington, DC"
+            ]
+          },
+          "latitude": {
+            "type": "number",
+            "title": "Latitude"
+          },
+          "longitude": {
+            "type": "number",
+            "title": "Longitude"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "latitude",
+          "longitude"
+        ],
+        "title": "GeocodeResult"
       },
       "HTTPValidationError": {
         "properties": {
