@@ -54,9 +54,9 @@ def upsert(rows: list[tuple]) -> int:
         return result.rowcount
 
 
-def poll() -> int:
-    """Last day + 2-day forecast of air quality for every site. Returns rows written."""
-    sites = load_sites()
+def poll(site_ids: list[int] | None = None) -> int:
+    """Last day + 2-day forecast of air quality for every site (or just `site_ids`). Returns rows written."""
+    sites = [s for s in load_sites() if site_ids is None or s["id"] in site_ids]
     now = datetime.now(UTC)
     rows = []
     with httpx.Client() as client:

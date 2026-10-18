@@ -3,7 +3,7 @@
 import { ArrowRight } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 import { api, type Scorer, type SiteSummary } from "@/lib/api";
 import { RISK_COLORS, RISK_LABELS, RISK_LEVELS, RISK_TEXT } from "@/lib/risk";
 import { usePolling } from "@/lib/usePolling";
@@ -40,13 +40,12 @@ const PANEL = "rounded-2xl border border-line bg-panel backdrop-blur";
 
 export function Dashboard() {
   const [model, setModel] = useState<Scorer>("rules"); // Real-time data first on every load
-  const [hoursAhead, setHoursAhead] = useState(0);
   const { me } = useMe();
   const scope = useSiteScope();
   const desktop = useSyncExternalStore(subscribeDesktop, isDesktop, () => true);
   // Refetch when the viewer changes (signing in reveals their private sites).
   const viewer = me?.user?.id ?? null;
-  const fetchSites = useCallback(() => api.sites(model, hoursAhead), [model, hoursAhead, viewer]); // eslint-disable-line react-hooks/exhaustive-deps
+  const fetchSites = useCallback(() => api.sites(model), [model, viewer]); // eslint-disable-line react-hooks/exhaustive-deps
   const sitesPoll = usePolling(fetchSites, POLL_MS);
   const alertsPoll = usePolling(fetchAlerts, POLL_MS);
   const reportsPoll = usePolling(fetchReports, POLL_MS);
@@ -64,13 +63,15 @@ export function Dashboard() {
         className={`contents lg:absolute lg:top-5 lg:bottom-5 lg:left-5 lg:z-[1001] lg:flex lg:w-[380px] lg:flex-col lg:gap-4 lg:overflow-hidden lg:p-5 ${PANEL} max-lg:border-0 max-lg:bg-transparent`}
       >
         <section className="order-1 flex flex-col gap-3.5 px-4 pt-6 pb-5 lg:p-0">
-          <p className="eyebrow">{sites.length || 160} job sites · now + next 24 h</p>
+          <p className="eyebrow">{sites.length || 160} job sites · scored every 5 min</p>
           <h1 className="font-display text-[44px] leading-[0.92] font-extrabold lg:text-[50px]">
             The forecast your crew <span className="text-accent">actually</span> needs.
           </h1>
           <p className="text-sm leading-relaxed text-ink-2">
-            Every site scored 0 to 10 for crew hazard: one score from OSHA and NWS work rules, one from a model trained
-            on weather history.
+            Every site scored 0 to 10 for crew hazard. <strong className="font-semibold text-ink">Real-time</strong>:
+            live NWS weather, smoke, nearby wildfires, earthquakes and warnings against OSHA and NWS work rules.{" "}
+            <strong className="font-semibold text-ink">Predictive</strong>: our model&apos;s odds of a recorded hazard
+            day, never below an active warning.
           </p>
           <ModelSwitch value={model} onChange={setModel} full />
           {error && <ErrorBanner message={error} retrying />}
@@ -79,7 +80,7 @@ export function Dashboard() {
         <section aria-label="Highest risk first" className="order-4 mx-4 mt-3 flex min-h-0 flex-col rounded-2xl border border-line bg-card lg:m-0 lg:flex-1 lg:rounded-none lg:border-0 lg:border-t lg:border-line-soft lg:bg-transparent">
           <div className="flex items-baseline justify-between px-3.5 pt-3.5 pb-2 lg:px-0 lg:pt-3">
             <h2 className="text-sm font-semibold">Highest risk first</h2>
-            <span className="eyebrow">{model === "ml" ? "Predictive" : "Real-time"}{hoursAhead ? ` · +${hoursAhead} h` : ""}</span>
+            <span className="eyebrow">{model === "ml" ? "Predictive" : "Real-time"}</span>
           </div>
           <RankedList sites={sites} selectedId={selectedId} onSelect={setSelectedId} model={model} loading={!sitesPoll.data} />
         </section>
@@ -112,12 +113,11 @@ export function Dashboard() {
       </section>
 
       <div className="order-3 flex flex-wrap gap-3 px-4 pt-3.5 lg:absolute lg:right-[76px] lg:bottom-5 lg:left-[420px] lg:z-[1001] lg:gap-3.5 lg:p-0">
-        <TimeSlider value={hoursAhead} onChange={setHoursAhead} />
         <Totals sites={sites} alerts={alerts} loaded={!!sitesPoll.data && !!alertsPoll.data} />
       </div>
 
       <footer className="order-5 px-4 pt-6 pb-8 font-mono text-[10px] leading-relaxed tracking-[0.08em] text-muted lg:hidden">
-        MODEL xgb-2026-10-17-us · DATA EIA-860M, NOAA, NWS, OPEN-METEO
+        MODEL xgb-2026-10-17-us · DATA EIA-860M, NOAA, NWS, OPEN-METEO, NIFC, USGS
       </footer>
     </main>
   );
@@ -198,51 +198,6 @@ function RankedList({
   );
 }
 
-/** Scrub the map to a forecast hour. The fetch waits until the thumb rests for a moment. */
-function TimeSlider({ value, onChange }: { value: number; onChange: (hours: number) => void }) {
-  const [draft, setDraft] = useState(value);
-  // Read the clock in the change handler, not during render (the page is prerendered).
-  const [atLabel, setAtLabel] = useState("Now");
-  useEffect(() => {
-    if (draft === value) return;
-    const t = setTimeout(() => onChange(draft), 250);
-    return () => clearTimeout(t);
-  }, [draft, value, onChange]);
-
-  const move = (hours: number) => {
-    setDraft(hours);
-    const at = new Date(Date.now() + hours * 3_600_000);
-    setAtLabel(hours === 0 ? "Now" : `+${hours} h · ${at.toLocaleTimeString([], { weekday: "short", hour: "numeric" })}`);
-  };
-  return (
-    <section aria-label="Time" className={`flex flex-[2_1_320px] flex-col gap-2 px-4 py-3 ${PANEL} max-lg:bg-card`}>
-      <div className="flex justify-between gap-3 text-xs">
-        <label htmlFor="hours-ahead" className="text-ink-2">
-          Showing <strong className="font-semibold text-ink">{atLabel}</strong>
-        </label>
-        <span className="eyebrow">{draft === 0 ? "Next 24 h" : "Forecast scores · alerts are live"}</span>
-      </div>
-      <input
-        id="hours-ahead"
-        type="range"
-        min={0}
-        max={24}
-        step={1}
-        value={draft}
-        onChange={(e) => move(Number(e.target.value))}
-        className="h-6 w-full cursor-pointer accent-[var(--color-accent)]"
-      />
-      <div className="flex justify-between font-mono text-[10px] text-muted" aria-hidden>
-        <span>NOW</span>
-        <span>+6 H</span>
-        <span>+12 H</span>
-        <span>+18 H</span>
-        <span>+24 H</span>
-      </div>
-    </section>
-  );
-}
-
 function Totals({ sites, alerts, loaded }: { sites: SiteSummary[]; alerts: { severity: string; type: string; site_id: number }[]; loaded: boolean }) {
   const count = (level: string) => sites.filter((s) => s.risk?.level === level).length;
   const warning = alerts.filter((a) => a.severity === "warning").length;
@@ -266,7 +221,7 @@ function Totals({ sites, alerts, loaded }: { sites: SiteSummary[]; alerts: { sev
       detail: [danger && `${danger} danger`, `${warning} warn`, `${info} info`].filter(Boolean).join(" · "),
       color: "var(--color-ink)",
     },
-    { key: "stop", label: "Stop-work", value: v(stopWork), detail: stopWork ? "lightning ≤ 10 mi" : "no lightning ≤ 10 mi", color: stopWork ? RISK_TEXT.extreme : "var(--color-ink)" },
+    { key: "stop", label: "Stop-work", value: v(stopWork), detail: stopWork ? "lightning ≤ 10 mi" : "none active", color: stopWork ? RISK_TEXT.extreme : "var(--color-ink)" },
   ];
   return (
     <section

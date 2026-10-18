@@ -198,7 +198,7 @@ function SiteDetailView({
               </div>
             </div>
           ) : (
-            <p className="text-sm text-ink-2">Waiting for the first score. The scoring job runs every 5 minutes.</p>
+            <p className="text-sm text-ink-2">Getting live weather for this site: the first scores appear in about a minute.</p>
           )}
 
           <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-line">
@@ -311,7 +311,7 @@ function SiteDetailView({
 
           <div className="grid gap-5 px-4 sm:grid-cols-2 sm:px-0">
             <Card>
-              <CardHeader title="Active alerts" icon={Bell} subtitle="NWS warnings and stop-work alerts" />
+              <CardHeader title="Active alerts" icon={Bell} subtitle="NWS warnings, nearby wildfires, earthquakes, smoke" />
               <SiteAlerts alerts={alerts} timeZone={tz} />
             </Card>
             <Card>
@@ -396,7 +396,7 @@ function SiteDetailView({
             {history.length > 0 ? (
               <RiskHistoryChart points={history} timeZone={tz} now={now} />
             ) : (
-              <EmptyState icon={TrendingUp} title="No scores yet" detail="The scoring job runs every 5 minutes." />
+              <EmptyState icon={TrendingUp} title="No scores yet" detail="Scores are updated every 5 minutes; a new site gets its first ones in about a minute." />
             )}
           </div>
         </Card>
@@ -540,8 +540,8 @@ function SiteAlerts({ alerts: all, timeZone }: { alerts: Alert[]; timeZone: stri
             <Check className="h-[18px] w-[18px]" aria-hidden />
           </span>
         }
-        title="No NWS warnings for this site"
-        detail="No lightning within 10 miles"
+        title="No active alerts"
+        detail="No NWS warnings, nearby wildfires or felt earthquakes"
       />
     );
   }

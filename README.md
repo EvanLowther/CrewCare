@@ -305,6 +305,9 @@ and snow depth 2% each. The national features (snowfall, wind chill, location) r
   peak heat, storm hours, gusts, snow, smoke, warnings in force and the precautions to take.
 - **Crew reports:** a phone form with live GPS and a draggable pin, to put a hazard (wildlife, flooding, downed line,
   ...) on the site map.
+- **Your own sites:** a manager adds a job site by address or pin and picks its crew. Within about a minute it has
+  live NWS weather, smoke, nearby alerts and both scores. The model is national (it knows latitude and longitude),
+  so a new location needs no retraining.
 
 **Live:** [planit.207-246-119-236.sslip.io](https://planit.207-246-119-236.sslip.io/). One Vultr server runs the site,
 the API and the worker, and deploys `main` automatically (see [`deploy/README.md`](deploy/README.md)).

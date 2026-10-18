@@ -89,13 +89,7 @@ const post = <T>(path: string, body?: unknown) => request<T>("POST", path, body)
 
 export const api = {
   health: () => get<Health>("/api/health"),
-  /** `hoursAhead` (1-24): each site scored with its forecast for that hour (the dashboard's time slider). */
-  sites: (model?: Scorer, hoursAhead = 0) => {
-    const q = new URLSearchParams();
-    if (model) q.set("model", model);
-    if (hoursAhead > 0) q.set("hours_ahead", String(hoursAhead));
-    return get<SiteList>(`/api/sites${q.size ? `?${q}` : ""}`);
-  },
+  sites: (model?: Scorer) => get<SiteList>(`/api/sites${model ? `?model=${model}` : ""}`),
   site: (id: number, model?: Scorer) => get<SiteDetail>(`/api/sites/${id}${model ? `?model=${model}` : ""}`),
   alerts: (opts: { siteId?: number; since?: string } = {}) => {
     const q = new URLSearchParams();
