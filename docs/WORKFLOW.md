@@ -33,19 +33,14 @@
       `systemctl restart planit-worker planit-api`); until then every briefing is the template
 
 ### Person A (data + ML)
-- [ ] Merge `a/lightning`: lightning stop-work rule, 30-minute countdown, replay, and the `simulate` demo script
-      (lightning, hurricane, flood, blizzard). Rebase on `main` and renumber its `006_simulated_weather.sql` to
-      `010` (006 to 009 are taken). `worker/rules/lightning.py` on `main` is still a stub, so the demo button's
-      replay does nothing yet
-- [ ] River flood rule with NWS flood stages; must cover the Mississippi (`ingest/usgs.py` and `rules/flood.py`
-      are stubs)
-- [ ] Crew reports raise the score
-- [ ] Flood replay demo, like the lightning one
-- [ ] Wildfire: NASA FIRMS satellite detections (sooner than NIFC's reports) and NIFC fire perimeters; debris flow
-      below burn scars
-- [ ] Live lightning strikes (GOES GLM) after the replay works
-- [ ] Later: score baseline per region, if "5" should mean "unusual for this site"; separate models per hazard
-      (storm, winter, flood, heat) instead of one "hazard day" model
+- [ ] Lightning stop-work, live: merge `a/lightning` (the rule, 30-minute countdown and replay; rebase on `main` and
+      renumber its `006_simulated_weather.sql` to `010`), then feed it real strikes from GOES GLM (NOAA, free,
+      ~20 s delay). `worker/rules/lightning.py` on `main` is still a stub, so no site gets a lightning alert today
+- [ ] Crew reports raise the score: an active report near a site (downed line, flooding, heat illness, ...) becomes
+      a hazard in both scores, like fire and quake alerts do
+
+Later, only if there's time: a river flood rule with NWS flood stages for sites on big rivers (NWS Flood Warnings
+already reach both scores).
 
 ### Person B (app)
 - [ ] Demo buttons in the app for admins: lightning replay (`POST /api/demo/lightning-replay` exists), then flood
