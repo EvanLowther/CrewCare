@@ -157,6 +157,7 @@ class HazardReport(BaseModel):
     status: Literal["active", "resolved"]
     created_at: datetime
     expires_at: datetime | None
+    resolved_at: datetime | None = Field(default=None, description="When a manager marked it resolved")
 
 
 class ReportList(BaseModel):

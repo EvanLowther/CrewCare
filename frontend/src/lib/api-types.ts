@@ -124,7 +124,8 @@ export interface paths {
         };
         /**
          * List Reports
-         * @description Active reports on sites the viewer may see.
+         * @description Active reports on sites the viewer may see. With `site_id` and `include_past=true`, that site's resolved and
+         *     expired reports too (the My sites page).
          */
         get: operations["list_reports_api_reports_get"];
         put?: never;
@@ -874,6 +875,11 @@ export interface components {
             created_at: string;
             /** Expires At */
             expires_at: string | null;
+            /**
+             * Resolved At
+             * @description When a manager marked it resolved
+             */
+            resolved_at?: string | null;
         };
         /** Health */
         Health: {
@@ -1758,6 +1764,7 @@ export interface operations {
         parameters: {
             query?: {
                 site_id?: number | null;
+                include_past?: boolean;
             };
             header?: never;
             path?: never;

@@ -15,7 +15,7 @@ the sign-in routes). Without it, reads return only public reference sites.
 | GET | `/api/sites` | `SiteList` | Sites the viewer may see, highest risk first. Each has `is_reference`, `my_role`, `can_manage`, `can_delete` |
 | GET | `/api/sites/{id}` | `SiteDetail` | Conditions, 48 h forecast, alerts, reports, risk history |
 | GET | `/api/alerts?site_id=&since=` | `AlertList` | Poll every 10 s, passing back `server_time` as `since` |
-| GET | `/api/reports?site_id=` | `ReportList` | Active crew reports |
+| GET | `/api/reports?site_id=&include_past=` | `ReportList` | Active crew reports; `include_past=true` (with a site) adds resolved and expired ones |
 | POST | `/api/reports` | `HazardReport` (201) | Signed in. `multipart/form-data`, optional `photo` file |
 | GET | `/api/photos/{id}` | image/jpeg | Use `photo_url` from a report (it's signed) |
 | GET | `/api/briefings?for_date=` | `BriefingList` | Defaults to tomorrow |

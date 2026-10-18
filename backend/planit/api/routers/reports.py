@@ -19,11 +19,14 @@ MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 
 
 @router.get("/reports", response_model=ReportList)
-def list_reports(user: OptionalUser, site_id: int | None = None) -> ReportList:
-    """Active reports on sites the viewer may see."""
+def list_reports(user: OptionalUser, site_id: int | None = None, include_past: bool = False) -> ReportList:
+    """Active reports on sites the viewer may see. With `site_id` and `include_past=true`, that site's resolved and
+    expired reports too (the My sites page)."""
+    if include_past and site_id is None:
+        raise HTTPException(422, "include_past needs a site_id")
     if use_mock():
         return ReportList(reports=mock.reports(site_id))
-    return ReportList(reports=reports_store.list_reports(site_id, user))
+    return ReportList(reports=reports_store.list_reports(site_id, user, include_past))
 
 
 @router.post("/reports", response_model=HazardReport, status_code=201)

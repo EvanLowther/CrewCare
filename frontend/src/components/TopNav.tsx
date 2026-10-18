@@ -19,7 +19,7 @@ const NAV: NavItem[] = [
   { href: "/", label: "Dashboard" },
   { href: "/alerts", label: "Alerts", badge: "alerts" },
   { href: "/briefings", label: "Briefings" },
-  { href: "/report", label: "Crew reports" },
+  { href: "/my-sites", label: "My sites" },
   { href: "/sites/new", label: "New site", show: "manager" },
   { href: "/admin", label: "Admin", show: "admin" },
 ];
