@@ -7,7 +7,15 @@ import pandas as pd
 import pytest
 
 from planit.ml.features import FEATURES
-from planit.ml.model import HazardModel, apply_heat_floor, heat_floor, latest_model_path, score_from_probability
+from planit.ml.model import (
+    HazardModel,
+    apply_heat_floor,
+    fit_scale,
+    heat_floor,
+    latest_model_path,
+    score_from_probability,
+    score_on_scale,
+)
 from planit.ml.train import evaluate, fit, save
 
 
@@ -44,6 +52,28 @@ def test_score_scale():
     assert score_from_probability(0.10, base) >= 5  # 2.5x normal is high
     assert score_from_probability(0.40, base) == 10.0
     assert score_from_probability(0.99, base) == 10.0
+
+
+def test_fit_scale_matches_real_time_hazard_rates_and_maps_back():
+    rng = np.random.default_rng(1)
+    rt = rng.uniform(0, 10, 20000)
+    y = (rng.uniform(size=rt.size) < 0.002 + 0.03 * rt ** 1.5 / 10).astype(int)  # hazard rate rises with the score
+    scale = fit_scale(rt, y)
+    rates = np.array(scale["rates"])
+    assert len(scale["scores"]) == 101 and np.all(np.diff(rates) >= 0)  # never falls as the score rises
+    rate_at_5 = rates[scale["scores"].index(5.0)]
+    assert score_on_scale(rate_at_5, scale) <= 5.0 <= score_on_scale(rate_at_5 + 1e-4, scale) + 0.2
+    assert score_on_scale(0.0, scale) == 0.0 and score_on_scale(0.99, scale) == 10.0
+    lower, higher = score_on_scale(0.02, scale), score_on_scale(0.06, scale)
+    assert lower < higher  # a lower probability scores lower: the forecast can go down
+
+
+def test_model_uses_the_scale_when_its_meta_has_one():
+    scale = {"scores": [0.0, 5.0, 10.0], "rates": [0.0, 0.05, 0.3]}
+    m = HazardModel(booster=None, features=[], base_rate=0.05, version="t", scale=scale)
+    assert m.score(0.05) == 5.0 and m.score(0.2) == 10.0 and m.score(0.01) == 5.0
+    assert HazardModel(booster=None, features=[], base_rate=0.05, version="t").score(0.05) == score_from_probability(
+        0.05, 0.05)  # no scale: the old mapping
 
 
 def test_heat_floor_bands():

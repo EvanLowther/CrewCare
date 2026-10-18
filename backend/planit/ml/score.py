@@ -9,8 +9,10 @@ Every run writes two scorers side by side, so the dashboard's Real-time / Predic
   action. Its weather is the NWS forecast and station observations (`nws_weather`, every 30 min) laid over
   Open-Meteo (merge_weather()), which still supplies soil moisture, CAPE and hourly rain.
 - scorer 'ml' (Predictive), with a trained model in ml/models/ and PLANIT_SCORE_MODEL=xgb (the default): the XGBoost
-  model scores each hour on the 24 hours around it (the "day" it learned from), with the OSHA heat floor from
-  ml/model.py, plus alert points and the lightning floor (combine()).
+  model scores each hour on the 24 hours around it (the "day" it learned from), on the Real-time scale (a Predictive
+  5 is as likely to be a hazard day as a Real-time 5, see ml/model.py), with the OSHA heat floor, plus alert points
+  and a floor at the Real-time severity of any NWS warning or lightning in force that hour (combine()). Both floors
+  are per hour, so the forecast goes back down when the heat or the warning ends.
 
 Rows carry the scorer's version ('rules-v2', 'xgb-2026-10-17').
 
@@ -41,8 +43,8 @@ ML_HALF_WINDOW = timedelta(hours=12)  # each hour is scored on the 24 h around i
 ML_RAIN_HISTORY = timedelta(days=3)  # precip_prev_3d_in: the 3 days before that window
 NO_SNOW_ABOVE_F = 34.0  # same as features.NO_SNOW_ABOVE_F (features needs pandas; this module mustn't)
 
-# ML scorer only: alert points on top of the model's weather score (see combine()).
-LIGHTNING_FLOOR = 8.0
+# ML scorer only: alert points on top of the model's weather score (see combine()). The floor for an alert in force
+# is its own Real-time severity (hazards.alert: lightning 10, Tornado Warning 10, Wind Advisory 4.5, ...).
 ALERT_POINTS = {"danger": 2.5, "warning": 1.2, "info": 0.3}
 LIGHTNING_POINTS = 4.0
 
@@ -195,7 +197,9 @@ def build_inputs(weather: list[dict], alerts: list[dict], hours: list[datetime])
 # --- ML model (scorer 'ml') ---------------------------------------------------------------------------------
 
 def combine(weather_score: float, weather_factors: list[dict], alerts: list[dict]) -> tuple[float, list[dict]]:
-    """ML scorer: the model's weather score + alert points, capped at 10; lightning keeps it at least 8."""
+    """ML scorer: the model's weather score + alert points, capped at 10, and never below the Real-time severity of
+    an alert in force at this hour (Wind Advisory 4.5, Heat Advisory 5, lightning 10, ...: `alerts` are the ones that
+    apply to this hour, see alerts_at(), so the floor lifts when the warning ends)."""
     alert_pts = sorted(
         ((LIGHTNING_POINTS if a["type"] == "lightning" else ALERT_POINTS.get(a["severity"], 0.0), a) for a in alerts),
         key=lambda p: p[0], reverse=True,
@@ -208,8 +212,18 @@ def combine(weather_score: float, weather_factors: list[dict], alerts: list[dict
             extra.append({"key": f"alert_{alert['type']}", "label": label, "contribution": round(points, 1)})
 
     score = min(10.0, weather_score + sum(f["contribution"] for f in extra))
-    if any(a["type"] == "lightning" for a in alerts):
-        score = max(score, LIGHTNING_FLOOR)
+    if alerts:
+        worst = max(alerts, key=lambda a: hazards.alert(a).severity)
+        floor = hazards.alert(worst).severity  # the Real-time score of the alert itself
+        if floor > score:
+            key = f"alert_{worst['type']}"
+            factor = next((f for f in extra if f["key"] == key), None)
+            if factor is None:
+                label = "Lightning within 10 miles" if worst["type"] == "lightning" else worst["title"]
+                factor = {"key": key, "label": label, "contribution": 0.0}
+                extra.append(factor)
+            factor["contribution"] = round(factor["contribution"] + floor - score, 1)
+            score = floor
     factors = sorted([*weather_factors, *extra], key=lambda f: f["contribution"], reverse=True)
     return round(score, 1), factors[:3]
 

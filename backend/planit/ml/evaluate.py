@@ -22,7 +22,7 @@ import pandas as pd
 from sklearn.metrics import average_precision_score, roc_auc_score
 
 from planit.ml.features import FEATURES, build_frame, label_days, load_inputs, utc_day
-from planit.ml.model import heat_floor, score_from_probability
+from planit.ml.model import fit_scale, heat_floor, score_on_scale
 from planit.ml.score import HourInputs, level_for, score_hour
 from planit.ml.train import fit
 from planit.states import REGION_OF
@@ -160,17 +160,18 @@ def leave_one_year_out(frame: pd.DataFrame, features: list[str] = FEATURES) -> p
     frame = frame.copy()
     frame["p_model"] = np.nan
     frame["model"] = np.nan
+    frame["rules"] = rules_scores(frame)
     years = frame["day"].dt.year
     for year in sorted(years.unique()):
         train, test = frame[years != year], years == year
         model = fit(train, features=features)
         p = model.predict_proba(frame.loc[test, features])[:, 1]
-        base = float(train["label"].mean())
+        # The Real-time scale from the training years only, like the saved model's (planit/ml/scale.py).
+        scale = fit_scale(train["rules"].to_numpy(), train["label"].to_numpy())
         frame.loc[test, "p_model"] = p
-        frame.loc[test, "model"] = [score_from_probability(float(x), base) for x in p]
+        frame.loc[test, "model"] = [score_on_scale(float(x), scale) for x in p]
     floors = np.array([heat_floor(h)[0] for h in frame["max_heat_index_f"]])
     frame["model_heat"] = np.maximum(frame["model"].to_numpy(), floors)
-    frame["rules"] = rules_scores(frame)
     return frame
 
 

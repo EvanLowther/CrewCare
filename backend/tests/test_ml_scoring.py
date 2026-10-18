@@ -3,7 +3,7 @@
 from datetime import UTC, datetime, timedelta
 
 from planit.ml.features import FEATURES
-from planit.ml.score import LIGHTNING_FLOOR, combine, window_features
+from planit.ml.score import alerts_at, combine, window_features
 
 HOUR = datetime(2026, 8, 1, 15, tzinfo=UTC)
 
@@ -48,13 +48,28 @@ def test_window_features_without_data():
     assert sparse["precip_prev_3d_in"] is None and sparse["total_precip_in"] == 0.0
 
 
-def test_combine_adds_alerts_and_keeps_lightning_floor():
+def test_combine_adds_alert_points_and_floors_at_the_alerts_real_time_severity():
     rain = [{"key": "rain_24h", "label": "2.0 in of rain in 24 h", "contribution": 3.0}]
-    warning = {"type": "wind", "severity": "warning", "title": "Wind Advisory"}
-    score, factors = combine(3.0, rain, [warning])
-    assert score == 4.2 and [f["key"] for f in factors] == ["rain_24h", "alert_wind"]
+    advisory = {"type": "wind", "severity": "warning", "title": "Wind Advisory", "nws_event": "Wind Advisory"}
+    score, factors = combine(5.0, rain, [advisory])  # above the floor: just the points
+    assert score == 6.2 and [f["key"] for f in factors] == ["rain_24h", "alert_wind"]
+
+    score, factors = combine(0.2, [], [advisory])  # a calm-looking day with a Wind Advisory in force
+    # The alert takes up the difference: the model's 0.2 + the alert's 4.3 = the 4.5 floor.
+    assert score == 4.5 and factors[0] == {"key": "alert_wind", "label": "Wind Advisory", "contribution": 4.3}
 
     score, factors = combine(1.0, [], [{"type": "lightning", "severity": "danger", "title": "STOP WORK"}])
-    assert score == LIGHTNING_FLOOR and factors[0]["label"] == "Lightning within 10 miles"
+    assert score == 10.0 and factors[0]["label"] == "Lightning within 10 miles"  # Real-time: lightning is 10
 
-    assert combine(9.5, rain, [warning])[0] == 10.0  # capped
+    frost = {"type": "nws", "severity": "info", "title": "Frost Advisory", "nws_event": "Frost Advisory"}
+    assert combine(0.2, [], [frost])[0] == 1.0  # frost isn't a crew hazard: floor 1.0
+    assert combine(9.5, rain, [advisory])[0] == 10.0  # capped
+
+
+def test_warning_floor_lifts_when_the_warning_ends():
+    ends = (HOUR + timedelta(hours=3)).isoformat()
+    alert = {"type": "wind", "severity": "warning", "title": "Wind Advisory issued", "all_clear_at": None,
+             "meta": {"nws_event": "Wind Advisory", "ends": ends}}
+    during = combine(0.3, [], alerts_at([alert], HOUR + timedelta(hours=1)))[0]
+    after = combine(0.3, [], alerts_at([alert], HOUR + timedelta(hours=4)))[0]
+    assert during == 4.5 and after == 0.3  # the forecast goes back down

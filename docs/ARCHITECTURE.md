@@ -67,8 +67,10 @@ Two scorers write `hazard_scores` side by side (`scorer` column, migration 003),
 - **Real-time** (`scorer='rules'`, rules-v2): measured conditions against work rules, described below.
 - **Predictive** (`scorer='ml'`, e.g. `xgb-2026-10-17-us`): one national XGBoost model's hazard-day likelihood
   (storms, floods, heat, wind, cold, winter weather, wildfire and dust; latitude and longitude tell it what's
-  normal where), plus the OSHA heat floor, alert points and the lightning floor (`backend/planit/ml/score.py`,
-  `ml/model.py`).
+  normal where), on the **same 0-10 scale** as Real-time: a probability scores as the Real-time score with the same
+  historical hazard-day odds (`scale` in the model's `.meta.json`, `ml/scale.py`). On top, per hour: alert points, a
+  floor at the Real-time severity of any NWS warning or lightning in force, and the OSHA heat floor
+  (`backend/planit/ml/score.py`, `ml/model.py`).
 
 | Score | Level | Meaning for the crew |
 |---|---|---|
