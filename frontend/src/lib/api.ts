@@ -124,6 +124,7 @@ export const api = {
     return post<HazardReport>("/api/reports", body);
   },
   resolveReport: (id: string) => request<HazardReport>("PATCH", `/api/reports/${id}/resolve`),
+  confirmReport: (id: string) => request<HazardReport>("PATCH", `/api/reports/${id}/confirm`),
   photoUrl: (relative: string) => `${API_URL}${relative}`,
   briefings: (forDate?: string) => get<BriefingList>(`/api/briefings${forDate ? `?for_date=${forDate}` : ""}`),
   generateBriefings: () => post<S["DemoAck"]>("/api/briefings/generate"),

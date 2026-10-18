@@ -1,5 +1,6 @@
 """Owner: Person B. Crew hazard reports (photo + map pin)."""
 
+from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -66,6 +67,19 @@ async def create_report(
 def resolve_report(report_id: UUID, user: SignedInUser) -> HazardReport:
     """Mark a report resolved so it leaves the map. The site's managers and admins only."""
     return reports_store.resolve_report(report_id, user)
+
+
+@router.patch("/reports/{report_id}/confirm", response_model=HazardReport)
+def confirm_report(report_id: UUID, user: SignedInUser) -> HazardReport:
+    """Confirm a report: it then counts fully in the site's score. The site's managers and admins only."""
+    if use_mock():
+        if user.role not in ("admin", "manager"):
+            raise HTTPException(403, "Only this site's managers can confirm its reports")
+        report = next((r for r in mock.reports(None) if r.id == report_id), None)
+        if report is None:
+            raise HTTPException(404, "Report not found")
+        return report.model_copy(update={"confirmed_at": datetime.now(UTC), "confirmed_by_name": user.display_name})
+    return reports_store.confirm_report(report_id, user)
 
 
 @router.get("/photos/{photo_id}")

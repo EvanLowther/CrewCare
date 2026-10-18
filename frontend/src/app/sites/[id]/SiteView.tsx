@@ -34,7 +34,7 @@ import { PastHazards } from "@/components/PastHazards";
 import { Card, CardHeader, EmptyState, ErrorBanner, PageBody, SeverityBadge } from "@/components/ui";
 import { api, type Alert, type Conditions, type HazardReport, type RiskPoint, type Scorer, type SiteDetail } from "@/lib/api";
 import { alertEndsAt, alertLabel, inForce, SEVERITY_RANK } from "@/lib/alerts";
-import { alertKind, factorKind, HAZARD_KINDS, kindChipStyle } from "@/lib/hazardKinds";
+import { alertKind, factorIcon, factorKind, HAZARD_KINDS, kindChipStyle } from "@/lib/hazardKinds";
 import { relativeTime, round, siteHour, siteTime } from "@/lib/format";
 import { HAZARD_LABELS, REPORT_SEVERITY_COLORS } from "@/lib/reports";
 import { levelFor, RISK_COLORS, RISK_GUIDANCE, RISK_LABELS, RISK_TEXT } from "@/lib/risk";
@@ -112,7 +112,8 @@ function SiteDetailView({
   const canReport = !!site.my_role || role === "admin";
   const [resolved, setResolved] = useState<Set<string>>(new Set());
   const [resolveError, setResolveError] = useState<string | null>(null);
-  const shownReports = reports.filter((r) => !resolved.has(r.id));
+  const [confirmed, setConfirmed] = useState<Map<string, HazardReport>>(new Map());
+  const shownReports = reports.filter((r) => !resolved.has(r.id)).map((r) => confirmed.get(r.id) ?? r);
 
   // The other scorer's number, so the page always shows both (they can disagree; that's the point).
   const fetchOther = useCallback(() => api.site(site.id, OTHER[model]), [site.id, model]);
@@ -131,6 +132,16 @@ function SiteDetailView({
       setResolved((prev) => new Set(prev).add(report.id));
     } catch (e) {
       setResolveError(e instanceof Error ? e.message : "Couldn't resolve the report");
+    }
+  }
+
+  async function confirm(report: HazardReport) {
+    setResolveError(null);
+    try {
+      const updated = await api.confirmReport(report.id);
+      setConfirmed((prev) => new Map(prev).set(report.id, updated));
+    } catch (e) {
+      setResolveError(e instanceof Error ? e.message : "Couldn't confirm the report");
     }
   }
 
@@ -234,7 +245,7 @@ function SiteDetailView({
                 const max = Math.max(...factors.map((x) => x.contribution), 0.1);
                 const color = risk ? RISK_COLORS[risk.level] : RISK_COLORS[levelFor(f.contribution)];
                 const kind = factorKind(f.key, f.label);
-                const KindIcon = HAZARD_KINDS[kind].icon;
+                const KindIcon = factorIcon(f.key, f.label);
                 return (
                   <div key={f.key} className="grid grid-cols-[24px_minmax(0,1fr)_44px] items-center gap-2.5">
                     <span
@@ -352,13 +363,28 @@ function SiteDetailView({
                         <p className="mt-1 text-xs text-muted">
                           {r.reporter_name ?? "Crew member"} · {relativeTime(r.created_at)} · {distanceLabel(site, r)}
                         </p>
+                        {r.confirmed_at && (
+                          <p className="mt-1 inline-flex items-center gap-1 text-xs text-risk-low">
+                            <Check className="h-3.5 w-3.5" aria-hidden /> Confirmed{r.confirmed_by_name ? ` by ${r.confirmed_by_name}` : ""}
+                          </p>
+                        )}
                       </div>
+                      {site.can_manage && r.site_id === site.id && !r.confirmed_at && (
+                        <button
+                          type="button"
+                          onClick={() => confirm(r)}
+                          title="Confirm: it counts fully in the site's score"
+                          className="ml-auto inline-flex h-fit shrink-0 items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs text-ink-2 hover:text-ink"
+                        >
+                          <Check className="h-3.5 w-3.5" aria-hidden /> Confirm
+                        </button>
+                      )}
                       {site.can_manage && r.site_id === site.id && (
                         <button
                           type="button"
                           onClick={() => resolve(r)}
                           title="Mark resolved: it leaves the map"
-                          className="ml-auto inline-flex h-fit shrink-0 items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs text-ink-2 hover:text-ink"
+                          className={`${r.confirmed_at ? "ml-auto " : ""}inline-flex h-fit shrink-0 items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs text-ink-2 hover:text-ink`}
                         >
                           <CheckCircle2 className="h-3.5 w-3.5" aria-hidden /> Resolve
                         </button>

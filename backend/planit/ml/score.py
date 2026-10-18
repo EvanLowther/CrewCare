@@ -85,8 +85,10 @@ class HourInputs:
     ice_24h_in: float | None = None
     us_aqi_pm2_5: float | None = None  # smoke: US AQI for PM2.5 (`air_quality`, Open-Meteo / CAMS)
     humidity_pct: float | None = None  # with gusts and 72 h rain: fire weather
+    temp_f: float | None = None  # to confirm ice and snow reports
     is_forecast: bool = False
     alerts: list[dict] = field(default_factory=list)  # see alerts_at()
+    reports: list[dict] = field(default_factory=list)  # active crew reports at or within 1 mi of the site, reports_at()
 
 
 def rule_hazards(x: HourInputs) -> list[hazards.Hazard | None]:
@@ -104,11 +106,83 @@ def rule_hazards(x: HourInputs) -> list[hazards.Hazard | None]:
         hazards.smoke(x.us_aqi_pm2_5),
         fire_weather(x),
         *(hazards.alert(a) for a in x.alerts),
+        *crew_hazards(x),
     ]
 
 
 def fire_weather(x: HourInputs) -> hazards.Hazard | None:
     return hazards.fire_weather(x.humidity_pct, x.gust_mph, x.rain_72h_in, x.snow_24h_in)
+
+
+# --- Crew reports -------------------------------------------------------------------------------------------
+
+REPORT_RADIUS_MI = 1.0  # reports filed on the site, or pinned this close to it, count in its score
+CONFIRM_GUST_MPH = 25.0
+CONFIRM_RAIN_24H_IN = 0.5
+CONFIRM_FREEZING_F = 34.0
+CONFIRM_SMOKE_AQI = 101.0
+CONFIRM_HEAT_INDEX_F = 90.0
+CONFIRM_WIND_CHILL_F = 32.0
+_WINTER_EVENT = ("winter", "snow", "ice", "freezing", "sleet", "blizzard")
+
+
+def report_confirmation(hazard_type: str, x: HourInputs) -> str | None:
+    """The live data that agrees with a crew report this hour ("GOES lightning", "gusts 31 mph", ...), or None.
+    Data only ever confirms a report; it never rejects one (see hazards.CREW_CHECKABLE)."""
+    types = {a["type"] for a in x.alerts}
+    events = " ".join((a.get("nws_event") or "").lower() for a in x.alerts)
+    if hazard_type == "lightning" and "lightning" in types:
+        return "GOES lightning"
+    if hazard_type == "high_wind":
+        if x.gust_mph is not None and x.gust_mph >= CONFIRM_GUST_MPH:
+            return f"gusts {round(x.gust_mph)} mph"
+        if "wind" in types:
+            return "an NWS wind alert"
+    if hazard_type == "flooding":
+        if "flood" in types:
+            return "a flood alert"
+        if x.rain_24h_in is not None and x.rain_24h_in >= CONFIRM_RAIN_24H_IN:
+            return f"{x.rain_24h_in:.1f} in of rain in 24 h"
+    if hazard_type in ("ice", "snow"):
+        if any(word in events for word in _WINTER_EVENT):
+            return "an NWS winter alert"
+        wet = (x.rain_24h_in or 0) > 0 or (x.snow_24h_in or 0) > 0 or (x.ice_24h_in or 0) > 0
+        if x.temp_f is not None and x.temp_f <= CONFIRM_FREEZING_F and wet:
+            return f"{round(x.temp_f)}°F with precipitation"
+    if hazard_type == "smoke":
+        if "air_quality" in types:
+            return "an air quality alert"
+        if x.us_aqi_pm2_5 is not None and x.us_aqi_pm2_5 >= CONFIRM_SMOKE_AQI:
+            return f"AQI {round(x.us_aqi_pm2_5)}"
+    if hazard_type == "heat_illness" and x.heat_index_f is not None and x.heat_index_f >= CONFIRM_HEAT_INDEX_F:
+        return f"heat index {round(x.heat_index_f)}°F"
+    if hazard_type == "cold_stress" and x.wind_chill_f is not None and x.wind_chill_f <= CONFIRM_WIND_CHILL_F:
+        return f"wind chill {round(x.wind_chill_f)}°F"
+    return None
+
+
+def crew_hazards(x: HourInputs) -> list[hazards.Hazard]:
+    """One hazard per report type at the site this hour: the worst severity, how many, and who or what confirms it."""
+    by_type: dict[str, list[dict]] = defaultdict(list)
+    for r in x.reports:
+        by_type[r["hazard_type"]].append(r)
+    out = []
+    for hazard_type, reports in by_type.items():
+        worst = max(reports, key=lambda r: hazards.CREW_SEVERITY_INDEX.get(r["severity"], 1))
+        manager = next((r for r in reports if r.get("confirmed_at")), None)
+        if manager:
+            out.append(hazards.crew_report(hazard_type, worst["severity"], len(reports),
+                                           manager.get("confirmed_by_name") or "a site manager", by_manager=True))
+        else:
+            out.append(hazards.crew_report(hazard_type, worst["severity"], len(reports),
+                                           report_confirmation(hazard_type, x)))
+    return out
+
+
+def reports_at(reports: list[dict], hour: datetime) -> list[dict]:
+    """Reports active during `hour`: filed before it ends, not expired before it starts."""
+    end = hour + timedelta(hours=1)
+    return [r for r in reports if r["created_at"] < end and (r.get("expires_at") is None or r["expires_at"] > hour)]
 
 
 def score_hour(x: HourInputs) -> tuple[float, list[dict]]:
@@ -134,7 +208,7 @@ def alerts_at(alerts: list[dict], hour: datetime) -> list[dict]:
     "nearest_mi", "rule_severity", "action"}, the shape both hazards.alert() and combine() take."""
     out = []
     for a in alerts:
-        if not _applies(a, hour):
+        if a["type"] == "crew_report" or not _applies(a, hour):  # crew reports are scored from the reports
             continue
         meta = a.get("meta") or {}
         out.append({"type": a["type"], "severity": a["severity"], "title": _short_title(a),
@@ -189,9 +263,9 @@ def merge_weather(open_meteo: list[dict], nws: list[dict]) -> list[dict]:
 
 
 def build_inputs(weather: list[dict], alerts: list[dict], hours: list[datetime],
-                 air: list[dict] | None = None) -> dict[datetime, HourInputs]:
+                 air: list[dict] | None = None, reports: list[dict] | None = None) -> dict[datetime, HourInputs]:
     """Per-hour rules-v2 inputs for one site. `weather` (and `air`, air_quality rows) are observed up to now and
-    forecast after; hours[0] is now."""
+    forecast after; hours[0] is now. `reports`: its active crew reports (compute_scores())."""
     by_hour = {w["ts"]: w for w in weather}
     out = {}
     for hour in hours:
@@ -217,6 +291,8 @@ def build_inputs(weather: list[dict], alerts: list[dict], hours: list[datetime],
             ice_24h_in=_total(last_24h, "ice_in"),
             us_aqi_pm2_5=aqi_at(air or [], hour),
             humidity_pct=row["humidity_pct"],
+            temp_f=row["temp_f"],
+            reports=reports_at(reports or [], hour),
             is_forecast=hour > hours[0], alerts=alerts_at(alerts, hour),
         )
     return out
@@ -277,6 +353,12 @@ def fire_weather_floor(score: float, factors: list[dict], x: HourInputs | None) 
     return rule_floor(score, factors, fire_weather(x) if x else None)
 
 
+def crew_report_floor(score: float, factors: list[dict], x: HourInputs | None) -> tuple[float, list[dict]]:
+    """Never below the worst crew report in force: the model can't see what the crew sees."""
+    reports = crew_hazards(x) if x else []
+    return rule_floor(score, factors, max(reports, key=lambda h: h.severity) if reports else None)
+
+
 def window_features(weather: list[dict], hour: datetime, site: dict | None = None) -> dict | None:
     """The ML model's features for one site-hour, from the 24 h around it (same columns as features.FEATURES).
     `site` gives latitude and longitude."""
@@ -328,24 +410,36 @@ def ml_model():
 
 
 def ml_scores(model, weather: list[dict], alerts: list[dict], hours: list[datetime],
-              site: dict | None = None, air: list[dict] | None = None) -> dict[datetime, tuple]:
-    """(score, factors) per hour from the ML model, plus alert points, the alert floor, and the smoke and fire
-    weather floors (from this hour's Open-Meteo readings, the source the model sees)."""
+              site: dict | None = None, air: list[dict] | None = None,
+              reports: list[dict] | None = None) -> dict[datetime, tuple]:
+    """(score, factors) per hour from the ML model, plus alert points, the alert floor, and the smoke, fire weather
+    and crew report floors (from this hour's Open-Meteo readings, the source the model sees, and its reports)."""
     import pandas as pd
 
     rows = [(hour, f) for hour in hours if (f := window_features(weather, hour, site)) is not None]
     if not rows:
         return {}
     frame = pd.DataFrame([f for _, f in rows], columns=model.features).astype(float)
-    inputs = build_inputs(weather, [], hours, air)
+    inputs = build_inputs(weather, alerts, hours, air, reports)
     out = {}
     for (hour, _), (score, factors) in zip(rows, model.explain(frame), strict=True):
         scored = smoke_floor(*combine(score, factors, alerts_at(alerts, hour)), aqi_at(air or [], hour))
-        out[hour] = fire_weather_floor(*scored, inputs.get(hour))
+        scored = fire_weather_floor(*scored, inputs.get(hour))
+        out[hour] = crew_report_floor(*scored, inputs.get(hour))
     return out
 
 
 # --- Writing ------------------------------------------------------------------------------------------------
+
+# Active crew reports per site: filed on it, or pinned within REPORT_RADIUS_MI of it (one report can count for two
+# sites), with the confirming manager's name.
+REPORTS_SQL = """
+SELECT s.id AS site_id, r.id, r.hazard_type, r.severity, r.created_at, r.expires_at, r.confirmed_at,
+       (SELECT coalesce(u.name, u.email) FROM users u WHERE u.id = r.confirmed_by) AS confirmed_by_name
+FROM hazard_reports r
+JOIN sites s ON s.id = r.site_id OR ST_DWithin(s.geom, r.geom, %(radius_m)s)
+WHERE r.status = 'active' AND (r.expires_at IS NULL OR r.expires_at > now())
+"""
 
 UPSERT_SQL = """
 INSERT INTO hazard_scores (site_id, ts, kind, scorer, score, level, factors, model_version, computed_at)
@@ -401,6 +495,7 @@ def compute_scores() -> list[dict]:
             "AND ((NOT is_forecast AND ts <= %s) OR (is_forecast AND ts > %s)) ORDER BY site_id, ts",
             (current - AIR_STALE_AFTER, hours[-1], now, now),
         ).fetchall()
+        reports = conn.execute(REPORTS_SQL, {"radius_m": REPORT_RADIUS_MI * 1609.344}).fetchall()
 
     weather_by_site: dict[int, list[dict]] = defaultdict(list)
     for w in weather:
@@ -411,6 +506,9 @@ def compute_scores() -> list[dict]:
     alerts_by_site: dict[int, list[dict]] = defaultdict(list)
     for a in alerts:
         alerts_by_site[a["site_id"]].append(a)
+    reports_by_site: dict[int, list[dict]] = defaultdict(list)
+    for r in reports:
+        reports_by_site[r["site_id"]].append(r)
     air_by_site: dict[int, list[dict]] = defaultdict(list)
     for a in air:
         air_by_site[a["site_id"]].append(a)
@@ -421,10 +519,12 @@ def compute_scores() -> list[dict]:
         # Real-time: NWS readings over Open-Meteo. Predictive: Open-Meteo only, the source the model was trained on.
         rules_weather = merge_weather(site_weather, nws_by_site[site_id])
         scorers = [("rules", MODEL_VERSION,
-                    {h: score_hour(x) for h, x in build_inputs(rules_weather, site_alerts, hours, site_air).items()})]
+                    {h: score_hour(x) for h, x in build_inputs(rules_weather, site_alerts, hours, site_air,
+                                                                 reports_by_site[site_id]).items()})]
         if model:
             scorers.append(("ml", model.version, ml_scores(model, site_weather, site_alerts, hours,
-                                                           sites.get(site_id), site_air)))
+                                                           sites.get(site_id), site_air,
+                                                           reports_by_site[site_id])))
         for scorer, version, scored in scorers:
             for hour, (score, factors) in scored.items():
                 rows.append({"site_id": site_id, "ts": hour, "kind": "current" if hour == current else "forecast",

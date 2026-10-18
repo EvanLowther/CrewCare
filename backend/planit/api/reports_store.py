@@ -39,7 +39,8 @@ EXPIRES_AFTER: dict[str, timedelta | None] = {
 }
 
 _REPORT_COLS = ("r.id, r.site_id, r.latitude, r.longitude, r.hazard_type, r.severity, r.description, "
-                "r.reporter_name, r.photo_id, r.status, r.created_at, r.expires_at, r.resolved_at")
+                "r.reporter_name, r.photo_id, r.status, r.created_at, r.expires_at, r.resolved_at, r.confirmed_at, "
+                "(SELECT coalesce(u.name, u.email) FROM users u WHERE u.id = r.confirmed_by) AS confirmed_by_name")
 
 
 def _report(row: dict) -> HazardReport:
@@ -121,6 +122,26 @@ def resolve_report(report_id: UUID, user: CurrentUser) -> HazardReport:
             raise HTTPException(403, "Only this site's managers can resolve its reports")
         row = conn.execute(
             "UPDATE hazard_reports SET status = 'resolved', resolved_by = %s, resolved_at = now() WHERE id = %s "
+            f"RETURNING {_REPORT_COLS.replace('r.', '')}",
+            (user.id, report_id),
+        ).fetchone()
+    return _report(dict(row))
+
+
+def confirm_report(report_id: UUID, user: CurrentUser) -> HazardReport:
+    """Marks a report confirmed: it counts fully in the score (hazards.crew_report). The site's managers and admins."""
+    with connection() as conn:
+        found = conn.execute(
+            "SELECT r.site_id, m.role AS my_role FROM hazard_reports r "
+            "LEFT JOIN site_members m ON m.site_id = r.site_id AND m.user_id = %s WHERE r.id = %s",
+            (user.id, report_id),
+        ).fetchone()
+        if found is None:
+            raise HTTPException(404, "Report not found")
+        if not can_manage(user, found["my_role"]):
+            raise HTTPException(403, "Only this site's managers can confirm its reports")
+        row = conn.execute(
+            "UPDATE hazard_reports SET confirmed_by = %s, confirmed_at = coalesce(confirmed_at, now()) WHERE id = %s "
             f"RETURNING {_REPORT_COLS.replace('r.', '')}",
             (user.id, report_id),
         ).fetchone()
