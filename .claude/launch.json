@@ -1,7 +1,0 @@
-{
-  "version": "0.0.1",
-  "configurations": [
-    { "name": "api", "runtimeExecutable": "python3", "runtimeArgs": ["dev.py", "api"], "port": 8000 },
-    { "name": "web", "runtimeExecutable": "python3", "runtimeArgs": ["dev.py", "web"], "port": 3000 }
-  ]
-}

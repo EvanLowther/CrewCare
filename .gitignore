@@ -25,3 +25,7 @@ data/processed/
 .DS_Store
 .next-new/
 .next-old/
+
+# Local editor and tool settings
+.claude/
+AGENTS.md
