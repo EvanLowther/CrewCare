@@ -19,6 +19,7 @@ import json
 import logging
 import re
 from datetime import UTC, date, datetime, time, timedelta
+from time import sleep
 from zoneinfo import ZoneInfo
 
 from psycopg.types.json import Jsonb
@@ -35,6 +36,8 @@ BRIEFING_HOUR = 18  # 6 PM site-local
 WORK_START, WORK_END = 6, 18  # the hours briefed, site-local
 BATCH = 20  # sites per Gemini request
 MAX_SUMMARY_CHARS = 600
+RETRY_ON = (429, 500, 503)  # busy or rate-limited: wait and try the same model once more
+RETRY_WAIT_S = 8
 THUNDER_LIKELY_PCT = 40
 SMOKE_MENTION_AQI = 101  # PM2.5 AQI from which smoke counts (hazards.SMOKE_ANCHORS)
 
@@ -203,7 +206,9 @@ def template_summary(f: dict) -> str:
 PROMPT = """You write next-day safety briefings for utility field-crew supervisors at power plant sites.
 For each site below, write a briefing of at most 60 words in plain English: the overall risk, the hazards that
 matter tomorrow and when, and the most important precaution. Use ONLY the facts given; don't add numbers, times,
-hazards or advice that aren't in them. Null means unknown: leave it out.
+hazards or advice that aren't in them. Null means unknown: leave it out, and never say that something is missing or
+not provided. On a low-risk day say it's a normal work day and name the one hazard worth watching, if any.
+Write temperatures in °F, wind in mph and rain in inches, as in the facts.
 
 Return JSON: a list of {"site_id": <int>, "summary": "<briefing>"}, one per site.
 
@@ -225,24 +230,42 @@ def valid_summary(summary: object, facts: dict) -> bool:
     return all(abs(n) <= 12 or n in known for n in _numbers(summary))
 
 
-def gemini_summaries(batch: list[dict], client=None) -> dict[int, str]:
-    """{site_id: summary} from one Gemini request for a batch of {"site_id", "site", "facts"}; {} on any failure."""
+def gemini_models() -> list[str]:
+    """settings.gemini_model, then the fallbacks, without repeats."""
+    names = [settings.gemini_model, *settings.gemini_fallback_models.split(",")]
+    return list(dict.fromkeys(n.strip() for n in names if n.strip()))
+
+
+def gemini_summaries(batch: list[dict], client=None) -> tuple[dict[int, str], str | None]:
+    """({site_id: summary}, the model that wrote them) from one Gemini request for a batch of {"site_id", "site",
+    "facts"}. A busy model (RETRY_ON) is retried once; a retired (404) or still-failing one hands over to the next in
+    gemini_models(). ({}, None) when none answers: the template covers those sites."""
     if client is None:
         if not settings.gemini_api_key:
-            return {}
+            return {}, None
         from google import genai  # only when a key is set
 
         client = genai.Client(api_key=settings.gemini_api_key)
     from google.genai import types
 
-    try:
-        resp = client.models.generate_content(
-            model=settings.gemini_model, contents=PROMPT + json.dumps(batch, default=str),
-            config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.2))
-        items = json.loads(resp.text)
-    except Exception as exc:  # network, quota, or a reply that isn't JSON: the template covers it
-        log.warning("Gemini briefing batch failed: %s", exc)
-        return {}
+    for model in gemini_models():
+        for attempt in range(2):
+            try:
+                resp = client.models.generate_content(
+                    model=model, contents=PROMPT + json.dumps(batch, default=str),
+                    config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.2))
+                items = json.loads(resp.text)
+            except Exception as exc:  # network, quota, retired model, or a reply that isn't JSON
+                log.warning("Gemini %s briefing batch failed: %s", model, str(exc)[:300])
+                if getattr(exc, "code", None) in RETRY_ON and attempt == 0:
+                    sleep(RETRY_WAIT_S)
+                    continue
+                break  # next model
+            return _valid_summaries(items, batch), model
+    return {}, None
+
+
+def _valid_summaries(items: object, batch: list[dict]) -> dict[int, str]:
     facts = {b["site_id"]: b["facts"] for b in batch}
     out = {}
     for item in items if isinstance(items, list) else []:
@@ -312,13 +335,17 @@ def build(sites: list[dict], now: datetime) -> list[dict]:
                             rows_for("alerts", sid), s["timezone"], rows_for("air", sid))
         entries.append({"site_id": sid, "site": _site_label(s), "facts": facts, "for_date": days[sid]})
 
-    written = {}
+    written: dict[int, tuple[str, str]] = {}  # site_id -> (summary, model)
     for i in range(0, len(entries), BATCH):
         batch = [{k: e[k] for k in ("site_id", "site", "facts")} for e in entries[i:i + BATCH]]
-        written |= gemini_summaries(batch)
+        summaries, model = gemini_summaries(batch)
+        written |= {sid: (text, model) for sid, text in summaries.items()}
+    if settings.gemini_api_key and entries and not written:
+        log.error("Gemini wrote none of %d briefings (tried %s); every one is the template. See the warnings above.",
+                  len(entries), ", ".join(gemini_models()))
     return [{"site_id": e["site_id"], "for_date": e["for_date"], "details": Jsonb(e["facts"]),
-             "summary": written.get(e["site_id"]) or template_summary(e["facts"]),
-             "generated_by": settings.gemini_model if e["site_id"] in written else "template"} for e in entries]
+             "summary": written[e["site_id"]][0] if e["site_id"] in written else template_summary(e["facts"]),
+             "generated_by": written[e["site_id"]][1] if e["site_id"] in written else "template"} for e in entries]
 
 
 def _write(rows: list[dict]) -> int:
