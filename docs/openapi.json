@@ -3229,6 +3229,38 @@
         ],
         "title": "RoleUpdate"
       },
+      "ScorePoint": {
+        "properties": {
+          "ts": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ts",
+            "description": "When it was scored"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "low",
+              "moderate",
+              "high",
+              "extreme"
+            ],
+            "title": "Level"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ts",
+          "score",
+          "level"
+        ],
+        "title": "ScorePoint",
+        "description": "One 5-minute scoring pass."
+      },
       "SiteCreate": {
         "properties": {
           "name": {
@@ -3354,6 +3386,14 @@
             "type": "array",
             "title": "Risk History",
             "description": "Past 24 h + next 24 h forecast"
+          },
+          "recent_scores": {
+            "items": {
+              "$ref": "#/components/schemas/ScorePoint"
+            },
+            "type": "array",
+            "title": "Recent Scores",
+            "description": "Every 5-minute score of the last 12 hours, oldest first (same scorer)"
           }
         },
         "type": "object",

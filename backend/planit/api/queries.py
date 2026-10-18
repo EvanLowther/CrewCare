@@ -25,6 +25,7 @@ from planit.models import (
     RiskFactor,
     RiskPoint,
     RiverStatus,
+    ScorePoint,
     SiteDetail,
     SiteSummary,
 )
@@ -262,6 +263,13 @@ def get_site(site_id: int, scorer: str | None = None, user: CurrentUser | None =
             (site_id, scorer),
         ).fetchall()
 
+        # Every 5-minute pass of the last 12 h (migration 013), so the page shows how the score moved within hours.
+        recent = conn.execute(
+            "SELECT ts, score, level FROM score_snapshots WHERE site_id = %s AND scorer = %s "
+            "AND ts >= now() - interval '12 hours' ORDER BY ts",
+            (site_id, scorer),
+        ).fetchall()
+
     return SiteDetail(
         site=_summary(row, user),
         conditions=_conditions(current) if current else None,
@@ -277,4 +285,5 @@ def get_site(site_id: int, scorer: str | None = None, user: CurrentUser | None =
         ],
         risk_history=[RiskPoint(ts=r["ts"], score=float(r["score"]), level=r["level"], kind=r["kind"])
                       for r in history],
+        recent_scores=[ScorePoint(ts=r["ts"], score=float(r["score"]), level=r["level"]) for r in recent],
     )

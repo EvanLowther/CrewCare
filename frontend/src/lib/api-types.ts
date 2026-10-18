@@ -1327,6 +1327,25 @@ export interface components {
              */
             role: "admin" | "manager" | "crew";
         };
+        /**
+         * ScorePoint
+         * @description One 5-minute scoring pass.
+         */
+        ScorePoint: {
+            /**
+             * Ts
+             * Format: date-time
+             * @description When it was scored
+             */
+            ts: string;
+            /** Score */
+            score: number;
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "low" | "moderate" | "high" | "extreme";
+        };
         /** SiteCreate */
         SiteCreate: {
             /**
@@ -1376,6 +1395,11 @@ export interface components {
              * @description Past 24 h + next 24 h forecast
              */
             risk_history: components["schemas"]["RiskPoint"][];
+            /**
+             * Recent Scores
+             * @description Every 5-minute score of the last 12 hours, oldest first (same scorer)
+             */
+            recent_scores?: components["schemas"]["ScorePoint"][];
         };
         /** SiteList */
         SiteList: {
