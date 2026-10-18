@@ -73,7 +73,7 @@ export function Dashboard() {
             on weather history.
           </p>
           <ModelSwitch value={model} onChange={setModel} full />
-          {error && <ErrorBanner message={error} />}
+          {error && <ErrorBanner message={error} retrying />}
         </section>
 
         <section aria-label="Highest risk first" className="order-4 mx-4 mt-3 flex min-h-0 flex-col rounded-2xl border border-line bg-card lg:m-0 lg:flex-1 lg:rounded-none lg:border-0 lg:border-t lg:border-line-soft lg:bg-transparent">

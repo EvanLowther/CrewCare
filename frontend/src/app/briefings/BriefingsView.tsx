@@ -94,7 +94,7 @@ export function BriefingsView() {
           </div>
         }
       />
-      {error && <ErrorBanner message={error} />}
+      {error && <ErrorBanner message={error} retrying />}
       {ack && <p className="rounded-lg border border-line bg-card px-4 py-2 text-sm text-ink-2">{ack}</p>}
 
       <Card className="overflow-hidden">

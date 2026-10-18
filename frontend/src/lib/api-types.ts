@@ -516,7 +516,7 @@ export interface components {
              * Hazard Type
              * @enum {string}
              */
-            hazard_type: "wildlife" | "flooding" | "unstable_ground" | "downed_line" | "heat_illness" | "fire" | "other";
+            hazard_type: "wildlife" | "flooding" | "unstable_ground" | "downed_line" | "heat_illness" | "fire" | "other" | "lightning" | "high_wind" | "ice" | "snow" | "cold_stress" | "smoke" | "sinkhole" | "fallen_tree" | "gas_leak" | "earthquake_damage";
             /**
              * Severity
              * @enum {string}
@@ -676,7 +676,7 @@ export interface components {
              * Hazard Type
              * @enum {string}
              */
-            hazard_type: "wildlife" | "flooding" | "unstable_ground" | "downed_line" | "heat_illness" | "fire" | "other";
+            hazard_type: "wildlife" | "flooding" | "unstable_ground" | "downed_line" | "heat_illness" | "fire" | "other" | "lightning" | "high_wind" | "ice" | "snow" | "cold_stress" | "smoke" | "sinkhole" | "fallen_tree" | "gas_leak" | "earthquake_damage";
             /**
              * Severity
              * @enum {string}

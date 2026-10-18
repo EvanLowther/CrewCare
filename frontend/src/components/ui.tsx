@@ -145,10 +145,12 @@ export function EmptyState({ icon: Icon, title, detail }: { icon: LucideIcon; ti
   );
 }
 
-export function ErrorBanner({ message }: { message: string }) {
+/** `retrying`: the page polls, so say it will try again on its own. */
+export function ErrorBanner({ message, retrying = false }: { message: string; retrying?: boolean }) {
   return (
-    <p className="rounded-lg border border-[rgb(255_74_74/0.4)] bg-[rgb(255_74_74/0.12)] px-4 py-2 text-sm text-[#ff9b9b]">
-      Can&apos;t reach the API ({message}). Is <code>python dev.py api</code> running? Retrying automatically.
+    <p role="alert" className="rounded-lg border border-[rgb(255_74_74/0.4)] bg-[rgb(255_74_74/0.12)] px-4 py-2 text-sm text-[#ff9b9b]">
+      {message}
+      {retrying && " Retrying automatically."}
     </p>
   );
 }

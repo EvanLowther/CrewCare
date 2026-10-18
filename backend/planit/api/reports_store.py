@@ -26,6 +26,16 @@ EXPIRES_AFTER: dict[str, timedelta | None] = {
     "downed_line": None,
     "unstable_ground": timedelta(days=7),
     "other": timedelta(hours=72),
+    "lightning": timedelta(hours=1),        # thunder heard: the 30-minute rule, with room to spare
+    "high_wind": timedelta(hours=6),
+    "ice": timedelta(hours=24),
+    "snow": timedelta(hours=48),
+    "cold_stress": timedelta(hours=12),
+    "smoke": timedelta(hours=12),
+    "sinkhole": None,
+    "fallen_tree": None,
+    "gas_leak": None,
+    "earthquake_damage": None,
 }
 
 _REPORT_COLS = ("r.id, r.site_id, r.latitude, r.longitude, r.hazard_type, r.severity, r.description, "

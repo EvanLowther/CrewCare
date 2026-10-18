@@ -44,24 +44,42 @@ export class ApiError extends Error {
   }
 }
 
+const DEV = process.env.NODE_ENV === "development";
+
+/** What to say when the API gave no explanation of its own (a crash, or a proxy error page). */
+function fallbackMessage(status: number): string {
+  if (status === 0 || status === 502 || status === 504) {
+    return DEV ? "Can't reach the API. Is python dev.py api running?" : "Can't reach the server right now.";
+  }
+  if (status === 503) return "The server is busy. Try again in a moment.";
+  if (status >= 500) return "Something went wrong on the server. Try again, and tell an admin if it keeps happening.";
+  return `Request failed (${status})`;
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const isForm = body instanceof FormData;
-  const res = await fetch(`${API_URL}${path}`, {
-    method,
-    cache: "no-store",
-    headers: { ...(await authHeaders()), ...(body === undefined || isForm ? {} : { "Content-Type": "application/json" }) },
-    body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      method,
+      cache: "no-store",
+      headers: { ...(await authHeaders()), ...(body === undefined || isForm ? {} : { "Content-Type": "application/json" }) },
+      body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
+    });
+  } catch {
+    throw new ApiError(0, fallbackMessage(0));
+  }
   if (!res.ok) {
-    const text = await res.text();
-    let detail = text;
+    // FastAPI explains refusals in `detail` (JSON). Anything else (a crash's "Internal Server Error", a proxy's HTML
+    // page) isn't worth showing as is.
+    let detail: string | null = null;
     try {
-      const parsed = JSON.parse(text).detail;
-      detail = typeof parsed === "string" ? parsed : Array.isArray(parsed) ? parsed.map((d) => d.msg).join("; ") : text;
+      const parsed = JSON.parse(await res.text()).detail;
+      detail = typeof parsed === "string" ? parsed : Array.isArray(parsed) ? parsed.map((d) => d.msg).join("; ") : null;
     } catch {
       /* not JSON */
     }
-    throw new ApiError(res.status, detail || `${res.status} ${method} ${path}`);
+    throw new ApiError(res.status, detail || fallbackMessage(res.status));
   }
   return (res.status === 204 ? undefined : await res.json()) as T;
 }

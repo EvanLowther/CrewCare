@@ -33,6 +33,19 @@ REPORT_RADIUS_M = 8046.7
 
 _SEVERITY_RANK = "CASE severity WHEN 'danger' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END"
 
+# Alerts as they stand right now. An alert whose time is up counts as cleared at once, even before the worker gets to
+# mark it: lightning at its all-clear (last strike + 30 min), NWS and earthquake alerts at meta.ends. Otherwise a
+# stop-work banner could sit at 0:00, or an expired warning linger, until the next worker pass.
+_ALERT_ENDS = "least(x.all_clear_at, (x.meta->>'ends')::timestamptz)"
+_ALERTS_NOW = f"""
+SELECT x.id, x.site_id, x.type, x.severity, x.title, x.message, x.started_at, x.all_clear_at, x.meta,
+       CASE WHEN x.status = 'active' AND {_ALERT_ENDS} <= now() THEN 'cleared' ELSE x.status END AS status,
+       CASE WHEN x.status = 'active' AND {_ALERT_ENDS} <= now() THEN {_ALERT_ENDS} ELSE x.cleared_at END AS cleared_at,
+       CASE WHEN x.status = 'active' AND {_ALERT_ENDS} <= now() THEN greatest(x.updated_at, {_ALERT_ENDS})
+            ELSE x.updated_at END AS updated_at
+FROM alerts x
+"""
+
 # One row per site: latest current score (or, with %(ahead)s > 0, the newest forecast for that many hours from now),
 # active alert count and most severe alert, latest heat index.
 _SITE_SUMMARY_SQL = f"""
@@ -47,7 +60,7 @@ WITH latest_score AS (
 active_alerts AS (
     SELECT site_id, count(*) AS n,
            (array_agg(type ORDER BY {_SEVERITY_RANK}, started_at DESC))[1] AS top_type
-    FROM alerts
+    FROM ({_ALERTS_NOW}) a
     WHERE status = 'active'
     GROUP BY site_id
 ),
@@ -68,10 +81,10 @@ LEFT JOIN active_alerts aa ON aa.site_id = s.id
 LEFT JOIN latest_heat lh ON lh.site_id = s.id
 """
 
-_ALERT_SQL = """
+_ALERT_SQL = f"""
 SELECT a.id, a.site_id, s.name AS site_name, a.type, a.severity, a.title, a.message, a.status, a.started_at,
        a.all_clear_at, a.cleared_at, a.meta, a.updated_at
-FROM alerts a JOIN sites s ON s.id = a.site_id
+FROM ({_ALERTS_NOW}) a JOIN sites s ON s.id = a.site_id
 """
 
 _CONDITION_COLS = ("ts, temp_f, heat_index_f, humidity_pct, precip_in, precip_prob_pct, wind_mph, gust_mph, "

@@ -34,6 +34,19 @@ if grep -q '^deploy/systemd/' <<<"$changed"; then
   systemctl restart planit-web
 fi
 
+if grep -q '^deploy/Caddyfile' <<<"$changed"; then
+  host=$(awk '!/^[#[:space:]]/ && /\{$/ {print $1; exit}' /etc/caddy/Caddyfile)
+  log "updating Caddy for $host"
+  sed "s/^PLANIT_HOST /$host /" "$APP/deploy/Caddyfile" > /etc/caddy/Caddyfile.new
+  if caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile.new >/dev/null 2>&1; then
+    mv /etc/caddy/Caddyfile.new /etc/caddy/Caddyfile
+    systemctl reload caddy
+  else
+    log "new Caddyfile is invalid; keeping the current one"
+    rm -f /etc/caddy/Caddyfile.new
+  fi
+fi
+
 if grep -q '^db/migrations/' <<<"$changed"; then
   log "applying migrations"
   (cd "$APP/backend" && as_planit "$APP/.venv/bin/python" scripts/migrate.py)
@@ -57,5 +70,8 @@ if [[ "${1:-}" == "--force" ]] || grep -q '^frontend/' <<<"$changed"; then
   cd "$APP"
 fi
 
-systemctl restart planit-api planit-worker
+# Only when Python code, migrations or services changed: a docs-only or frontend-only merge leaves them running.
+if [[ "${1:-}" == "--force" ]] || grep -qE '^(backend/|db/|deploy/)' <<<"$changed"; then
+  systemctl restart planit-api planit-worker
+fi
 log "done: ${new:0:7}"

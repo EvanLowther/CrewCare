@@ -66,3 +66,20 @@ export const SEVERITY_STYLES: Record<Severity, { bg: string; fg: string; dot: st
 };
 
 export const SEVERITY_RANK: Record<Severity, number> = { danger: 0, warning: 1, info: 2 };
+
+/** The alert's heading: its type, or for a generic NWS alert the NWS event itself ("Winter Storm Warning"). */
+export function alertLabel(alert: Pick<Alert, "type" | "meta">): string {
+  const event = alert.type === "nws" ? (alert.meta as { nws_event?: string }).nws_event : undefined;
+  return event ?? ALERT_LABELS[alert.type];
+}
+
+/** When the alert stops on its own: lightning's all-clear, or an NWS / earthquake alert's end time. */
+export function alertEndsAt(alert: Pick<Alert, "all_clear_at" | "meta">): string | null {
+  return alert.all_clear_at ?? (alert.meta as { ends?: string | null }).ends ?? null;
+}
+
+/** Still in force at `now` (ms). The API already drops ended alerts; this hides one the moment it ends between polls. */
+export function inForce(alert: Pick<Alert, "status" | "all_clear_at" | "meta">, now: number): boolean {
+  const ends = alertEndsAt(alert);
+  return alert.status === "active" && (ends === null || new Date(ends).getTime() > now);
+}
