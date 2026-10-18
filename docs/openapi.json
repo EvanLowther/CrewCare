@@ -479,7 +479,7 @@
           "reports"
         ],
         "summary": "List Reports",
-        "description": "Active reports on sites the viewer may see.",
+        "description": "Active reports on sites the viewer may see. With `site_id` and `include_past=true`, that site's resolved and\nexpired reports too (the My sites page).",
         "operationId": "list_reports_api_reports_get",
         "parameters": [
           {
@@ -496,6 +496,16 @@
                 }
               ],
               "title": "Site Id"
+            }
+          },
+          {
+            "name": "include_past",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Past"
             }
           }
         ],
@@ -2182,6 +2192,19 @@
               }
             ],
             "title": "Expires At"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At",
+            "description": "When a manager marked it resolved"
           }
         },
         "type": "object",

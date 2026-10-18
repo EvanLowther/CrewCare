@@ -102,7 +102,11 @@ export const api = {
     if (opts.since) q.set("since", opts.since);
     return get<AlertList>(`/api/alerts${q.size ? `?${q}` : ""}`);
   },
-  reports: (siteId?: number) => get<ReportList>(`/api/reports${siteId !== undefined ? `?site_id=${siteId}` : ""}`),
+  /** Active reports; with a site and `includePast`, its resolved and expired ones too. */
+  reports: (siteId?: number, includePast = false) =>
+    get<ReportList>(
+      `/api/reports${siteId !== undefined ? `?site_id=${siteId}${includePast ? "&include_past=true" : ""}` : ""}`,
+    ),
   createReport: (form: {
     site_id: number;
     latitude: number;
