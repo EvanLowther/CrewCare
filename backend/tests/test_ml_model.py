@@ -8,6 +8,7 @@ import pytest
 
 from planit.ml.features import FEATURES
 from planit.ml.model import (
+    CALMEST_P,
     HazardModel,
     apply_heat_floor,
     fit_scale,
@@ -66,6 +67,18 @@ def test_fit_scale_matches_real_time_hazard_rates_and_maps_back():
     assert score_on_scale(0.0, scale) == 0.0 and score_on_scale(0.99, scale) == 10.0
     lower, higher = score_on_scale(0.02, scale), score_on_scale(0.06, scale)
     assert lower < higher  # a lower probability scores lower: the forecast can go down
+
+
+def test_calm_days_spread_below_1_instead_of_all_scoring_0():
+    # Like the US model's scale: Real-time 0 days were hazard days 0.34% of the time, Real-time 1.0 days 1.05%.
+    scores = np.round(np.arange(0, 10.05, 0.1), 1).tolist()
+    scale = {"scores": scores, "rates": np.interp(scores, [0, 1, 10], [0.00338, 0.01053, 0.55]).round(5).tolist()}
+    assert score_on_scale(CALMEST_P, scale) == 0.0 and score_on_scale(0.0, scale) == 0.0
+    calm = [score_on_scale(p, scale) for p in (0.0008, 0.0018, 0.0034)]  # quiet October sites, all 0.0 before
+    assert calm == sorted(calm) and 0 < calm[0] < calm[-1] < 1.0
+    assert score_on_scale(0.01053, scale) == 1.0  # meets the Real-time match at 1.0
+    mapped = [score_on_scale(p, scale) for p in np.linspace(0, 0.6, 3000)]
+    assert all(b >= a for a, b in zip(mapped, mapped[1:], strict=False))  # never falls as the odds rise
 
 
 def test_model_uses_the_scale_when_its_meta_has_one():

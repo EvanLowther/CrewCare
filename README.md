@@ -237,8 +237,14 @@ days against Real-time's 4%, mostly in summer. On top of the model, per hour:
   (Wind Advisory 4.5, Heat Advisory 5, Blizzard Warning 9, lightning or a Tornado Warning 10). Frost and freeze
   alerts stay low (1-1.5).
 - **OSHA heat floor:** a heat index of 103°F or more keeps it at least 5, and 115°F or more at least 7.5.
-- Both floors apply hour by hour, using each warning's end time and each hour's forecast heat, so the forecast goes
-  back down when the warning ends or the heat breaks.
+- **Fire weather floor:** on a dry, windy hour after 3 dry days, Predictive can't be below the Real-time fire weather
+  severity (up to 4.5). NOAA rarely logs those days as hazard days, so the model learned to call them calm.
+- The floors apply hour by hour, using each warning's end time and each hour's forecast, so the forecast goes back
+  down when the warning ends, the heat breaks or the wind drops.
+- **Calm days below 1.0:** the odds match needs a Real-time score with the same odds, and every calm day is Real-time
+  0 (0.34% were hazard days). The model tells those days apart, from 0.03% to 1%, so under 1.0 Predictive spreads
+  its odds on a log scale instead (0.03% scores 0.0, the odds at Real-time 1.0 score 1.0). Before, a quarter of all
+  days scored exactly 0. Either way it's "low".
 
 The rescale made the Predictive score more cautious: at "high or above" it catches 76% of hazard days (61% before),
 and 1 flag in 5 is a real hazard day (1 in 4 before). The probabilities themselves are unchanged and still calibrated:
@@ -320,9 +326,12 @@ can't show come from their own sources: **smoke** (the PM2.5 air quality index, 
 EPA categories and Cal/OSHA's wildfire smoke rule: N95s at AQI 151, respirators required above 500), **wildfires**
 (every active fire NIFC lists, by miles to its estimated edge, less once it's 90% contained) and **earthquakes** (every
 USGS quake, by the shaking it should cause at the site, from the Atkinson & Wald 2007 intensity equation USGS uses;
-damage starts around intensity VI). A site's score is its worst hazard plus a little for other serious ones.
+damage starts around intensity VI). **Fire weather** scores dry air with wind after 3 days without rain, near NWS Red
+Flag criteria (about 15-25% humidity with 25-35 mph gusts) at its top of 4.5, with a "no hot work without a fire
+watch" action; on 2023-2025 history it flags 5% of site-days and catches 27% of the fire and dust days, which are 5x
+as likely on those days. A site's score is its worst hazard plus a little for other serious ones.
 **Predictive** is the model above on the same 0-10 scale, with the NWS warning, lightning, wildfire, earthquake,
-smoke and OSHA heat floors on top, hour by hour.
+smoke, fire weather and OSHA heat floors on top, hour by hour.
 
 | Tool | What it does here |
 |---|---|
@@ -351,8 +360,8 @@ smoke and OSHA heat floors on top, hour by hour.
 - NOAA offices log events more or less thoroughly, so labels are uneven; that's why the OSHA heat floor and the rules
   stay on top of the model.
 - Predictive answers "how likely is a NOAA-recorded hazard day", so on a breezy day that's over lift limits but not
-  severe it stays low while Real-time doesn't. Quiet regions and seasons sit near 0; that's the real odds, on the
-  shared scale.
+  severe it stays low while Real-time doesn't. Quiet regions and seasons sit low (under 1 on calm days); that's the
+  real odds. Dry, windy days get the fire weather floor, but that tops out at moderate.
 - The model itself can't see fires, smoke or earthquakes (Q6); the Real-time rules do, and Predictive gets them only
   through its floors. Fires are what agencies report to NIFC, so a new one can take hours to appear, and its edge is
   estimated from its size, not its perimeter. Smoke is modelled (CAMS), not read from monitors. Earthquake shaking is

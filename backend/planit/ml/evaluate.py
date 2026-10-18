@@ -105,7 +105,8 @@ def rules_scores(frame: pd.DataFrame) -> np.ndarray:
         heat_index_f=col(r, "max_nws_heat_index_f"), rain_1h_in=col(r, "max_hourly_precip_in"),
         rain_24h_in=col(r, "total_precip_in"),
         rain_72h_in=(col(r, "total_precip_in") or 0) + (col(r, "precip_prev_3d_in") or 0),
-        soil_moisture=col(r, "avg_soil_moisture"), gust_mph=col(r, "max_gust_mph")))[0]
+        soil_moisture=col(r, "avg_soil_moisture"), gust_mph=col(r, "max_gust_mph"),
+        humidity_pct=col(r, "min_humidity_pct"), snow_24h_in=col(r, "total_snowfall_in")))[0]
         for r in frame.itertuples()])
 
 

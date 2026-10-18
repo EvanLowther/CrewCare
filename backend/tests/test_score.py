@@ -154,6 +154,20 @@ def test_smoke_enters_the_real_time_score_hour_by_hour():
     assert aqi_at([{"ts": T0, "us_aqi_pm2_5": 240.0}], T0 + timedelta(hours=4)) is None  # too old to use
 
 
+def test_dry_gusty_afternoon_after_dry_days_is_fire_weather():
+    weather = [{"ts": T0 + timedelta(hours=h), "temp_f": 78.0, "humidity_pct": 14.0, "precip_in": 0.0,
+                "precip_prob_pct": 0.0, "soil_moisture": 0.08, "gust_mph": 36.0, "cape_jkg": 0.0, "weather_code": 0}
+               for h in range(-72, 1)]
+    x = build_inputs(weather, [], [T0])[T0]
+    assert x.humidity_pct == 14.0 and x.rain_72h_in == 0.0
+    score, factors = score_hour(x)
+    assert level_for(score) == "high"  # 36 mph gusts are over the aerial-lift limit: wind sets the score
+    assert [f["key"] for f in factors][:2] == ["wind", "fire_weather"]  # and fire weather shows with its action
+    calmer = build_inputs([{**w, "gust_mph": 26.0} for w in weather], [], [T0])[T0]
+    score, factors = score_hour(calmer)  # under the lift limit: moderate, with the hot-work precaution listed
+    assert level_for(score) == "moderate" and "No hot work" in factors[1]["action"]
+
+
 def test_wildfire_and_earthquake_alerts_score_at_their_own_severity():
     fire = {"type": "wildfire", "severity": "warning", "title": "Creek Fire 9 mi away", "all_clear_at": None,
             "meta": {"source": "nifc", "rule_severity": 5.2, "action": "Set to leave"}}
