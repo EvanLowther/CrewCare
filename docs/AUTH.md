@@ -34,7 +34,8 @@ site's manager. Demoting a manager to crew makes them crew on the sites they man
 | Edit a site, add/remove members, resolve reports | — | — | On sites they manage | Any |
 | Delete a site | — | — | Ones they created and still manage | Any |
 | Admin page: users, roles | — | — | — | Yes |
-| Demo buttons (lightning replay, generate briefings) | — | — | — | Yes |
+| Generate tomorrow's briefings now | — | — | Sites they manage | Every site |
+| Demo buttons (lightning replay) | — | — | — | Yes |
 
 The rules are plain functions in `backend/planit/api/access.py` (tested in `tests/test_access.py`). The 5-mile
 check runs on the server, but a browser can't prove its GPS isn't faked: it stops mistakes, not a determined cheat.

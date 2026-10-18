@@ -153,6 +153,31 @@ def test_without_a_key_gemini_is_skipped(monkeypatch):
 
 def test_generate_now_job_is_registered(monkeypatch):
     seen = []
-    monkeypatch.setattr(G, "generate_all", lambda: seen.append(True) or 160)
-    jobs.HANDLERS["generate_briefings"]({})
-    assert seen == [True]
+    monkeypatch.setattr(G, "generate_all", lambda site_ids=None: seen.append(site_ids) or 160)
+    jobs.HANDLERS["generate_briefings"]({})  # admin: every site
+    jobs.HANDLERS["generate_briefings"]({"site_ids": [9001, 9011]})  # a manager's own sites
+    assert seen == [None, [9001, 9011]]
+
+
+def test_generate_now_for_a_managers_sites_only(monkeypatch):
+    class FakeConn:
+        def execute(self, *_):
+            return self
+
+        def fetchall(self):
+            return [{"id": 1}, {"id": 2}, {"id": 3}]
+
+    class FakeCtx:
+        def __enter__(self):
+            return FakeConn()
+
+        def __exit__(self, *_):
+            return False
+
+    built = []
+    monkeypatch.setattr(G, "connection", FakeCtx)
+    monkeypatch.setattr(G, "build", lambda sites, now: built.append([s["id"] for s in sites]) or [])
+    monkeypatch.setattr(G, "_write", lambda rows: 0)
+    G.generate_all(site_ids=[3, 1, 99])
+    G.generate_all()
+    assert built == [[1, 3], [1, 2, 3]]  # a site they don't manage (99) or that isn't in the list is skipped

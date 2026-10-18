@@ -36,7 +36,10 @@ function localDate(days: number): string {
 
 /** Tomorrow's (or today's) safety briefing for every site the viewer may see, riskiest first. */
 export function BriefingsView() {
-  const { role } = useMe();
+  const { role, siteRoles } = useMe();
+  // Admins generate every site; managers only the sites they manage (the API picks them).
+  const managesSites = [...siteRoles.values()].includes("manager");
+  const canGenerate = role === "admin" || (role === "manager" && managesSites);
   const scope = useSiteScope();
   const [day, setDay] = useState<Day>("tomorrow");
   // The date is read when fetching, not during render (the page is prerendered).
@@ -93,15 +96,16 @@ export function BriefingsView() {
                 </button>
               ))}
             </div>
-            {role === "admin" && (
+            {canGenerate && (
               <button
                 type="button"
                 onClick={generate}
                 disabled={busy}
+                title={role === "admin" ? "Write tomorrow's briefing for every site now" : "Write tomorrow's briefing now for the sites you manage"}
                 className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-accent-strong px-4 text-sm font-medium text-on-accent hover:bg-accent disabled:opacity-40"
               >
                 <RefreshCw className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} aria-hidden />
-                Generate now
+                {role === "admin" ? "Generate now" : "Generate for my sites"}
               </button>
             )}
           </div>
@@ -120,7 +124,7 @@ export function BriefingsView() {
           <EmptyState
             icon={FileText}
             title={`No briefings for ${day} yet`}
-            detail="Each site's briefing is written at 6 PM in its local time. Admins can generate them now."
+            detail="Each site's briefing is written at 6 PM in its local time. Managers can generate their sites' now; admins, every site's."
           />
         ) : (
           <ul className="divide-y divide-line border-t border-line">
