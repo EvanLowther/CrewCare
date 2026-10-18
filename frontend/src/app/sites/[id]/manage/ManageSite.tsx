@@ -116,7 +116,7 @@ export function ManageSite({ id, isNew }: { id: number; isNew: boolean }) {
                   setError(e instanceof Error ? e.message : "Couldn't delete the site");
                 }
               }}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(208_59_59/0.5)] px-4 py-2 text-sm text-[#ff9b9b] hover:bg-[rgb(208_59_59/0.12)]"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[rgb(255_74_74/0.5)] px-4 py-2 text-sm text-[#ff9b9b] hover:bg-[rgb(255_74_74/0.12)]"
             >
               <Trash2 className="h-4 w-4" aria-hidden /> Delete {site.name}
             </button>
@@ -255,7 +255,7 @@ function AddPeople({
                   <button
                     type="button"
                     onClick={() => add(u, "crew")}
-                    className="inline-flex items-center gap-1 rounded-md bg-accent-strong px-2.5 py-1 text-xs font-medium text-white hover:bg-accent"
+                    className="inline-flex items-center gap-1 rounded-md bg-accent-strong px-2.5 py-1 text-xs font-medium text-on-accent hover:bg-accent"
                   >
                     <UserPlus className="h-3.5 w-3.5" aria-hidden /> Add as crew
                   </button>

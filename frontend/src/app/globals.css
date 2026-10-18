@@ -1,33 +1,38 @@
 @import "tailwindcss";
 
-/* PlanIT Control design tokens (dark only). Use the Tailwind classes they generate, e.g.
-   bg-card, border-line, text-ink-2, bg-accent-strong. Risk colors live in src/lib/risk.ts too. */
+/* PlanIT Control design tokens ("Skyline", dark only). Use the Tailwind classes they generate, e.g.
+   bg-card, border-line, text-ink-2, bg-accent-strong text-on-accent, font-display. Risk colors live in
+   src/lib/risk.ts too. */
 @theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-plex-sans);
+  --font-mono: var(--font-plex-mono);
+  --font-display: var(--font-big-shoulders);
 }
 
 /* Not `inline`, so each color is also a real CSS variable (used by the map styles below). */
 @theme {
-  --color-page: #0b1130;          /* page background */
-  --color-sidebar: #0d1436;
-  --color-card: #111a3d;          /* cards, chart surface */
-  --color-raised: #17224d;        /* hover rows, inputs, popovers */
-  --color-line: #1f2a58;          /* hairline borders, gridlines */
+  --color-page: #06080c;          /* page background, near-black */
+  --color-sidebar: #0a0d13;
+  --color-card: #0a0d13;          /* cards, chart surface */
+  --color-panel: rgb(9 12 18 / 0.92); /* panels floating over the map */
+  --color-raised: #121823;        /* hover rows, inputs, popovers */
+  --color-line: #1c2433;          /* hairline borders, gridlines */
+  --color-line-soft: #161d29;
 
-  --color-ink: #eef1ff;           /* primary text   15:1 on card */
-  --color-ink-2: #aeb6d9;         /* secondary text  8.5:1 */
-  --color-muted: #7a84ae;         /* axis labels, captions 4.6:1 */
+  --color-ink: #e8edf5;           /* primary text   16:1 on card */
+  --color-ink-2: #a3adbf;         /* secondary text  8.6:1 */
+  --color-muted: #7c879b;         /* axis labels, captions 5:1 */
 
-  --color-accent: #6e7bff;        /* chart marks, active nav, links */
-  --color-accent-strong: #5865f2; /* filled buttons (white text 4.6:1) */
-  --color-accent-soft: rgb(110 123 255 / 0.14);
-  --color-cyan: #38bdf8;          /* UI highlight only, never a data series */
+  --color-accent: #9ad7ff;        /* ice blue: links, active states, selected ring */
+  --color-accent-strong: #9ad7ff; /* filled buttons, with text-on-accent */
+  --color-on-accent: #06080c;     /* text on accent fills 12:1 */
+  --color-accent-soft: rgb(154 215 255 / 0.12);
+  --color-cyan: #9ad7ff;
 
-  --color-risk-low: #0ca30c;
-  --color-risk-moderate: #fab219;
-  --color-risk-high: #ec835a;
-  --color-risk-extreme: #d03b3b;
+  --color-risk-low: #3fbf7f;
+  --color-risk-moderate: #f5b83d;
+  --color-risk-high: #f0804f;
+  --color-risk-extreme: #ff4a4a;
 }
 
 html {
@@ -36,7 +41,7 @@ html {
 }
 
 body {
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-plex-sans), system-ui, sans-serif;
   background: var(--color-page);
   color: var(--color-ink);
 }
@@ -45,30 +50,41 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Small mono caps label: "BROWARD, FL · GAS COMBINED CYCLE" */
+.eyebrow {
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
 /* ---- Map (components/SiteMap.tsx) --------------------------------------------------------- */
 
-/* Esri's dark-gray basemap, tinted navy with a filter (tiles only; pins are in another pane).
+/* Esri's dark-gray basemap, pushed to a cool near-black with a filter (tiles only; markers are in another pane).
    Every rule starts with `html` so it beats leaflet.css whatever order the two stylesheets load in. */
 html .leaflet-container {
-  background: #0a1029;
+  background: #040609;
   font-family: inherit;
 }
 html .leaflet-tile-pane {
-  filter: sepia(1) hue-rotate(190deg) saturate(1.8) brightness(0.8);
+  filter: grayscale(1) brightness(0.62) contrast(1.12) sepia(0.25) hue-rotate(175deg);
 }
 /* `.leaflet-container` prefix beats leaflet.css (incl. its .leaflet-touch rules on phones). */
 html .leaflet-container .leaflet-control-zoom a,
 html .leaflet-container .leaflet-control-zoom a:hover {
-  background: var(--color-raised);
+  background: var(--color-panel);
   color: var(--color-ink);
   border-color: var(--color-line) !important;
 }
 html .leaflet-container .leaflet-bar {
   border: 1px solid var(--color-line) !important;
+  border-radius: 10px;
+  overflow: hidden;
   box-shadow: none !important;
 }
 html .leaflet-container .leaflet-control-attribution {
-  background: rgb(11 17 48 / 0.75) !important;
+  background: rgb(6 8 12 / 0.75) !important;
   color: var(--color-muted);
 }
 html .leaflet-container .leaflet-control-attribution a {
@@ -76,66 +92,124 @@ html .leaflet-container .leaflet-control-attribution a {
 }
 html .leaflet-container .leaflet-popup-content-wrapper,
 html .leaflet-container .leaflet-popup-tip {
-  background: var(--color-raised);
+  background: transparent;
   color: var(--color-ink);
-  border: 1px solid var(--color-line);
-  box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+  box-shadow: none;
+  padding: 0;
+}
+html .leaflet-container .leaflet-popup-tip-container {
+  display: none;
 }
 html .leaflet-container .leaflet-popup-content {
-  margin: 14px 16px;
+  margin: 0;
 }
 html .leaflet-container a.leaflet-popup-close-button {
   color: var(--color-muted);
+  top: 8px;
+  right: 8px;
+}
+html .leaflet-div-icon.pc-icon {
+  background: none;
+  border: none;
 }
 
-.site-pin {
+/* Site markers. National zoom: a 10px dot. State / local zoom: a disc with the score (sizes set in SiteMap.tsx). */
+.pc-mark {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.pc-mark .pc-body {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 9999px;
-  border: 2px solid var(--color-page);
-  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.18), 0 2px 8px rgb(0 0 0 / 0.5);
-  font-weight: 700;
-  font-size: 12px;
+  background: var(--pin-color);
+  color: #06080c;
+  box-shadow: 0 0 0 var(--pin-outline, 2px) #06080c, 0 4px 12px rgb(0 0 0 / 0.5);
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-weight: 600;
   line-height: 1;
-  position: relative;
 }
-.site-pin.selected {
-  box-shadow: 0 0 0 3px var(--color-accent), 0 2px 10px rgb(0 0 0 / 0.6);
+.pc-mark.is-selected .pc-body {
+  box-shadow: 0 0 0 var(--pin-outline, 2px) #06080c, 0 0 0 calc(var(--pin-outline, 2px) + 3px) var(--color-accent),
+    0 4px 12px rgb(0 0 0 / 0.5);
 }
-.site-pin .badge {
+/* Active alert: one calm ring in the alert's severity color. */
+.pc-mark .pc-ring {
   position: absolute;
-  top: -9px;
-  right: -9px;
+  left: 50%;
+  top: 50%;
+  width: calc(100% + 4px);
+  height: calc(100% + 4px);
+  border-radius: 9999px;
+  border: 1.5px solid var(--ring-color);
+  transform: translate(-50%, -50%);
+  animation: pc-pulse 2.6s ease-out infinite;
+  pointer-events: none;
+}
+@keyframes pc-pulse {
+  from { transform: translate(-50%, -50%) scale(1); opacity: 0.85; }
+  to { transform: translate(-50%, -50%) scale(2.6); opacity: 0; }
+}
+/* Stop-work (lightning within 10 miles): a bolt badge on top of the red ring. */
+.pc-mark .pc-bolt {
+  position: absolute;
+  right: -8px;
+  top: -8px;
   z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 9999px;
-  background: var(--color-raised);
-  border: 1px solid var(--color-line);
-  font-size: 12px;
+  background: var(--color-risk-extreme);
+  box-shadow: 0 0 0 2px #06080c;
 }
-.site-pin.alerting::after {
+
+/* Crew reports: a diamond in the severity color with a line icon. */
+.pc-diamond {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+.pc-diamond::before {
   content: "";
   position: absolute;
-  inset: -2px;
-  border-radius: 9999px;
-  border: 3px solid var(--pin-color);
-  animation: pin-pulse 1.6s ease-out infinite;
+  inset: 4px;
+  transform: rotate(45deg);
+  border-radius: 4px;
+  background: var(--report-color);
+  box-shadow: 0 0 0 2px #06080c, 0 4px 12px rgb(0 0 0 / 0.5);
 }
-@keyframes pin-pulse {
-  from { transform: scale(1); opacity: 0.9; }
-  to { transform: scale(2.2); opacity: 0; }
+.pc-diamond svg {
+  position: relative;
 }
+
+/* Hover tag on a marker (Leaflet tooltip). */
+html .leaflet-tooltip.pc-tag {
+  padding: 8px 12px;
+  border: 0;
+  border-left: 2px solid var(--tag-color, var(--color-accent));
+  border-radius: 0;
+  background: rgb(8 11 17 / 0.95);
+  color: var(--color-ink);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.5);
+  white-space: nowrap;
+}
+html .leaflet-tooltip.pc-tag::before {
+  display: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .site-pin.alerting::after { animation: none; }
-}
-html .leaflet-div-icon.site-pin-wrap {
-  background: none;
-  border: none;
+  .pc-mark .pc-ring { animation: none; opacity: 0.7; }
+  .live-dot::after { animation: none; }
 }
 
 /* Live dot used in headers */
@@ -153,20 +227,15 @@ html .leaflet-div-icon.site-pin-wrap {
   inset: 0;
   border-radius: 9999px;
   background: var(--color-risk-low);
-  animation: pin-pulse 2s ease-out infinite;
+  animation: live-pulse 2s ease-out infinite;
+}
+@keyframes live-pulse {
+  from { transform: scale(1); opacity: 0.9; }
+  to { transform: scale(2.4); opacity: 0; }
 }
 
-/* Crew report markers on the dashboard map (components/SiteMap.tsx) */
-.report-pin {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: var(--color-raised);
-  border: 2px solid var(--report-color);
-  box-shadow: 0 2px 6px rgb(0 0 0 / 0.5);
-  font-size: 14px;
-  line-height: 1;
-}
+/* Hover tag edge in the site's risk color. */
+html .leaflet-tooltip.pc-tag.lvl-low { --tag-color: var(--color-risk-low); }
+html .leaflet-tooltip.pc-tag.lvl-moderate { --tag-color: var(--color-risk-moderate); }
+html .leaflet-tooltip.pc-tag.lvl-high { --tag-color: var(--color-risk-high); }
+html .leaflet-tooltip.pc-tag.lvl-extreme { --tag-color: var(--color-risk-extreme); }

@@ -5,8 +5,13 @@ import type { Alert, RiskLevel } from "@/lib/api";
 import { SEVERITY_LABELS, SEVERITY_STYLES } from "@/lib/alerts";
 import { NO_SCORE_COLOR, NO_SCORE_INK, RISK_COLORS, RISK_INK, RISK_LABELS } from "@/lib/risk";
 
+/** Padded, centered page body for every page except the full-bleed dashboard and the site page. */
+export function PageBody({ children }: { children: ReactNode }) {
+  return <main className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</main>;
+}
+
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <section className={`rounded-xl border border-line bg-card ${className}`}>{children}</section>;
+  return <section className={`rounded-2xl border border-line bg-card ${className}`}>{children}</section>;
 }
 
 export function CardHeader({
@@ -23,7 +28,7 @@ export function CardHeader({
   return (
     <header className="flex flex-wrap items-start justify-between gap-3 px-5 pt-4 pb-3">
       <div className="min-w-0">
-        <h2 className="flex items-center gap-2 text-sm font-medium text-ink">
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
           {Icon && <Icon className="h-4 w-4 text-accent" aria-hidden />}
           {title}
         </h2>
@@ -38,7 +43,7 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
   return (
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">{title}</h1>
+        <h1 className="font-display text-5xl leading-[0.95] font-extrabold text-ink">{title}</h1>
         {subtitle && <div className="mt-1 text-sm text-ink-2">{subtitle}</div>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
@@ -64,14 +69,14 @@ export function StatTile({
       <div className="flex items-center gap-2 text-xs text-ink-2">
         <span
           className={`flex h-6 w-6 items-center justify-center rounded-md ${
-            tone === "danger" ? "bg-[rgb(208_59_59/0.18)] text-[#ff8a8a]" : "bg-accent-soft text-accent"
+            tone === "danger" ? "bg-[rgb(255_74_74/0.18)] text-[#ff8a8a]" : "bg-accent-soft text-accent"
           }`}
         >
           <Icon className="h-3.5 w-3.5" aria-hidden />
         </span>
         {label}
       </div>
-      <div className="mt-3 text-3xl font-semibold text-ink">{value}</div>
+      <div className="mt-3 font-display text-4xl leading-none font-extrabold text-ink">{value}</div>
       {detail && <div className="mt-1 text-xs text-muted">{detail}</div>}
     </Card>
   );
@@ -142,7 +147,7 @@ export function EmptyState({ icon: Icon, title, detail }: { icon: LucideIcon; ti
 
 export function ErrorBanner({ message }: { message: string }) {
   return (
-    <p className="rounded-lg border border-[rgb(208_59_59/0.4)] bg-[rgb(208_59_59/0.12)] px-4 py-2 text-sm text-[#ff9b9b]">
+    <p className="rounded-lg border border-[rgb(255_74_74/0.4)] bg-[rgb(255_74_74/0.12)] px-4 py-2 text-sm text-[#ff9b9b]">
       Can&apos;t reach the API ({message}). Is <code>python dev.py api</code> running? Retrying automatically.
     </p>
   );

@@ -12,7 +12,7 @@ the sign-in routes). Without it, reads return only public reference sites.
 | Method | Path | Returns | Notes |
 |---|---|---|---|
 | GET | `/api/health` | `Health` | `mock`, `database` status |
-| GET | `/api/sites` | `SiteList` | Sites the viewer may see, highest risk first. Each has `is_reference`, `my_role`, `can_manage`, `can_delete` |
+| GET | `/api/sites` | `SiteList` | Sites the viewer may see, highest risk first. Each has `is_reference`, `my_role`, `can_manage`, `can_delete`. `?hours_ahead=1..24` scores each site with its forecast for that hour |
 | GET | `/api/sites/{id}` | `SiteDetail` | Conditions, 48 h forecast, alerts, reports, risk history |
 | GET | `/api/alerts?site_id=&since=` | `AlertList` | Poll every 10 s, passing back `server_time` as `since` |
 | GET | `/api/reports?site_id=` | `ReportList` | Active crew reports |

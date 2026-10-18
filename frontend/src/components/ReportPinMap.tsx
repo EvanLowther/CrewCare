@@ -13,19 +13,19 @@ const US_CENTER: L.LatLngTuple = [39.5, -98.35];
 export type LatLng = { lat: number; lng: number };
 
 const pin = L.divIcon({
-  className: "site-pin-wrap",
+  className: "pc-icon",
   iconSize: [30, 40],
   iconAnchor: [15, 38],
   html: `<svg width="30" height="40" viewBox="0 0 30 40" xmlns="http://www.w3.org/2000/svg">
-    <path d="M15 1C7.3 1 1 7.2 1 14.9 1 25.3 15 39 15 39s14-13.7 14-24.1C29 7.2 22.7 1 15 1z" fill="#6e7bff" stroke="#0b1130" stroke-width="2"/>
-    <circle cx="15" cy="15" r="5.5" fill="#0b1130"/></svg>`,
+    <path d="M15 1C7.3 1 1 7.2 1 14.9 1 25.3 15 39 15 39s14-13.7 14-24.1C29 7.2 22.7 1 15 1z" fill="#9ad7ff" stroke="#06080c" stroke-width="2"/>
+    <circle cx="15" cy="15" r="5.5" fill="#06080c"/></svg>`,
 });
 
 const siteDot = L.divIcon({
-  className: "site-pin-wrap",
+  className: "pc-icon",
   iconSize: [10, 10],
   iconAnchor: [5, 5],
-  html: `<div style="width:10px;height:10px;border-radius:9999px;background:#aeb6d9;border:2px solid #0b1130"></div>`,
+  html: `<div style="width:10px;height:10px;border-radius:9999px;background:#a3adbf;border:2px solid #06080c"></div>`,
 });
 
 /** Re-centers when the position comes from GPS (not when the user drags), and lets a tap move the pin. */
@@ -92,7 +92,7 @@ export default function ReportPinMap({
         <Circle
           center={[gps.lat, gps.lng]}
           radius={accuracyM}
-          pathOptions={{ color: "#6e7bff", weight: 1, fillOpacity: 0.08 }}
+          pathOptions={{ color: "#9ad7ff", weight: 1, fillOpacity: 0.08 }}
         />
       )}
       {position && (

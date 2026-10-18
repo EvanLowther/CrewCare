@@ -158,7 +158,7 @@ function AssignToSite({
           onAssign(user, Number(siteId), role);
           setSiteId("");
         }}
-        className="rounded-md bg-accent-strong px-2.5 py-1 text-xs font-medium text-white hover:bg-accent disabled:opacity-40"
+        className="rounded-md bg-accent-strong px-2.5 py-1 text-xs font-medium text-on-accent hover:bg-accent disabled:opacity-40"
       >
         Add
       </button>
