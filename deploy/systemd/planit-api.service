@@ -1,5 +1,5 @@
 [Unit]
-Description=PlanIT Control API (FastAPI)
+Description=Crew Care API (FastAPI)
 After=network-online.target
 Wants=network-online.target
 

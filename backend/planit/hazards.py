@@ -31,7 +31,7 @@ Each hazard's severity is linear between anchors:
     smoke (PM2.5 AQI) 100 0 · 150 3 · 200 5 · 300 7.5 · 500 10           EPA AQI categories (151 unhealthy, 301
                       hazardous); Cal/OSHA 5141.1: N95s provided at AQI 151+, respirators required above 500
     wildfire          miles to the fire's edge: 25 2.5 · 10 5 · 5 7 · 1 9.5; half at 90% contained; under 100 acres
-                      within 10 mi, spot fires (< 10 acres) within 5 mi and at most 4   PlanIT's own distances
+                      within 10 mi, spot fires (< 10 acres) within 5 mi and at most 4   Crew Care's own distances
                       (there is no published rule); the edge is estimated from the acres
     earthquake        shaking at the site (MMI): IV 1 · V 3 · VI 5 · VII 7.5 · VIII 9 · IX 10   Atkinson & Wald
                       (2007) intensity prediction equation; USGS: damage begins at VI, considerable at VII
@@ -359,7 +359,7 @@ def smoke(us_aqi_pm2_5: float | None) -> Hazard | None:
     return _hazard("smoke", piecewise(us_aqi_pm2_5, SMOKE_ANCHORS), label, action)
 
 
-# Miles from the fire's edge -> severity. PlanIT's own distances: there's no published stand-off rule. The actions
+# Miles from the fire's edge -> severity. Crew Care's own distances: there's no published stand-off rule. The actions
 # borrow the stages of the Ready, Set, Go! evacuation program (be ready, set to leave, go); the miles are ours.
 WILDFIRE_ANCHORS = [(1.0, 9.5), (5.0, 7.0), (10.0, 5.0), (25.0, 2.5)]
 WILDFIRE_RADIUS_MI = 25.0  # fires farther than this from a site are ignored

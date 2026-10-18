@@ -18,7 +18,7 @@ log = logging.getLogger("planit.geocode")
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 # Nominatim refuses placeholder contacts (like the example.com one in .env.example), so name the project instead.
-USER_AGENT = "PlanIT-Control/1.0 (+https://github.com/EvanLowther/planit-control)"
+USER_AGENT = "CrewCare/1.0 (+https://github.com/EvanLowther/planit-control)"
 
 
 @lru_cache(maxsize=256)
