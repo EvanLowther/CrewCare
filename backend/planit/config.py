@@ -16,7 +16,9 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000"]
 
     gemini_api_key: str | None = None
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-3.5-flash"
+    # Tried in order when the model above is retired (404) or overloaded (503), comma-separated.
+    gemini_fallback_models: str = "gemini-3.5-flash,gemini-3.7-flash,gemini-flash-latest"
     nws_user_agent: str = "Crew Care (hackathon project)"
 
     # Hazard score: "xgb" uses the trained model in planit/ml/models/ (falls back to rules-v1 without one),

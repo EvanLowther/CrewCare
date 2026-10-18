@@ -269,7 +269,7 @@ class Briefing(BaseModel):
         examples=[{"peak_heat_index_f": 110, "storm_window": "2 PM - 6 PM", "risk_score": 7.4,
                    "recommendations": ["Water/rest/shade every hour after 11 AM"]}],
     )
-    generated_by: str = Field(examples=["gemini-2.5-flash", "template"])
+    generated_by: str = Field(examples=["gemini-3.5-flash", "template"])
     generated_at: datetime
 
 
