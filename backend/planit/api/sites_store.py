@@ -1,7 +1,8 @@
 """Owner: Person B. Sites managers create, who's on each site, and user roles (docs/AUTH.md).
 
-New sites are private (`is_reference = false`) and the creator becomes their manager. The worker reads the
-`sites` table, so a new site gets weather, alerts and scores on its next poll without any worker change.
+New sites are private (`is_reference = false`) and the creator becomes their manager. Creating or moving a site
+queues a 'site_setup' job (worker/site_setup.py), so it has weather and both scores within about a minute; the
+regular polls read the whole `sites` table and keep it up to date after that.
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ from uuid import UUID
 
 import httpx
 from fastapi import HTTPException
+from psycopg.types.json import Jsonb
 from tzfpy import get_tz
 
 from planit.api.access import can_delete, can_manage, member_role_error
@@ -22,8 +24,8 @@ from planit.models import AdminUser, Me, MySite, SiteCreate, SiteMember, SiteUpd
 log = logging.getLogger("planit.sites")
 
 # Tables with a site_id that a deleted site's rows must leave first (sites.id has no ON DELETE CASCADE).
-_SITE_CHILD_TABLES = ("hazard_scores", "weather", "nws_weather", "alerts", "nws_alerts", "briefings",
-                      "hazard_reports")
+_SITE_CHILD_TABLES = ("hazard_scores", "weather", "nws_weather", "air_quality", "alerts", "nws_alerts",
+                      "briefings", "hazard_reports")
 # Cleared when a site moves, so the worker looks its NWS grid up again (migration 005).
 _NWS_LOOKUP_COLS = ("nws_grid_id", "nws_grid_x", "nws_grid_y", "nws_station", "nws_zone", "nws_county_zone")
 UNKNOWN_STATE = "XX"
@@ -82,7 +84,17 @@ def create_site(req: SiteCreate, user: CurrentUser) -> int:
         ).fetchone()["id"]
         conn.execute("INSERT INTO site_members (site_id, user_id, role, added_by) VALUES (%s, %s, 'manager', %s)",
                      (site_id, user.id, user.id))
+        _queue_setup(conn, site_id)
     return site_id
+
+
+# The weather the worker stored for a site, which no longer applies once it's moved.
+_SITE_WEATHER_TABLES = ("weather", "nws_weather", "air_quality")
+
+
+def _queue_setup(conn, site_id: int) -> None:
+    """Ask the worker to fetch this site's weather and score it now (worker/site_setup.py), not on the next polls."""
+    conn.execute("INSERT INTO job_requests (kind, params) VALUES ('site_setup', %s)", (Jsonb({"site_id": site_id}),))
 
 
 def update_site(site_id: int, req: SiteUpdate, user: CurrentUser) -> None:
@@ -105,6 +117,10 @@ def update_site(site_id: int, req: SiteUpdate, user: CurrentUser) -> None:
             sets += [f"{col} = NULL" for col in _NWS_LOOKUP_COLS]
         if sets:
             conn.execute(f"UPDATE sites SET {', '.join(sets)} WHERE id = %(id)s", params)
+        if "lat" in params:  # moved: the old location's weather doesn't apply; fetch the new one now
+            for table in _SITE_WEATHER_TABLES:
+                conn.execute(f"DELETE FROM {table} WHERE site_id = %s", (site_id,))
+            _queue_setup(conn, site_id)
 
 
 def delete_site(site_id: int, user: CurrentUser) -> None:
