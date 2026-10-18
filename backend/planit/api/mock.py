@@ -18,10 +18,16 @@ from planit.models import (
     Alert,
     Briefing,
     Conditions,
+    EventTypeCount,
     HazardReport,
     Last24h,
+    LocationHistory,
     Me,
     MySite,
+    Notification,
+    NotificationList,
+    PastReport,
+    PastStormEvent,
     Risk,
     RiskFactor,
     RiskPoint,
@@ -257,4 +263,48 @@ def me(user: CurrentUser | None) -> Me:
         user=User(id=user.id, name=user.name, email=user.email, picture=user.picture, role=user.role),
         sites=[MySite(site_id=sid, site_name=names[sid], role=role) for sid, role in _MEMBERSHIPS.get(key, [])],
         auth="dev",
+    )
+
+
+def notifications(user: CurrentUser) -> NotificationList:
+    names = {sid: name for sid, name, *_ in _SITES}
+    now = _now()
+    items = [
+        Notification(id=3, kind="crew_report", site_id=9001, severity="danger",
+                     title=f"Sinkhole reported at {names[9001]}", body="Soft spot by the east gate · by Dev Crew",
+                     link="/sites/9001", created_at=now - timedelta(minutes=4), read=False),
+        Notification(id=2, kind="alert", site_id=9011, severity="danger",
+                     title=f"Severe Thunderstorm Warning · {names[9011]}", body="60 mph gusts and quarter-size hail",
+                     link="/sites/9011", created_at=now - timedelta(minutes=40), read=False),
+        Notification(id=1, kind="briefing", site_id=9001, severity="info",
+                     title=f"Briefing for {names[9001]}, tomorrow",
+                     body="Start before 7 AM. Heat index reaches 108°F by 1 PM; storms likely after 3 PM.",
+                     link="/briefings?site=9001", created_at=now - timedelta(hours=3), read=True),
+    ]
+    return NotificationList(notifications=items, unread=sum(not n.read for n in items))
+
+
+def location_history() -> LocationHistory:
+    now = _now()
+    return LocationHistory(
+        reports=[
+            PastReport(id=uuid.uuid5(uuid.NAMESPACE_URL, "planit-mock/past-report/1"), site_id=9001,
+                       site_name=_SITES[0][1], hazard_type="flooding", severity="high",
+                       description="Access road under 8 in of water", created_at=now - timedelta(days=12),
+                       status="resolved", distance_mi=0.4),
+            PastReport(id=uuid.uuid5(uuid.NAMESPACE_URL, "planit-mock/past-report/2"), site_id=9001,
+                       site_name=_SITES[0][1], hazard_type="wildlife", severity="medium",
+                       description="Alligator by the laydown yard", created_at=now - timedelta(days=40),
+                       status="expired", distance_mi=1.2),
+        ],
+        storm_events=[
+            PastStormEvent(event_id=1001, event_type="Thunderstorm Wind", begin_ts=now - timedelta(days=120),
+                           place="Hillsborough, Florida", distance_mi=6.3, injuries=0, deaths=0, damage_usd=15000),
+            PastStormEvent(event_id=1002, event_type="Flash Flood", begin_ts=now - timedelta(days=300),
+                           place="Pasco, Florida", distance_mi=18.9, injuries=0, deaths=0, damage_usd=250000),
+        ],
+        storm_event_count=2,
+        storm_event_types=[EventTypeCount(event_type="Thunderstorm Wind", count=1),
+                           EventTypeCount(event_type="Flash Flood", count=1)],
+        storm_years="2024-2025",
     )

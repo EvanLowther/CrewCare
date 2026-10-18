@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Big_Shoulders, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { MeProvider } from "@/components/MeProvider";
+import { NotificationsProvider } from "@/components/Notifications";
 import { TopNav } from "@/components/TopNav";
 import "./globals.css";
 
@@ -26,6 +27,8 @@ const bigShoulders = Big_Shoulders({
 export const metadata: Metadata = {
   title: "Crew Care",
   description: "The forecast your crew actually needs: a 0-10 hazard score for every job site, now and for the next 24 hours",
+  // Added to the home screen, it opens full screen (and iPhones then allow push notifications).
+  appleWebApp: { capable: true, title: "Crew Care", statusBarStyle: "black-translucent" },
 };
 
 export const viewport: Viewport = {
@@ -39,8 +42,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className={`${plexSans.variable} ${plexMono.variable} ${bigShoulders.variable} h-full antialiased`}>
       <body className="min-h-full bg-page text-ink">
         <MeProvider>
-          <TopNav />
-          {children}
+          <NotificationsProvider>
+            <TopNav />
+            {children}
+          </NotificationsProvider>
         </MeProvider>
       </body>
     </html>

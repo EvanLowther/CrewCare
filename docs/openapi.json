@@ -984,6 +984,337 @@
         }
       }
     },
+    "/api/notifications": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "List Notifications",
+        "description": "Your latest 30 (newest first) and how many are unread. With `after`, only newer ones.",
+        "operationId": "list_notifications_api_notifications_get",
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/read": {
+      "post": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Mark Read",
+        "description": "Mark `ids` read, or all of them when `ids` is omitted.",
+        "operationId": "mark_read_api_notifications_read_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkRead"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/stream": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Stream",
+        "description": "Server-sent events: `notification` events (a Notification) as they're written, within ~2 s.\n\nRead it with fetch (EventSource can't send the sign-in token). Pass the newest id you have as `after` when\nreconnecting; the stream closes itself after a couple of minutes, so reconnect then too.",
+        "operationId": "stream_api_notifications_stream_get",
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/push-key": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Push Key",
+        "description": "The server's public VAPID key for PushManager.subscribe, or null when push isn't set up.",
+        "operationId": "push_key_api_notifications_push_key_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushKey"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/subscriptions": {
+      "post": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Subscribe",
+        "description": "Send your notifications to this device (the browser's PushSubscription.toJSON()).",
+        "operationId": "subscribe_api_notifications_subscriptions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushSubscriptionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/subscriptions/delete": {
+      "post": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Unsubscribe",
+        "description": "Stop sending to this device.",
+        "operationId": "unsubscribe_api_notifications_subscriptions_delete_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushUnsubscribe"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites/{site_id}/history": {
+      "get": {
+        "tags": [
+          "history"
+        ],
+        "summary": "Site History",
+        "description": "Crew reports within 5 mi of the site (resolved and expired too) and NOAA Storm Events within 25 mi.",
+        "operationId": "site_history_api_sites__site_id__history_get",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Site Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationHistory"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/history": {
+      "get": {
+        "tags": [
+          "history"
+        ],
+        "summary": "Place History",
+        "description": "The same for any spot, for the new-site form (managers and admins).",
+        "operationId": "place_history_api_history_get",
+        "parameters": [
+          {
+            "name": "lat",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "maximum": 90,
+              "minimum": -90,
+              "title": "Lat"
+            }
+          },
+          {
+            "name": "lon",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "maximum": 180,
+              "minimum": -180,
+              "title": "Lon"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationHistory"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "tags": [
@@ -1661,6 +1992,24 @@
         ],
         "title": "DemoAck"
       },
+      "EventTypeCount": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "title": "Event Type"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "count"
+        ],
+        "title": "EventTypeCount"
+      },
       "GeocodeList": {
         "properties": {
           "results": {
@@ -1955,6 +2304,87 @@
         ],
         "title": "LightningReplayRequest"
       },
+      "LocationHistory": {
+        "properties": {
+          "report_radius_mi": {
+            "type": "number",
+            "title": "Report Radius Mi",
+            "default": 5.0
+          },
+          "storm_radius_mi": {
+            "type": "number",
+            "title": "Storm Radius Mi",
+            "default": 25.0
+          },
+          "reports": {
+            "items": {
+              "$ref": "#/components/schemas/PastReport"
+            },
+            "type": "array",
+            "title": "Reports",
+            "description": "Crew reports within report_radius_mi, newest first (max 50)"
+          },
+          "storm_events": {
+            "items": {
+              "$ref": "#/components/schemas/PastStormEvent"
+            },
+            "type": "array",
+            "title": "Storm Events",
+            "description": "NOAA Storm Events within storm_radius_mi, newest first (max 50)"
+          },
+          "storm_event_count": {
+            "type": "integer",
+            "title": "Storm Event Count",
+            "description": "All of them, not just the 50 listed"
+          },
+          "storm_event_types": {
+            "items": {
+              "$ref": "#/components/schemas/EventTypeCount"
+            },
+            "type": "array",
+            "title": "Storm Event Types",
+            "description": "Most common first"
+          },
+          "storm_years": {
+            "type": "string",
+            "title": "Storm Years",
+            "description": "Years the NOAA data covers",
+            "examples": [
+              "2024-2025"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "reports",
+          "storm_events",
+          "storm_event_count",
+          "storm_event_types",
+          "storm_years"
+        ],
+        "title": "LocationHistory"
+      },
+      "MarkRead": {
+        "properties": {
+          "ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ids",
+            "description": "Omit to mark all of them read"
+          }
+        },
+        "type": "object",
+        "title": "MarkRead"
+      },
       "Me": {
         "properties": {
           "user": {
@@ -2043,6 +2473,355 @@
           "role"
         ],
         "title": "MySite"
+      },
+      "Notification": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "Increases over time; pass the newest as `after` to get only newer ones"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "crew_report",
+              "alert",
+              "briefing"
+            ],
+            "title": "Kind"
+          },
+          "site_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Id"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "danger"
+            ],
+            "title": "Severity"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "examples": [
+              "Sinkhole reported at Big Bend"
+            ]
+          },
+          "body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
+          },
+          "link": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link",
+            "description": "Page to open, e.g. /sites/621"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "read": {
+            "type": "boolean",
+            "title": "Read"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "site_id",
+          "severity",
+          "title",
+          "created_at",
+          "read"
+        ],
+        "title": "Notification",
+        "description": "Something that happened on one of your sites: a crew report, a danger alert or the 6 PM briefing."
+      },
+      "NotificationList": {
+        "properties": {
+          "notifications": {
+            "items": {
+              "$ref": "#/components/schemas/Notification"
+            },
+            "type": "array",
+            "title": "Notifications",
+            "description": "Newest first"
+          },
+          "unread": {
+            "type": "integer",
+            "title": "Unread"
+          }
+        },
+        "type": "object",
+        "required": [
+          "notifications",
+          "unread"
+        ],
+        "title": "NotificationList"
+      },
+      "PastReport": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "site_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Id"
+          },
+          "site_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Name"
+          },
+          "hazard_type": {
+            "type": "string",
+            "enum": [
+              "wildlife",
+              "flooding",
+              "unstable_ground",
+              "downed_line",
+              "heat_illness",
+              "fire",
+              "other",
+              "lightning",
+              "high_wind",
+              "ice",
+              "snow",
+              "cold_stress",
+              "smoke",
+              "sinkhole",
+              "fallen_tree",
+              "gas_leak",
+              "earthquake_damage"
+            ],
+            "title": "Hazard Type"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Severity"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "resolved",
+              "expired"
+            ],
+            "title": "Status"
+          },
+          "distance_mi": {
+            "type": "number",
+            "title": "Distance Mi"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "site_id",
+          "site_name",
+          "hazard_type",
+          "severity",
+          "description",
+          "created_at",
+          "status",
+          "distance_mi"
+        ],
+        "title": "PastReport"
+      },
+      "PastStormEvent": {
+        "properties": {
+          "event_id": {
+            "type": "integer",
+            "title": "Event Id"
+          },
+          "event_type": {
+            "type": "string",
+            "title": "Event Type",
+            "examples": [
+              "Thunderstorm Wind",
+              "Flash Flood"
+            ]
+          },
+          "begin_ts": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Begin Ts"
+          },
+          "place": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Place",
+            "description": "NOAA's county or zone name, and state"
+          },
+          "distance_mi": {
+            "type": "number",
+            "title": "Distance Mi"
+          },
+          "injuries": {
+            "type": "integer",
+            "title": "Injuries"
+          },
+          "deaths": {
+            "type": "integer",
+            "title": "Deaths"
+          },
+          "damage_usd": {
+            "type": "integer",
+            "title": "Damage Usd"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_id",
+          "event_type",
+          "begin_ts",
+          "place",
+          "distance_mi",
+          "injuries",
+          "deaths",
+          "damage_usd"
+        ],
+        "title": "PastStormEvent"
+      },
+      "PushKey": {
+        "properties": {
+          "public_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Key",
+            "description": "VAPID key for PushManager.subscribe; null when push is off"
+          }
+        },
+        "type": "object",
+        "required": [
+          "public_key"
+        ],
+        "title": "PushKey"
+      },
+      "PushSubscriptionIn": {
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Endpoint"
+          },
+          "keys": {
+            "$ref": "#/components/schemas/PushSubscriptionKeys"
+          }
+        },
+        "type": "object",
+        "required": [
+          "endpoint",
+          "keys"
+        ],
+        "title": "PushSubscriptionIn",
+        "description": "What the browser's PushSubscription.toJSON() returns."
+      },
+      "PushSubscriptionKeys": {
+        "properties": {
+          "p256dh": {
+            "type": "string",
+            "title": "P256Dh"
+          },
+          "auth": {
+            "type": "string",
+            "title": "Auth"
+          }
+        },
+        "type": "object",
+        "required": [
+          "p256dh",
+          "auth"
+        ],
+        "title": "PushSubscriptionKeys"
+      },
+      "PushUnsubscribe": {
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Endpoint"
+          }
+        },
+        "type": "object",
+        "required": [
+          "endpoint"
+        ],
+        "title": "PushUnsubscribe"
       },
       "ReportList": {
         "properties": {

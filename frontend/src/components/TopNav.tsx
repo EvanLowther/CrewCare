@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, LogIn, LogOut, Menu, Plus, Search, X } from "lucide-react";
+import { LogIn, LogOut, Menu, Plus, Search, TriangleAlert, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Suspense, useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -8,6 +8,7 @@ import { api, type SiteSummary } from "@/lib/api";
 import { DEV_AUTH, DEV_USERS, devUser, setDevUser, SIGN_OUT_HREF, signInHref } from "@/lib/auth";
 import { usePolling } from "@/lib/usePolling";
 import { useMe } from "./MeProvider";
+import { Inbox } from "./Notifications";
 import { ScoreChip } from "./ui";
 
 const fetchAlerts = () => api.alerts();
@@ -280,7 +281,7 @@ export function TopNav() {
   const alertCount = useAlertCount();
 
   return (
-    <header className="sticky top-0 z-[1000] border-b border-line-soft bg-page/95 backdrop-blur">
+    <header className="sticky top-0 z-[1050] border-b border-line-soft bg-page/95 backdrop-blur">
       <div className="flex items-center gap-3 px-3 py-2.5 sm:px-6 xl:gap-5">
         <Logo />
         <div className="hidden xl:block">
@@ -294,6 +295,7 @@ export function TopNav() {
         >
           <Plus className="h-4 w-4" aria-hidden /> Report hazard
         </Link>
+        <Inbox />
         <div className="hidden xl:block">
           <Account compact />
         </div>
@@ -304,7 +306,7 @@ export function TopNav() {
           aria-label={`Alerts, ${alertCount} active`}
           className="relative flex h-11 w-11 items-center justify-center text-ink-2 xl:hidden"
         >
-          <Bell className="h-5 w-5" aria-hidden />
+          <TriangleAlert className="h-5 w-5" aria-hidden />
           {alertCount > 0 && (
             <span className="absolute top-1 right-0 rounded-full bg-[rgb(245_184_61/0.16)] px-1.5 font-mono text-[10px] text-risk-moderate">
               {alertCount}

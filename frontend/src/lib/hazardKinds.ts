@@ -107,10 +107,12 @@ const ALERT_TYPE_KINDS: Record<Alert["type"], HazardKind> = {
   nws: "other",
 };
 
-// NWS event names that arrive as the generic `nws` type, matched in order.
+// NWS event names (alerts that arrive as the generic `nws` type) and NOAA Storm Events types, matched in order.
 const NWS_EVENT_KINDS: [RegExp, HazardKind][] = [
-  [/winter|snow|blizzard|ice storm|freezing (rain|spray)|sleet|lake effect/i, "winter"],
-  [/cold|chill|freeze|frost|hard freeze/i, "cold"],
+  [/lightning/i, "lightning"],
+  [/hail|funnel|waterspout/i, "storm"],
+  [/winter|snow|blizzard|ice storm|freezing (rain|spray|fog)|sleet|lake.effect/i, "winter"],
+  [/cold|chill|freeze|frost/i, "cold"],
   [/fog|smoke|dust|ashfall/i, "visibility"],
   [/heat/i, "heat"],
   [/flood|surge|tsunami|hydrologic/i, "flood"],
@@ -120,6 +122,11 @@ const NWS_EVENT_KINDS: [RegExp, HazardKind][] = [
   [/air quality/i, "smoke"],
   [/earthquake/i, "earthquake"],
 ];
+
+/** Kind of an NWS alert event or a NOAA Storm Events type ("Thunderstorm Wind", "Flash Flood", ...). */
+export function eventKind(event: string): HazardKind {
+  return nwsKind(event);
+}
 
 function nwsKind(event: string): HazardKind {
   return NWS_EVENT_KINDS.find(([re]) => re.test(event))?.[1] ?? "other";

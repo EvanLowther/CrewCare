@@ -6,7 +6,7 @@ Wants=network-online.target
 [Service]
 User=planit
 WorkingDirectory=/opt/planit/backend
-ExecStart=/opt/planit/.venv/bin/uvicorn planit.api.main:app --host 127.0.0.1 --port 8000 --workers 2 --proxy-headers
+ExecStart=/opt/planit/.venv/bin/uvicorn planit.api.main:app --host 127.0.0.1 --port 8000 --workers 2 --proxy-headers --timeout-graceful-shutdown 5
 Restart=always
 RestartSec=3
 
