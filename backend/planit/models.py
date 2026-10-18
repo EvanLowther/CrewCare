@@ -13,7 +13,8 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 RiskLevel = Literal["low", "moderate", "high", "extreme"]
-AlertType = Literal["lightning", "flood", "heat", "storm", "wind", "wildfire", "crew_report", "nws"]
+AlertType = Literal["lightning", "flood", "heat", "storm", "wind", "wildfire", "air_quality", "earthquake",
+                    "crew_report", "nws"]
 AlertSeverity = Literal["info", "warning", "danger"]
 HazardType = Literal["wildlife", "flooding", "unstable_ground", "downed_line", "heat_illness", "fire", "other"]
 ReportSeverity = Literal["low", "medium", "high"]
@@ -72,6 +73,14 @@ class Last24h(BaseModel):
     total_precip_in: float | None
     max_heat_index_f: float | None
     max_gust_mph: float | None
+
+
+class AirQuality(BaseModel):
+    """Latest air-quality reading for a site (Open-Meteo / CAMS model values, hourly)."""
+    ts: datetime
+    us_aqi: float | None = Field(description="US AQI, worst pollutant")
+    us_aqi_pm2_5: float | None = Field(description="US AQI for PM2.5 alone (smoke): what the Real-time score uses")
+    pm2_5_ugm3: float | None = Field(description="PM2.5, µg/m³")
 
 
 # --- Alerts -----------------------------------------------------------------
@@ -156,6 +165,7 @@ class SiteDetail(BaseModel):
     site: SiteSummary
     conditions: Conditions | None
     last_24h: Last24h | None
+    air_quality: AirQuality | None = Field(default=None, description="Latest air-quality hour, for smoke")
     forecast: list[Conditions] = Field(description="Next 48 hours, hourly")
     alerts: list[Alert] = Field(description="Active alerts for this site")
     reports: list[HazardReport] = Field(description="Active crew reports within 5 miles")

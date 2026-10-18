@@ -310,15 +310,22 @@ the API and the worker, and deploys `main` automatically (see [`deploy/README.md
 **Real-time** (`hazards.py`) scores what's happening now against published rules: OSHA's heat-index bands, lift wind
 limits, the NWS wind chill chart (frostbite in 30 min at -18°F), Dense Fog Advisory visibility, rain rate, saturated
 ground, snow (Winter Storm Warning criteria, about 6 in in 24 h or 1 in/h), ice (Ice Storm Warning criteria, ¼ in), and
-about 50 NWS warning types (Tornado Warning 10, Blizzard Warning 9, Wind Advisory 4.5). A site's score is its
-worst hazard plus a little for other serious ones. **Predictive** is the model above on the same 0-10 scale, with the
-NWS warning, lightning and OSHA heat floors on top, hour by hour.
+about 50 NWS warning types (Tornado Warning 10, Blizzard Warning 9, Wind Advisory 4.5). Three hazards the weather
+can't show come from their own sources: **smoke** (the PM2.5 air quality index, hourly with a 2-day forecast, on the
+EPA categories and Cal/OSHA's wildfire smoke rule: N95s at AQI 151, respirators required above 500), **wildfires**
+(every active fire NIFC lists, by miles to its estimated edge, less once it's 90% contained) and **earthquakes** (every
+USGS quake, by the shaking it should cause at the site, from the Atkinson & Wald 2007 intensity equation USGS uses;
+damage starts around intensity VI). A site's score is its worst hazard plus a little for other serious ones.
+**Predictive** is the model above on the same 0-10 scale, with the NWS warning, lightning, wildfire, earthquake,
+smoke and OSHA heat floors on top, hour by hour.
 
 | Tool | What it does here |
 |---|---|
 | **Tiger Data (TimescaleDB + PostGIS)** | Hypertables for weather, NWS weather, lightning strikes and scores; a continuous aggregate (`time_bucket`, 1 day) for the model's daily features; `ST_DWithin` for strikes within 10 miles of a site |
 | **NWS API** | Hourly forecast and station observations for the Real-time score (wind chill, WBGT, visibility, ice), and every active warning in one national request, matched to sites by polygon or zone |
-| **Open-Meteo** | Hourly weather history for training; soil moisture, storm energy and the model's live inputs |
+| **Open-Meteo** | Hourly weather history for training; soil moisture, storm energy and the model's live inputs; air quality (PM2.5 AQI, CAMS model) for smoke |
+| **NIFC (WFIGS)** | Every active US wildfire in one national request: location, acres, % contained |
+| **USGS Earthquakes** | Every M2.5+ quake of the last day in one feed, scored by the shaking expected at each site |
 | **NOAA Storm Events** | The labels: what actually happened, where and when |
 | **EIA-860M** | Every US power plant, with coordinates, utility and type |
 | **Vultr** | Hosts the live site: one Ubuntu server running the site, API and worker behind Caddy (HTTPS), auto-deploying `main` |
@@ -330,7 +337,8 @@ NWS warning, lightning and OSHA heat floors on top, hour by hour.
 - **On a branch, not merged:** the lightning stop-work rule with its 30-minute countdown, and a `simulate` script for
   demos (lightning, hurricane, flood, blizzard). Demo buttons in the app come later.
 - **Not built:** the 6 PM next-day briefing (Gemini, with a template fallback), crew reports raising the score, the
-  river flood rule with NWS flood stages, and fire detections.
+  river flood rule with NWS flood stages, satellite fire detections (NASA FIRMS, which see new fires sooner than
+  NIFC's reports), fire perimeters, and debris flows.
 
 ## Limitations
 
@@ -340,7 +348,10 @@ NWS warning, lightning and OSHA heat floors on top, hour by hour.
 - Predictive answers "how likely is a NOAA-recorded hazard day", so on a breezy day that's over lift limits but not
   severe it stays low while Real-time doesn't. Quiet regions and seasons sit near 0; that's the real odds, on the
   shared scale.
-- The model can't see fires, smoke or earthquakes; wildfire days are missed unless the wind or an NWS warning flags them.
+- The model itself can't see fires, smoke or earthquakes (Q6); the Real-time rules do, and Predictive gets them only
+  through its floors. Fires are what agencies report to NIFC, so a new one can take hours to appear, and its edge is
+  estimated from its size, not its perimeter. Smoke is modelled (CAMS), not read from monitors. Earthquake shaking is
+  an estimate from magnitude and distance; it doesn't know the site's soil.
 
 ## Run it locally
 

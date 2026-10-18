@@ -28,6 +28,13 @@ Each hazard's severity is linear between anchors:
                       Storm Warning ~6 in; heavy snow >= 1 in/h
     ice, 24 h         0.05 in 3 · 0.1 4.5 · 0.25 7.5 · 0.5 9.5           NWS Ice Storm Warning ~1/4 in: lines and
                       limbs break; same kind as snow (one winter storm)
+    smoke (PM2.5 AQI) 100 0 · 150 3 · 200 5 · 300 7.5 · 500 10           EPA AQI categories (151 unhealthy, 301
+                      hazardous); Cal/OSHA 5141.1: N95s provided at AQI 151+, respirators required above 500
+    wildfire          miles to the fire's edge: 25 2.5 · 10 5 · 5 7 · 1 9.5; half at 90% contained; under 100 acres
+                      within 10 mi, spot fires (< 10 acres) within 5 mi and at most 4   PlanIT's own distances
+                      (there is no published rule); the edge is estimated from the acres
+    earthquake        shaking at the site (MMI): IV 1 · V 3 · VI 5 · VII 7.5 · VIII 9 · IX 10   Atkinson & Wald
+                      (2007) intensity prediction equation; USGS: damage begins at VI, considerable at VII
     NWS alerts       by event (NWS_EVENTS), e.g. Tornado Warning 10, Wind Advisory 4.5
 
 Site score = worst hazard + 0.25 x second + 0.10 x third, capped at 10 (combine()); the second and third only add
@@ -316,6 +323,145 @@ def ice(total_24h_in: float | None) -> Hazard | None:
     return _hazard("ice", piecewise(total_24h_in, ICE_24H_ANCHORS), f"{total_24h_in:.2f} in of ice in 24 h", action)
 
 
+# --- Smoke, wildfire, earthquakes ---------------------------------------------------------------------------
+
+EARTH_RADIUS_MI = 3958.8
+KM_PER_MILE = 1.609344
+
+
+def miles_between(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Great-circle distance in miles."""
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp, dl = p2 - p1, math.radians(lon2 - lon1)
+    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * EARTH_RADIUS_MI * math.asin(math.sqrt(a))
+
+
+# US AQI for PM2.5 -> severity. EPA categories: 101 unhealthy for sensitive groups, 151 unhealthy, 201 very
+# unhealthy, 301 hazardous. Cal/OSHA 5141.1 (wildfire smoke): N95s provided at 151+, respirators required above 500.
+SMOKE_ANCHORS = [(100, 0.0), (150, 3.0), (200, 5.0), (300, 7.5), (500, 10.0)]
+# (at least AQI, category, action), highest first
+SMOKE_BANDS = [
+    (501, "beyond the AQI", "Respirators required (Cal/OSHA 5141.1); move work indoors or postpone it"),
+    (301, "hazardous", "N95s for everyone outdoors; postpone strenuous work"),
+    (201, "very unhealthy", "N95s for outdoor work (Cal/OSHA 5141.1); cut exertion; filtered, enclosed cabs"),
+    (151, "unhealthy", "Hand out N95s (Cal/OSHA 5141.1); cut exertion; filtered, enclosed cabs"),
+    (101, "unhealthy for sensitive groups", "Limit strenuous work for crew with asthma or heart conditions"),
+    (float("-inf"), "", None),
+]
+
+
+def smoke(us_aqi_pm2_5: float | None) -> Hazard | None:
+    if us_aqi_pm2_5 is None:
+        return None
+    _, category, action = _band(us_aqi_pm2_5, SMOKE_BANDS)
+    label = f"Air quality AQI {round(us_aqi_pm2_5)} (smoke / PM2.5)" + (f" · {category}" if category else "")
+    return _hazard("smoke", piecewise(us_aqi_pm2_5, SMOKE_ANCHORS), label, action)
+
+
+# Miles from the fire's edge -> severity. PlanIT's own distances: there's no published stand-off rule. The actions
+# borrow the stages of the Ready, Set, Go! evacuation program (be ready, set to leave, go); the miles are ours.
+WILDFIRE_ANCHORS = [(1.0, 9.5), (5.0, 7.0), (10.0, 5.0), (25.0, 2.5)]
+WILDFIRE_RADIUS_MI = 25.0  # fires farther than this from a site are ignored
+SMALL_FIRE_ACRES = 100.0  # smaller fires only count within SMALL_FIRE_RADIUS_MI
+SMALL_FIRE_RADIUS_MI = 10.0
+# Spot fires (no size yet, or under 10 acres) only count within 5 mi and at most "moderate": dispatch centers log
+# every brush call (LA County files dozens a day at 0.01 acres), and most are out within the hour.
+SPOT_FIRE_ACRES = 10.0
+SPOT_FIRE_RADIUS_MI = 5.0
+SPOT_FIRE_CAP = 4.0
+MOSTLY_CONTAINED_PCT = 90.0  # severity halves from here; 100% contained isn't a hazard
+ACRES_PER_SQ_MI = 640.0
+
+
+def fire_edge_mi(distance_mi: float, acres: float | None) -> float:
+    """Miles from a site to a fire's edge, treating the fire as a circle of its size around its reported point."""
+    radius = math.sqrt((acres or 0.0) / ACRES_PER_SQ_MI / math.pi)
+    return max(0.0, distance_mi - radius)
+
+
+def wildfire(name: str, distance_mi: float, acres: float | None, contained_pct: float | None) -> Hazard | None:
+    """An active wildfire `distance_mi` from the site (to its reported point)."""
+    contained = contained_pct or 0.0
+    size = acres or 0.0
+    edge = fire_edge_mi(distance_mi, acres)
+    spot = size < SPOT_FIRE_ACRES
+    if contained >= 100 or edge > WILDFIRE_RADIUS_MI:
+        return None
+    if (size < SMALL_FIRE_ACRES and edge > SMALL_FIRE_RADIUS_MI) or (spot and edge > SPOT_FIRE_RADIUS_MI):
+        return None
+    severity = piecewise(edge, WILDFIRE_ANCHORS) * (0.5 if contained >= MOSTLY_CONTAINED_PCT else 1.0)
+    if spot:
+        severity = min(severity, SPOT_FIRE_CAP)
+    if severity >= 7.5:
+        action = "Evacuate crews if ordered; follow incident command; keep access roads clear for engines"
+    elif severity >= 5:
+        action = "Set to leave: two exit routes, vehicles fueled and facing out; no hot work"
+    elif severity >= 2.5:
+        action = "Watch for smoke and road closures; no hot work"
+    else:
+        action = None
+    size_label = f", {acres:,.0f} acres" if acres and acres >= 1 else ", small" if spot else ""
+    pct = f", {round(contained)}% contained" if contained_pct is not None else ""
+    where = "at the site" if edge < 0.5 else f"{edge:.0f} mi away" if edge >= 2 else f"{edge:.1f} mi away"
+    title = name.strip().title()
+    if not title.endswith(("Fire", "Complex")):
+        title += " Fire"
+    return _hazard("alert_wildfire", severity, f"{title} {where}{size_label}{pct}", action)
+
+
+# Atkinson & Wald (2007), "Did You Feel It?" intensity data, Seismological Research Letters 78(3), Table 1:
+# MMI = c1 + c2 (M-6) + c3 (M-6)^2 + c4 log R + c5 R + c6 B + c7 M log R, R = sqrt(D^2 + h^2) (km),
+# B = 0 within Rt, log(R / Rt) beyond. D is the distance to the fault, about the hypocentral distance for small and
+# moderate quakes. USGS "Did You Feel It?" uses this equation; the coefficients reproduce its published curves.
+AW07 = {
+    "west": {"c1": 12.27, "c2": 2.270, "c3": 0.1304, "c4": -1.30, "c5": -0.0007070, "c6": 1.95, "c7": -0.577,
+             "h": 14.0, "rt": 30.0},  # California, used for the active West, Alaska and Hawaii
+    "east": {"c1": 11.72, "c2": 2.36, "c3": 0.1155, "c4": -0.44, "c5": -0.002044, "c6": 2.31, "c7": -0.479,
+             "h": 17.0, "rt": 80.0},  # central and eastern US: shaking carries much farther
+}
+WEST_OF_LONGITUDE = -104.0  # the Rockies' front: AW07's California set to the west, CEUS to the east
+
+
+def quake_region(longitude: float) -> str:
+    return "west" if longitude < WEST_OF_LONGITUDE else "east"
+
+
+def earthquake_mmi(magnitude: float, distance_km: float, depth_km: float, region: str) -> float:
+    """Estimated shaking (Modified Mercalli Intensity) at a site `distance_km` from the epicenter."""
+    c = AW07[region]
+    d = math.hypot(distance_km, depth_km)  # hypocentral distance
+    r = math.hypot(d, c["h"])
+    b = math.log10(r / c["rt"]) if r > c["rt"] else 0.0
+    m = magnitude - 6
+    return (c["c1"] + c["c2"] * m + c["c3"] * m * m + c["c4"] * math.log10(r) + c["c5"] * r + c["c6"] * b
+            + c["c7"] * magnitude * math.log10(r))
+
+
+# MMI -> severity. USGS intensity scale: IV light (felt indoors by many), V moderate (felt by nearly everyone),
+# VI strong (some damage), VII very strong (considerable damage to poorly built structures), VIII+ severe.
+QUAKE_ANCHORS = [(3.5, 0.0), (4.0, 1.0), (5.0, 3.0), (6.0, 5.0), (7.0, 7.5), (8.0, 9.0), (9.0, 10.0)]
+QUAKE_MIN_MMI = 4.0  # below IV (light) a quake isn't an alert
+ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]
+
+
+def mmi_roman(mmi: float) -> str:
+    return ROMAN[max(1, min(10, round(mmi))) - 1]
+
+
+def earthquake(magnitude: float, distance_mi: float, mmi: float) -> Hazard | None:
+    if mmi < QUAKE_MIN_MMI:
+        return None
+    if mmi >= 6.5:
+        action = "Stop work; inspect structures, lines, slopes and excavations before resuming; expect aftershocks"
+    elif mmi >= 4.5:
+        action = "Pause crane, elevated and trench work; check structures, lines and slopes before resuming"
+    else:
+        action = "Check for loose material at height and in excavations"
+    label = f"M{magnitude:.1f} earthquake {distance_mi:.0f} mi away · shaking {mmi_roman(mmi)} (est.)"
+    return _hazard("alert_earthquake", piecewise(mmi, QUAKE_ANCHORS), label, action)
+
+
 # --- Alerts -------------------------------------------------------------------------------------------------
 
 # NWS event (lowercase) -> (severity, action). Anything not listed falls back to NWS_SEVERITY_FALLBACK.
@@ -391,10 +537,13 @@ def badge_for(severity: float) -> str:
 def alert(a: dict) -> Hazard:
     """Hazard for an active app alert.
 
-    `a` has "type", "severity", "title" and optionally "nws_event", "nws_severity", "nearest_mi".
+    `a` has "type", "severity", "title" and optionally "nws_event", "nws_severity", "nearest_mi", and
+    "rule_severity" + "action" for alerts these rules scored when they were raised (wildfire, earthquake).
     """
     if a["type"] == "lightning":
         return lightning(a.get("nearest_mi"))
+    if a.get("rule_severity") is not None:
+        return Hazard(f"alert_{a['type']}", float(a["rule_severity"]), a["title"], a.get("action"))
     if a.get("nws_event"):
         severity, action = nws_event(a["nws_event"], a.get("nws_severity"))
         return Hazard(f"alert_{a['type']}", severity, a["nws_event"], action)
@@ -418,6 +567,9 @@ KINDS = {
     "cold": "cold", "visibility": "visibility",
     # Snow and ice come from the same winter storm.
     "snow": "winter", "ice": "winter",
+    # A Red Flag Warning and a fire nearby are one fire danger; smoke counts apart (it travels hundreds of miles).
+    "alert_wildfire": "fire", "smoke": "air", "alert_air_quality": "air",
+    "alert_earthquake": "earthquake",
 }
 
 

@@ -14,6 +14,7 @@ from datetime import UTC, date, datetime, timedelta
 
 from planit.auth import CurrentUser
 from planit.models import (
+    AirQuality,
     Alert,
     Briefing,
     Conditions,
@@ -49,7 +50,7 @@ _SCORES = {9001: 8.4, 9011: 7.9, 9003: 6.6, 9008: 6.1, 9006: 5.2, 9002: 4.8,
            9005: 4.1, 9004: 3.6, 9012: 3.0, 9007: 2.4, 9010: 1.9, 9009: 1.2}
 
 _FIXED_IDS = {name: uuid.uuid5(uuid.NAMESPACE_URL, f"planit-mock/{name}") for name in
-              ["lightning", "heat", "flood", "report-gator", "report-mud"]}
+              ["lightning", "heat", "flood", "wildfire", "smoke", "report-gator", "report-mud"]}
 
 
 def _now() -> datetime:
@@ -129,6 +130,24 @@ def _alerts() -> list[Alert]:
             meta={"rain_12h_in": 3.1, "stage_ft": 9.2, "action_stage_ft": 10.0, "gauge_id": "02292900"},
             updated_at=now - timedelta(hours=1),
         ),
+        Alert(
+            id=_FIXED_IDS["wildfire"], site_id=9011, site_name="Everglades Solar Energy Center", type="wildfire",
+            severity="warning", title="Mile Marker 39 Fire 6 mi away, 4,200 acres, 40% contained",
+            message="Set to leave: two exit routes, vehicles fueled and facing out; no hot work",
+            status="active", started_at=now - timedelta(hours=9), all_clear_at=None, cleared_at=None,
+            meta={"source": "nifc", "incident": "Mile Marker 39", "acres": 4200, "contained_pct": 40,
+                  "distance_mi": 6.1, "rule_severity": 6.5,
+                  "action": "Set to leave: two exit routes, vehicles fueled and facing out; no hot work"},
+            updated_at=now - timedelta(minutes=40),
+        ),
+        Alert(
+            id=_FIXED_IDS["smoke"], site_id=9003, site_name="Martin Clean Energy Center", type="air_quality",
+            severity="info", title="Air Quality Alert issued by NWS Miami FL",
+            message="Smoke from Everglades fires: fine particle levels unhealthy for sensitive groups until 8 PM.",
+            status="active", started_at=now - timedelta(hours=4), all_clear_at=None, cleared_at=None,
+            meta={"source": "nws", "nws_event": "Air Quality Alert", "nws_severity": "Unknown"},
+            updated_at=now - timedelta(hours=4),
+        ),
     ]
 
 
@@ -185,6 +204,9 @@ def site_detail(site_id: int) -> SiteDetail | None:
             max_heat_index_f=max(c.heat_index_f or 0 for c in past),
             max_gust_mph=max(c.gust_mph or 0 for c in past),
         ),
+        # Smoke from the Everglades fire reaches the Martin site (its Air Quality Alert above); the rest is clean.
+        air_quality=AirQuality(ts=hour, us_aqi=128 if site_id == 9003 else 41,
+                               us_aqi_pm2_5=128 if site_id == 9003 else 33, pm2_5_ugm3=46.5 if site_id == 9003 else 8.0),
         forecast=[_conditions(site_id, hour + timedelta(hours=h)) for h in range(1, 49)],
         alerts=[a for a in _alerts() if a.site_id == site_id],
         reports=[r for r in _reports() if r.site_id == site_id],

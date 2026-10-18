@@ -1114,6 +1114,60 @@
         ],
         "title": "AdminUserList"
       },
+      "AirQuality": {
+        "properties": {
+          "ts": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ts"
+          },
+          "us_aqi": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Us Aqi",
+            "description": "US AQI, worst pollutant"
+          },
+          "us_aqi_pm2_5": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Us Aqi Pm2 5",
+            "description": "US AQI for PM2.5 alone (smoke): what the Real-time score uses"
+          },
+          "pm2_5_ugm3": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pm2 5 Ugm3",
+            "description": "PM2.5, \u00b5g/m\u00b3"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ts",
+          "us_aqi",
+          "us_aqi_pm2_5",
+          "pm2_5_ugm3"
+        ],
+        "title": "AirQuality",
+        "description": "Latest air-quality reading for a site (Open-Meteo / CAMS model values, hourly)."
+      },
       "Alert": {
         "properties": {
           "id": {
@@ -1138,6 +1192,8 @@
               "storm",
               "wind",
               "wildfire",
+              "air_quality",
+              "earthquake",
               "crew_report",
               "nws"
             ],
@@ -2227,6 +2283,17 @@
               }
             ]
           },
+          "air_quality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AirQuality"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Latest air-quality hour, for smoke"
+          },
           "forecast": {
             "items": {
               "$ref": "#/components/schemas/Conditions"
@@ -2467,6 +2534,8 @@
                   "storm",
                   "wind",
                   "wildfire",
+                  "air_quality",
+                  "earthquake",
                   "crew_report",
                   "nws"
                 ]

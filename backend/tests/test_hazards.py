@@ -142,3 +142,71 @@ def test_combine_counts_each_kind_of_hazard_once():
 
 def test_combine_without_hazards():
     assert H.combine([None, None]) == (0, [])
+
+
+def test_smoke_follows_the_aqi_categories_and_cal_osha():
+    assert H.smoke(None) is None and H.smoke(90) is None  # good / moderate air
+    unhealthy = H.smoke(175)
+    assert unhealthy.severity == 4.0 and unhealthy.label == "Air quality AQI 175 (smoke / PM2.5) · unhealthy"
+    assert "N95" in unhealthy.action and "5141.1" in unhealthy.action
+    assert H.smoke(200).severity == 5.0 and H.smoke(300).severity == 7.5
+    assert H.smoke(650).severity == 10.0 and "Respirators required" in H.smoke(650).action
+
+
+def test_wildfire_by_distance_to_the_edge_size_and_containment():
+    # A 50,000-acre fire is ~5 mi across its radius: its reported point 5 mi off puts the edge at the site.
+    big = H.wildfire("Creek", 5.0, 50_000, 20)
+    assert big.severity == 9.5 and big.label == "Creek Fire at the site, 50,000 acres, 20% contained"
+    assert "Evacuate" in big.action
+    near = H.wildfire("PARK FIRE", 10.0, 1000, 0)  # edge ~9.3 mi
+    assert near.severity == pytest.approx(5.3, abs=0.1) and near.label.startswith("Park Fire 9 mi away")
+    assert H.wildfire("Park", 10.0, 1000, 95).severity == pytest.approx(near.severity / 2)
+    assert H.wildfire("Park", 10.0, 1000, 100) is None  # contained
+    assert H.wildfire("Park", 30.0, 1000, 0) is None  # out of range
+    assert H.wildfire("Ridge", 12.0, 50, 0) is None and H.wildfire("Ridge", 8.0, 50, 0).severity > 5
+
+
+def test_spot_fires_count_only_close_and_at_most_moderate():
+    spot = H.wildfire("LAC-374499", 2.0, None, None)  # a dispatch record with no size yet
+    assert spot.severity == H.SPOT_FIRE_CAP and spot.label == "Lac-374499 Fire 2 mi away, small"
+    assert H.wildfire("LAC-374499", 6.0, 0.01, None) is None
+    assert H.fire_edge_mi(3.0, None) == 3.0
+
+
+@pytest.mark.parametrize(("region", "table"), [
+    # USGS "Did You Feel It?" Atkinson-Wald 2007 curves for an M5.4 (event us70005dj8), at 41, 97, 251 and 717 km
+    ("west", [4.01, 3.10, 1.98, 0.53]),
+    ("east", [5.27, 4.32, 3.71, 2.44]),
+])
+def test_earthquake_intensity_reproduces_the_usgs_curves(region, table):
+    distances = [41.1, 96.91, 251.38, 717.25]
+    assert [round(H.earthquake_mmi(5.4, d, 0.0, region), 2) for d in distances] == table
+
+
+def test_earthquake_severity_by_shaking():
+    assert H.quake_region(-118.6) == "west" and H.quake_region(-89.6) == "east"
+    assert H.mmi_roman(H.earthquake_mmi(6.0, 0.0, 0.0, "west")) == "VII"  # an M6 right under the site
+    assert H.earthquake_mmi(3.0, 100 * H.KM_PER_MILE, 8.0, "west") < H.QUAKE_MIN_MMI  # an M3 100 mi off: nothing
+    assert H.earthquake(3.0, 100, 2.1) is None
+    strong = H.earthquake(6.0, 5, 7.0)
+    assert strong.severity == 7.5 and strong.label == "M6.0 earthquake 5 mi away · shaking VII (est.)"
+    assert "aftershocks" in strong.action
+    assert H.earthquake(4.2, 3, 4.0).severity == 1.0
+
+
+def test_alerts_scored_when_raised_keep_their_severity_and_kind():
+    fire = H.alert({"type": "wildfire", "severity": "danger", "title": "Creek Fire at the site",
+                    "rule_severity": 9.5, "action": "Evacuate"})
+    assert (fire.key, fire.severity, fire.label, fire.action) == ("alert_wildfire", 9.5, "Creek Fire at the site",
+                                                                   "Evacuate")
+    red_flag = H.alert({"type": "wildfire", "severity": "warning", "title": "x", "nws_event": "Red Flag Warning"})
+    assert H.combine([red_flag, fire])[0] == 9.5  # one fire danger, counted once
+    smoke = H.smoke(250)  # smoke is its own kind: it compounds with the fire
+    ridge = H.wildfire("Ridge", 9.0, 800, 0)  # ~5.6
+    assert H.combine([ridge, smoke])[0] == round(smoke.severity + 0.25 * ridge.severity, 1)
+    assert H.KINDS["smoke"] == H.KINDS["alert_air_quality"] == "air"
+
+
+def test_miles_between():
+    assert H.miles_between(25.435, -80.331, 25.435, -80.331) == 0
+    assert H.miles_between(34.05, -118.25, 37.77, -122.42) == pytest.approx(347, abs=3)  # LA to San Francisco

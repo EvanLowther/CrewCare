@@ -4,15 +4,17 @@ Every run writes two scorers side by side, so the dashboard's Real-time / Predic
 
 - scorer 'rules' (Real-time), rules-v2 (planit/hazards.py): every hazard on one 0-10 scale anchored to published
   work rules (the NWS heat index on OSHA's bands, wind chill, visibility, lightning, forecast thunderstorms and
-  storm energy, wind gusts against lift limits, rain rate, 24 h rain, saturated ground, NWS alerts by event). The
+  storm energy, wind gusts against lift limits, rain rate, 24 h rain, saturated ground, smoke (PM2.5 AQI from
+  `air_quality`), NWS alerts by event, nearby wildfires and felt earthquakes (alerts the worker scores). The
   site score is the worst kind of hazard plus a little for other serious ones; each factor carries a recommended
   action. Its weather is the NWS forecast and station observations (`nws_weather`, every 30 min) laid over
   Open-Meteo (merge_weather()), which still supplies soil moisture, CAPE and hourly rain.
 - scorer 'ml' (Predictive), with a trained model in ml/models/ and PLANIT_SCORE_MODEL=xgb (the default): the XGBoost
   model scores each hour on the 24 hours around it (the "day" it learned from), on the Real-time scale (a Predictive
   5 is as likely to be a hazard day as a Real-time 5, see ml/model.py), with the OSHA heat floor, plus alert points
-  and a floor at the Real-time severity of any NWS warning or lightning in force that hour (combine()). Both floors
-  are per hour, so the forecast goes back down when the heat or the warning ends.
+  and a floor at the Real-time severity of any NWS warning, lightning, wildfire or earthquake alert in force that
+  hour (combine()), and of smoke (smoke_floor()). The floors are per hour, so the forecast goes back down when the
+  heat, the warning or the smoke ends.
 
 Rows carry the scorer's version ('rules-v2', 'xgb-2026-10-17').
 
@@ -77,6 +79,7 @@ class HourInputs:
     snow_1h_in: float | None = None
     snow_24h_in: float | None = None
     ice_24h_in: float | None = None
+    us_aqi_pm2_5: float | None = None  # smoke: US AQI for PM2.5 (`air_quality`, Open-Meteo / CAMS)
     is_forecast: bool = False
     alerts: list[dict] = field(default_factory=list)  # see alerts_at()
 
@@ -93,6 +96,7 @@ def rule_hazards(x: HourInputs) -> list[hazards.Hazard | None]:
         hazards.rain_rate(x.rain_1h_in),
         hazards.rain_24h(x.rain_24h_in),
         hazards.ground(x.soil_moisture, x.rain_72h_in),
+        hazards.smoke(x.us_aqi_pm2_5),
         *(hazards.alert(a) for a in x.alerts),
     ]
 
@@ -117,7 +121,7 @@ def _applies(alert: dict, hour: datetime) -> bool:
 
 def alerts_at(alerts: list[dict], hour: datetime) -> list[dict]:
     """Active alerts in force at `hour`: {"type", "severity", "title" (short), "nws_event", "nws_severity",
-    "nearest_mi"}, the shape both hazards.alert() and combine() take."""
+    "nearest_mi", "rule_severity", "action"}, the shape both hazards.alert() and combine() take."""
     out = []
     for a in alerts:
         if not _applies(a, hour):
@@ -125,8 +129,19 @@ def alerts_at(alerts: list[dict], hour: datetime) -> list[dict]:
         meta = a.get("meta") or {}
         out.append({"type": a["type"], "severity": a["severity"], "title": _short_title(a),
                     "nws_event": meta.get("nws_event"), "nws_severity": meta.get("nws_severity"),
-                    "nearest_mi": meta.get("nearest_strike_mi")})
+                    "nearest_mi": meta.get("nearest_strike_mi"),
+                    # Wildfire and earthquake alerts are scored by hazards.py when they're raised.
+                    "rule_severity": meta.get("rule_severity"), "action": meta.get("action")})
     return out
+
+
+AIR_STALE_AFTER = timedelta(hours=3)  # air_quality is polled every 2 h
+
+
+def aqi_at(air: list[dict], hour: datetime) -> float | None:
+    """US AQI for PM2.5 at `hour`: that hour's row, or the latest one in the 3 h before it."""
+    rows = [a for a in air if hour - AIR_STALE_AFTER <= a["ts"] <= hour and a.get("us_aqi_pm2_5") is not None]
+    return max(rows, key=lambda a: a["ts"])["us_aqi_pm2_5"] if rows else None
 
 
 def _total(rows: list[dict], key: str) -> float | None:
@@ -163,9 +178,10 @@ def merge_weather(open_meteo: list[dict], nws: list[dict]) -> list[dict]:
     return rows
 
 
-def build_inputs(weather: list[dict], alerts: list[dict], hours: list[datetime]) -> dict[datetime, HourInputs]:
-    """Per-hour rules-v2 inputs for one site. `weather` rows are observed up to now and forecast after; hours[0]
-    is now."""
+def build_inputs(weather: list[dict], alerts: list[dict], hours: list[datetime],
+                 air: list[dict] | None = None) -> dict[datetime, HourInputs]:
+    """Per-hour rules-v2 inputs for one site. `weather` (and `air`, air_quality rows) are observed up to now and
+    forecast after; hours[0] is now."""
     by_hour = {w["ts"]: w for w in weather}
     out = {}
     for hour in hours:
@@ -189,6 +205,7 @@ def build_inputs(weather: list[dict], alerts: list[dict], hours: list[datetime])
             snow_1h_in=row.get("snowfall_in"),
             snow_24h_in=_total(last_24h, "snowfall_in"),
             ice_24h_in=_total(last_24h, "ice_in"),
+            us_aqi_pm2_5=aqi_at(air or [], hour),
             is_forecast=hour > hours[0], alerts=alerts_at(alerts, hour),
         )
     return out
@@ -226,6 +243,17 @@ def combine(weather_score: float, weather_factors: list[dict], alerts: list[dict
             score = floor
     factors = sorted([*weather_factors, *extra], key=lambda f: f["contribution"], reverse=True)
     return round(score, 1), factors[:3]
+
+
+def smoke_floor(score: float, factors: list[dict], us_aqi_pm2_5: float | None) -> tuple[float, list[dict]]:
+    """ML scorer: never below the Real-time smoke severity at this hour. The model has never seen air quality, so
+    like the OSHA heat floor this keeps Predictive from calling a smoky day calm; smoke takes up the difference."""
+    smoke = hazards.smoke(us_aqi_pm2_5)
+    if smoke is None or smoke.severity <= score:
+        return score, factors
+    factor = {"key": "smoke", "label": smoke.label, "contribution": round(smoke.severity - score, 1),
+              "action": smoke.action}
+    return round(smoke.severity, 1), sorted([*factors, factor], key=lambda f: f["contribution"], reverse=True)[:3]
 
 
 def window_features(weather: list[dict], hour: datetime, site: dict | None = None) -> dict | None:
@@ -279,15 +307,15 @@ def ml_model():
 
 
 def ml_scores(model, weather: list[dict], alerts: list[dict], hours: list[datetime],
-              site: dict | None = None) -> dict[datetime, tuple]:
-    """(score, factors) per hour from the ML model, plus alert points and the lightning floor."""
+              site: dict | None = None, air: list[dict] | None = None) -> dict[datetime, tuple]:
+    """(score, factors) per hour from the ML model, plus alert points, the alert floor and the smoke floor."""
     import pandas as pd
 
     rows = [(hour, f) for hour in hours if (f := window_features(weather, hour, site)) is not None]
     if not rows:
         return {}
     frame = pd.DataFrame([f for _, f in rows], columns=model.features).astype(float)
-    return {hour: combine(score, factors, alerts_at(alerts, hour))
+    return {hour: smoke_floor(*combine(score, factors, alerts_at(alerts, hour)), aqi_at(air or [], hour))
             for (hour, _), (score, factors) in zip(rows, model.explain(frame), strict=True)}
 
 
@@ -342,6 +370,11 @@ def compute_scores() -> list[dict]:
         alerts = conn.execute(
             "SELECT site_id, type, severity, title, all_clear_at, meta FROM alerts WHERE status = 'active'"
         ).fetchall()
+        air = conn.execute(
+            "SELECT site_id, ts, us_aqi_pm2_5 FROM air_quality WHERE ts > %s AND ts <= %s "
+            "AND ((NOT is_forecast AND ts <= %s) OR (is_forecast AND ts > %s)) ORDER BY site_id, ts",
+            (current - AIR_STALE_AFTER, hours[-1], now, now),
+        ).fetchall()
 
     weather_by_site: dict[int, list[dict]] = defaultdict(list)
     for w in weather:
@@ -352,17 +385,20 @@ def compute_scores() -> list[dict]:
     alerts_by_site: dict[int, list[dict]] = defaultdict(list)
     for a in alerts:
         alerts_by_site[a["site_id"]].append(a)
+    air_by_site: dict[int, list[dict]] = defaultdict(list)
+    for a in air:
+        air_by_site[a["site_id"]].append(a)
 
     rows = []
     for site_id in weather_by_site.keys() | nws_by_site.keys():
-        site_weather, site_alerts = weather_by_site[site_id], alerts_by_site[site_id]
+        site_weather, site_alerts, site_air = weather_by_site[site_id], alerts_by_site[site_id], air_by_site[site_id]
         # Real-time: NWS readings over Open-Meteo. Predictive: Open-Meteo only, the source the model was trained on.
         rules_weather = merge_weather(site_weather, nws_by_site[site_id])
         scorers = [("rules", MODEL_VERSION,
-                    {h: score_hour(x) for h, x in build_inputs(rules_weather, site_alerts, hours).items()})]
+                    {h: score_hour(x) for h, x in build_inputs(rules_weather, site_alerts, hours, site_air).items()})]
         if model:
             scorers.append(("ml", model.version, ml_scores(model, site_weather, site_alerts, hours,
-                                                           sites.get(site_id))))
+                                                           sites.get(site_id), site_air)))
         for scorer, version, scored in scorers:
             for hour, (score, factors) in scored.items():
                 rows.append({"site_id": site_id, "ts": hour, "kind": "current" if hour == current else "forecast",

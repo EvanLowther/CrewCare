@@ -396,6 +396,32 @@ export interface components {
             /** Users */
             users: components["schemas"]["AdminUser"][];
         };
+        /**
+         * AirQuality
+         * @description Latest air-quality reading for a site (Open-Meteo / CAMS model values, hourly).
+         */
+        AirQuality: {
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+            /**
+             * Us Aqi
+             * @description US AQI, worst pollutant
+             */
+            us_aqi: number | null;
+            /**
+             * Us Aqi Pm2 5
+             * @description US AQI for PM2.5 alone (smoke): what the Real-time score uses
+             */
+            us_aqi_pm2_5: number | null;
+            /**
+             * Pm2 5 Ugm3
+             * @description PM2.5, µg/m³
+             */
+            pm2_5_ugm3: number | null;
+        };
         /** Alert */
         Alert: {
             /**
@@ -411,7 +437,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "lightning" | "flood" | "heat" | "storm" | "wind" | "wildfire" | "crew_report" | "nws";
+            type: "lightning" | "flood" | "heat" | "storm" | "wind" | "wildfire" | "air_quality" | "earthquake" | "crew_report" | "nws";
             /**
              * Severity
              * @enum {string}
@@ -874,6 +900,8 @@ export interface components {
             site: components["schemas"]["SiteSummary"];
             conditions: components["schemas"]["Conditions"] | null;
             last_24h: components["schemas"]["Last24h"] | null;
+            /** @description Latest air-quality hour, for smoke */
+            air_quality?: components["schemas"]["AirQuality"] | null;
             /**
              * Forecast
              * @description Next 48 hours, hourly
@@ -976,7 +1004,7 @@ export interface components {
              * Top Alert
              * @description Most severe active alert type, for the map icon
              */
-            top_alert: ("lightning" | "flood" | "heat" | "storm" | "wind" | "wildfire" | "crew_report" | "nws") | null;
+            top_alert: ("lightning" | "flood" | "heat" | "storm" | "wind" | "wildfire" | "air_quality" | "earthquake" | "crew_report" | "nws") | null;
             /** Heat Index F */
             heat_index_f: number | null;
             /**
