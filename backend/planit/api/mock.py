@@ -32,6 +32,7 @@ from planit.models import (
     RiskFactor,
     RiskPoint,
     RiverStatus,
+    ScorePoint,
     SiteDetail,
     SiteSummary,
     User,
@@ -222,7 +223,20 @@ def site_detail(site_id: int) -> SiteDetail | None:
         alerts=[a for a in _alerts() if a.site_id == site_id],
         reports=[r for r in _reports() if r.site_id == site_id],
         risk_history=history,
+        recent_scores=_recent_scores(site_id),
     )
+
+
+def _recent_scores(site_id: int) -> list[ScorePoint]:
+    """12 hours of 5-minute scores drifting around the site's current score."""
+    now = _now().replace(second=0, microsecond=0)
+    now -= timedelta(minutes=now.minute % 5)
+    base = _risk(site_id).score
+    points = []
+    for i in range(144, -1, -1):
+        score = round(min(10.0, max(0.0, base + 1.2 * math.sin((i + site_id) / 9) + 0.3 * math.sin(i / 2))), 1)
+        points.append(ScorePoint(ts=now - timedelta(minutes=5 * i), score=score, level=_level(score)))
+    return points
 
 
 def alerts(site_id: int | None = None) -> list[Alert]:
