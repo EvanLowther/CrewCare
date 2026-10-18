@@ -37,7 +37,7 @@ export function Logo() {
         <rect x="1" y="1" width="24" height="24" rx="5" fill="none" stroke="var(--color-accent)" strokeWidth="1.5" />
         <path d="M8 19 V13 M13 19 V7 M18 19 V10" stroke="var(--color-accent)" strokeWidth="2" strokeLinecap="round" />
       </svg>
-      <span className="font-display text-[20px] font-extrabold tracking-[0.06em] whitespace-nowrap sm:text-[22px]">CREW CARE</span>
+      <span className="font-display text-[20px] font-extrabold tracking-[0.06em] whitespace-nowrap sm:text-[22px]">CREWCARE</span>
     </Link>
   );
 }
