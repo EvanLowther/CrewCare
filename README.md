@@ -309,7 +309,7 @@ and snow depth 2% each. The national features (snowfall, wind chill, location) r
   live NWS weather, smoke, nearby alerts and both scores. The model is national (it knows latitude and longitude),
   so a new location needs no retraining.
 
-**Live:** [planit.207-246-119-236.sslip.io](https://planit.207-246-119-236.sslip.io/). One Vultr server runs the site,
+**Live:** [crewcare.207-246-119-236.sslip.io](https://crewcare.207-246-119-236.sslip.io/). One Vultr server runs the site,
 the API and the worker, and deploys `main` automatically (see [`deploy/README.md`](deploy/README.md)).
 
 **Real-time** (`hazards.py`) scores what's happening now against published rules: OSHA's heat-index bands, lift wind

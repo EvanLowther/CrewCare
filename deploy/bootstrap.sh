@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One-time server setup for Ubuntu 24.04, run as root:  bash bootstrap.sh <hostname>
-#   e.g. bash bootstrap.sh planit.203-0-113-7.sslip.io
+#   e.g. bash bootstrap.sh crewcare.203-0-113-7.sslip.io
 # Safe to run again. See deploy/README.md for the full order of steps.
 set -euo pipefail
 
@@ -81,7 +81,7 @@ fi
 
 echo "== services"
 cp "$APP"/deploy/systemd/*.service "$APP"/deploy/systemd/*.timer /etc/systemd/system/
-sed "s/^PLANIT_HOST /$HOST /" "$APP/deploy/Caddyfile" > /etc/caddy/Caddyfile
+sed "s/PLANIT_HOST/$HOST/g" "$APP/deploy/Caddyfile" > /etc/caddy/Caddyfile
 systemctl daemon-reload
 systemctl enable planit-api planit-worker planit-web planit-deploy.timer
 systemctl reload-or-restart caddy
