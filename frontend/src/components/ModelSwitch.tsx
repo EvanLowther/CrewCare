@@ -2,10 +2,10 @@
 
 import type { Scorer } from "@/lib/api";
 
-export const MODEL_LABELS: Record<Scorer, string> = { ml: "Predictive (ML model)", rules: "Real-time (rules-v2)" };
+export const MODEL_LABELS: Record<Scorer, string> = { ml: "Predictive (ML model)", rules: "Real-time data" };
 
 const OPTIONS: { value: Scorer; label: string; short: string; title: string }[] = [
-  { value: "rules", label: "Real-time rules", short: "Real-time", title: "Rules-v2: OSHA/NWS work-rule thresholds on current heat, storms, wind, rain and alerts" },
+  { value: "rules", label: "Real-time data", short: "Real-time", title: "Rules-v2: OSHA/NWS work-rule thresholds on current heat, storms, wind, rain and alerts" },
   { value: "ml", label: "Predictive model", short: "Predictive", title: "ML model: XGBoost trained on 2023-2025 weather and NOAA storm records" },
 ];
 

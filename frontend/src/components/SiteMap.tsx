@@ -11,6 +11,7 @@ import { ALERT_ICONS, ALERT_LABELS, SEVERITY_STYLES } from "@/lib/alerts";
 import { relativeTime } from "@/lib/format";
 import { HAZARD_ICON_PATHS, HAZARD_LABELS, REPORT_SEVERITY_COLORS } from "@/lib/reports";
 import { NO_SCORE_COLOR, RISK_COLORS, RISK_GUIDANCE, RISK_LABELS, RISK_TEXT } from "@/lib/risk";
+import { useIsShown } from "@/lib/useIsShown";
 
 const US_CENTER: L.LatLngTuple = [39.5, -98.35];
 
@@ -169,6 +170,8 @@ export default function SiteMap({
   zoomPosition?: L.ControlPosition;
 }) {
   const markers = useRef(new Map<number, L.Marker>());
+  // Only while the page is on screen, so returning to it builds a fresh map (see useIsShown).
+  const shown = useIsShown();
   const [zoom, setZoom] = useState(focus?.zoom ?? 4);
   const tier = tierFor(zoom);
   // Draw the riskiest sites on top when markers overlap.
@@ -182,6 +185,7 @@ export default function SiteMap({
     return worst;
   }, [alerts]);
 
+  if (!shown) return null;
   return (
     // Scroll-wheel zoom off so scrolling the page over the map scrolls the page; +/- and pinch still zoom.
     // Start at the focus when there is one: jumping from zoom 4 leaves stretched zoom-4 label tiles behind.

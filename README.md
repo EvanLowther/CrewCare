@@ -264,7 +264,7 @@ where fire, dust and dry air matter most, is the one to re-check with more histo
 
 ### By hazard
 
-| Hazard (NOAA event types) | Days | Predictive | Real-time rules |
+| Hazard (NOAA event types) | Days | Predictive | Real-time data |
 |---|---|---|---|
 | Heat | 626 | **92%** | 63% |
 | Tropical (hurricane, tropical storm, surge) | 349 | 93% | **96%** |
