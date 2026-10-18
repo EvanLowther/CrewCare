@@ -36,9 +36,9 @@ What's left, measured against the Sperry Tech brief (`.github/sperry tech.pdf`).
       all-clear that restarts with each strike, replay) fed by GOES GLM every 20 s (`ingest/glm.py`)
 - [x] ⭐ River flood-risk warning: sites within 2 mi of an NWS river gauge with flood stages get a `flood` alert when
       the river is at or forecast to reach action stage, or after 1 in of rain in 12 h (NOAA NWPS, every 15 min)
-- [ ] ⭐ Crew reports in the risk picture: an active report near a site (wildlife, downed line, flooding, heat
-      illness, ...) becomes a hazard in both scores, like fire and quake alerts, and a `crew_report` alert for that
-      site so its team hears about it (the alert type exists; nothing creates it yet)
+- [x] ⭐ Crew reports in the risk picture: active reports on a site or within 1 mi count in both scores by type and
+      severity; weather confirms checkable ones (never rejects), managers can confirm any; medium and high ones raise a
+      `crew_report` alert for the site's team
 
 ### Person B (API + app)
 - [ ] Demo buttons for admins: lightning replay (`POST /api/demo/lightning-replay` exists) once lightning is merged

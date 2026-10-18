@@ -247,7 +247,8 @@ def get_site(site_id: int, scorer: str | None = None, user: CurrentUser | None =
         visible, vis_params = visible_sites_sql(user, alias="rs")
         reports = conn.execute(
             "SELECT r.id, r.site_id, r.latitude, r.longitude, r.hazard_type, r.severity, r.description, "
-            "r.reporter_name, r.photo_id, r.status, r.created_at, r.expires_at "
+            "r.reporter_name, r.photo_id, r.status, r.created_at, r.expires_at, r.confirmed_at, "
+            "(SELECT coalesce(u.name, u.email) FROM users u WHERE u.id = r.confirmed_by) AS confirmed_by_name "
             "FROM hazard_reports r JOIN sites s ON s.id = %(site_id)s LEFT JOIN sites rs ON rs.id = r.site_id "
             "WHERE r.status = 'active' AND (r.expires_at IS NULL OR r.expires_at > now()) "
             f"AND (r.site_id = s.id OR (ST_DWithin(r.geom, s.geom, %(radius)s) AND (rs.id IS NULL OR {visible}))) "

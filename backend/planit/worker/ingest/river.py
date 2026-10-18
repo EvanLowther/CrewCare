@@ -30,9 +30,9 @@ MATCH_RADIUS_MI = 2.0
 FORECAST_HOURS = 48
 NO_VALUE = -900.0  # NWPS uses -999 / -9999 for "none"
 STAGE_NAMES = ("action", "minor", "moderate", "major")
-# SHEF codes of what a gauge measures (pedts.observed): HG river stage, HP reservoir pool at a dam. Tide and coastal
-# water-level gauges (HM...) have flood stages too, but they're coastal flooding, not a river.
-RIVER_PEDTS = ("HG", "HP")
+# SHEF codes of what a gauge measures (pedts.observed): HG river stage, HP reservoir pool at a dam, HT tailwater below
+# a lock or dam. Tide and coastal water-level gauges (HM...) have flood stages too, but they're coastal, not a river.
+RIVER_PEDTS = ("HG", "HP", "HT")
 NOT_A_RIVER = ("tide", "ocean", "atlantic coast", "gulf coast", "pacific coast")
 REQUEST_PAUSE_S = 0.4  # NWPS answers 429 to bursts
 RETRIES = 3

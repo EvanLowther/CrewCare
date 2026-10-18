@@ -637,6 +637,81 @@ def alert(a: dict) -> Hazard:
     return Hazard(f"alert_{a['type']}", OTHER_ALERT_SEVERITY.get(a["severity"], 2.0), a["title"], None)
 
 
+# --- Crew reports -------------------------------------------------------------------------------------------
+
+# Report type -> (low, medium, high) severity, as the reporter rated it. PlanIT's own scale: what the crew saw, read
+# against the same work-rule levels (5 restricted work, 7.5 stop non-essential work).
+CREW_REPORT_SEVERITY: dict[str, tuple[float, float, float]] = {
+    "downed_line": (5.0, 7.0, 8.5),
+    "fire": (4.0, 6.5, 8.5),
+    "gas_leak": (5.0, 6.5, 7.0),
+    "lightning": (5.0, 6.5, 7.0),  # thunder heard: OSHA "when thunder roars, go indoors"
+    "flooding": (3.0, 5.0, 7.0),
+    "heat_illness": (4.0, 6.0, 7.0),
+    "unstable_ground": (3.0, 5.0, 7.0),
+    "sinkhole": (3.5, 5.5, 7.0),
+    "earthquake_damage": (3.5, 5.5, 7.0),
+    "wildlife": (2.5, 4.0, 6.0),
+    "fallen_tree": (2.5, 4.5, 6.5),
+}
+CREW_REPORT_DEFAULT = (2.5, 4.5, 6.5)  # high wind, ice, snow, cold stress, smoke, other
+CREW_SEVERITY_INDEX = {"low": 0, "medium": 1, "high": 2}
+# One report can make a site extreme only for these, unless a manager confirms it; everything else stops at high.
+CREW_EXTREME_TYPES = ("downed_line", "fire")
+CREW_REPORT_CAP = 7.0
+CREW_CONFIRMED_HIGH = 8.5  # a manager-confirmed high report of any type
+# Types live data can check (score.report_confirmation): until it agrees, or a manager confirms, they count at most
+# moderate. The others (wildlife, a downed line, ...) no feed can see, so they count as reported.
+CREW_CHECKABLE = ("lightning", "high_wind", "flooding", "ice", "snow", "smoke", "heat_illness", "cold_stress")
+CREW_UNCONFIRMED_CAP = 4.5
+CREW_KINDS = {"flooding": "water", "fire": "fire", "lightning": "storm", "high_wind": "wind", "heat_illness": "heat",
+              "ice": "winter", "snow": "winter", "cold_stress": "cold", "smoke": "air",
+              "earthquake_damage": "earthquake"}
+CREW_ACTIONS = {
+    "downed_line": "Stay 35 ft back; call the utility; don't drive over it or touch anything it touches",
+    "fire": "Move crews away and upwind; call 911; keep access clear for engines",
+    "gas_leak": "Evacuate upwind; no sparks, engines or phones near it; call the utility and 911",
+    "lightning": "Stop work and shelter until 30 min after the last thunder",
+    "flooding": "Keep vehicles off flooded ground; never drive through moving water",
+    "heat_illness": "Move the worker to shade, cool them, give water; call 911 if confused or not sweating",
+    "unstable_ground": "Keep equipment back from the edge; mat or reroute access",
+    "sinkhole": "Barricade the area; keep equipment well back",
+    "earthquake_damage": "Keep crews out of damaged structures until inspected",
+    "wildlife": "Keep clear and tell the crew; don't approach or feed it",
+    "fallen_tree": "Clear the route only with a sawyer; watch for lines in the branches",
+    "high_wind": "Ground aerial lifts; secure loose material",
+    "ice": "Ice cleats, de-icer, three points of contact",
+    "snow": "Clear walking surfaces; chains or 4x4 on access roads",
+    "cold_stress": "Warm-up breaks; watch each other for frostbite",
+    "smoke": "N95s for outdoor work; cut exertion",
+}
+
+
+def crew_report(hazard_type: str, severity: str, count: int = 1, confirmed_by: str | None = None,
+                by_manager: bool = False) -> Hazard:
+    """The hazard of the worst active report of one type at a site. `confirmed_by` is who or what backs it up: a
+    site manager's name (`by_manager`), or the live data that agrees (e.g. "GOES lightning")."""
+    table = CREW_REPORT_SEVERITY.get(hazard_type, CREW_REPORT_DEFAULT)
+    level = CREW_SEVERITY_INDEX.get(severity, 1)
+    value = table[level]
+    if by_manager:
+        value = max(value, CREW_CONFIRMED_HIGH) if severity == "high" else value
+    else:
+        if hazard_type not in CREW_EXTREME_TYPES:
+            value = min(value, CREW_REPORT_CAP)
+        if hazard_type in CREW_CHECKABLE and confirmed_by is None:
+            value = min(value, CREW_UNCONFIRMED_CAP)
+    what = hazard_type.replace("_", " ")
+    label = f"Crew report: {what} ({severity})"
+    if count > 1:
+        label += f" · {count} reports"
+    if confirmed_by:
+        label += f" · confirmed by {confirmed_by}"
+    elif hazard_type in CREW_CHECKABLE:
+        label += " · not yet confirmed"
+    return Hazard(f"report_{hazard_type}", value, label, CREW_ACTIONS.get(hazard_type))
+
+
 # --- Combining ----------------------------------------------------------------------------------------------
 
 COMPOUND = (1.0, 0.25, 0.10)  # weights for the worst, second and third kind of hazard
@@ -657,6 +732,8 @@ KINDS = {
     # A Red Flag Warning and a fire nearby are one fire danger; smoke counts apart (it travels hundreds of miles).
     "alert_wildfire": "fire", "fire_weather": "fire", "smoke": "air", "alert_air_quality": "air",
     "alert_earthquake": "earthquake",
+    # A crew report is the same danger as the weather it describes (a flooding report and heavy rain count once).
+    **{f"report_{t}": kind for t, kind in CREW_KINDS.items()},
 }
 
 
