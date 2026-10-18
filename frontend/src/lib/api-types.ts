@@ -1030,6 +1030,8 @@ export interface operations {
             query?: {
                 /** @description Whose risk scores: 'ml' (XGBoost, Predictive) or 'rules' (rules-v2, Real-time). Default: ml. */
                 model?: ("ml" | "rules") | null;
+                /** @description Score each site with its forecast this many hours from now (the dashboard's time slider). 0: the current score. */
+                hours_ahead?: number;
             };
             header?: never;
             path?: never;

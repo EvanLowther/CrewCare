@@ -31,14 +31,16 @@ REPORT_RADIUS_M = 8046.7
 
 _SEVERITY_RANK = "CASE severity WHEN 'danger' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END"
 
-# One row per site: latest current score, active alert count and most severe alert, latest heat index.
+# One row per site: latest current score (or, with %(ahead)s > 0, the newest forecast for that many hours from now),
+# active alert count and most severe alert, latest heat index.
 _SITE_SUMMARY_SQL = f"""
 WITH latest_score AS (
     SELECT DISTINCT ON (site_id) site_id, score, level, factors, model_version, computed_at
     FROM hazard_scores
-    WHERE kind = 'current' AND scorer = %(scorer)s
-      AND ts > now() - interval '2 days' AND ts <= now() + interval '1 hour'
-    ORDER BY site_id, ts DESC
+    WHERE scorer = %(scorer)s AND (
+        (%(ahead)s = 0 AND kind = 'current' AND ts > now() - interval '2 days' AND ts <= now() + interval '1 hour')
+        OR (%(ahead)s > 0 AND ts = date_trunc('hour', now()) + %(ahead)s * interval '1 hour'))
+    ORDER BY site_id, ts DESC, computed_at DESC
 ),
 active_alerts AS (
     SELECT site_id, count(*) AS n,
@@ -123,15 +125,16 @@ def default_scorer() -> str:
     return "ml" if settings.score_model == "xgb" else "rules"
 
 
-def list_sites(scorer: str | None = None, user: CurrentUser | None = None) -> list[SiteSummary]:
+def list_sites(scorer: str | None = None, user: CurrentUser | None = None, hours_ahead: int = 0) -> list[SiteSummary]:
     """Sites `user` may see, highest risk first by `scorer` ('ml' or 'rules'); unscored sites last, largest plants
-    first among them."""
+    first among them. `hours_ahead` (1-24) scores each site with its forecast for that hour instead of now."""
     visible, params = visible_sites_sql(user)
     with connection() as conn:
         rows = conn.execute(
             _SITE_SUMMARY_SQL + f" WHERE {visible} "
             "ORDER BY ls.score DESC NULLS LAST, s.capacity_mw DESC NULLS LAST, s.id",
-            {"scorer": scorer or default_scorer(), "me_id": user.id if user else None, **params},
+            {"scorer": scorer or default_scorer(), "ahead": hours_ahead, "me_id": user.id if user else None,
+             **params},
         ).fetchall()
     return [_summary(r, user) for r in rows]
 
@@ -165,7 +168,8 @@ def get_site(site_id: int, scorer: str | None = None, user: CurrentUser | None =
     scorer = scorer or default_scorer()
     with connection() as conn:
         row = conn.execute(_SITE_SUMMARY_SQL + " WHERE s.id = %(site_id)s",
-                           {"scorer": scorer, "site_id": site_id, "me_id": user.id if user else None}).fetchone()
+                           {"scorer": scorer, "ahead": 0, "site_id": site_id,
+                            "me_id": user.id if user else None}).fetchone()
         if row is None:
             return None
         if not can_view(user, row["is_reference"], row["my_role"]):

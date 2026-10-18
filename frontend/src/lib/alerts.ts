@@ -50,11 +50,11 @@ export const ALERT_LABELS: Record<AlertType, string> = {
 
 export const SEVERITY_LABELS: Record<Severity, string> = { danger: "Danger", warning: "Warning", info: "Info" };
 
-/** Badge colors: tinted fill + readable text, matching the risk palette's red / amber / blue. */
+/** Badge colors: tinted fill + readable text, matching the risk palette's red / amber / ice blue; the dot is also the map ring color. */
 export const SEVERITY_STYLES: Record<Severity, { bg: string; fg: string; dot: string }> = {
-  danger: { bg: "rgb(208 59 59 / 0.16)", fg: "#ff8a8a", dot: "#d03b3b" },
-  warning: { bg: "rgb(250 178 25 / 0.14)", fg: "#fcc954", dot: "#fab219" },
-  info: { bg: "rgb(110 123 255 / 0.16)", fg: "#a5adff", dot: "#6e7bff" },
+  danger: { bg: "rgb(255 74 74 / 0.14)", fg: "#ff8a8a", dot: "#ff4a4a" },
+  warning: { bg: "rgb(245 184 61 / 0.14)", fg: "#ffd27a", dot: "#f5b83d" },
+  info: { bg: "rgb(154 215 255 / 0.12)", fg: "#bfe6ff", dot: "#9ad7ff" },
 };
 
 export const SEVERITY_RANK: Record<Severity, number> = { danger: 0, warning: 1, info: 2 };

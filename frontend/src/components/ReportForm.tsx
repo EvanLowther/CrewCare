@@ -87,7 +87,7 @@ export function ReportForm({ initialSiteId }: { initialSiteId: number | null }) 
           ) : (
             <a
               href={signInHref(`/report${initialSiteId ? `?site=${initialSiteId}` : ""}`)}
-              className="inline-flex items-center gap-2 rounded-lg bg-accent-strong px-4 py-2 text-sm font-medium text-white hover:bg-accent"
+              className="inline-flex items-center gap-2 rounded-lg bg-accent-strong px-4 py-2 text-sm font-medium text-on-accent hover:bg-accent"
             >
               <LogIn className="h-4 w-4" aria-hidden /> Sign in
             </a>
@@ -234,7 +234,7 @@ function SignedInReportForm({ initialSiteId, isAdmin, reporter }: { initialSiteI
             <button
               type="button"
               onClick={reset}
-              className="rounded-lg bg-accent-strong px-4 py-2 text-sm font-medium text-white hover:bg-accent"
+              className="rounded-lg bg-accent-strong px-4 py-2 text-sm font-medium text-on-accent hover:bg-accent"
             >
               Report another
             </button>
@@ -382,13 +382,13 @@ function SignedInReportForm({ initialSiteId, isAdmin, reporter }: { initialSiteI
 
           <p className="text-xs text-muted">Reporting as {reporter}</p>
 
-          {error && <p className="rounded-lg bg-[rgb(208_59_59/0.12)] px-3 py-2 text-sm text-[#ff9b9b]">{error}</p>}
+          {error && <p className="rounded-lg bg-[rgb(255_74_74/0.12)] px-3 py-2 text-sm text-[#ff9b9b]">{error}</p>}
 
           <button
             type="button"
             onClick={submit}
             disabled={!ready}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent-strong px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent-strong px-4 py-3 text-sm font-semibold text-on-accent transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
           >
             {submitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
             {submitting ? "Sharing…" : "Share hazard"}

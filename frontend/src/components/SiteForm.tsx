@@ -105,12 +105,12 @@ export function SiteForm({
             className={inputClass}
           />
         </label>
-        {error && <p className="rounded-lg bg-[rgb(208_59_59/0.12)] px-3 py-2 text-sm text-[#ff9b9b]">{error}</p>}
+        {error && <p className="rounded-lg bg-[rgb(255_74_74/0.12)] px-3 py-2 text-sm text-[#ff9b9b]">{error}</p>}
         <button
           type="button"
           onClick={submit}
           disabled={!ready}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent-strong px-4 py-2.5 text-sm font-semibold text-white hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent-strong px-4 py-2.5 text-sm font-semibold text-on-accent hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
         >
           {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
           {submitLabel}

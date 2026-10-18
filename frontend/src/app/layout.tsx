@@ -1,37 +1,46 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Big_Shoulders, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { MeProvider } from "@/components/MeProvider";
-import { Sidebar } from "@/components/Sidebar";
+import { TopNav } from "@/components/TopNav";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const plexSans = IBM_Plex_Sans({
+  variable: "--font-plex-sans",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const plexMono = IBM_Plex_Mono({
+  variable: "--font-plex-mono",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
+});
+
+// Condensed display face for headlines and the big scores.
+const bigShoulders = Big_Shoulders({
+  variable: "--font-big-shoulders",
+  subsets: ["latin"],
+  weight: ["600", "800"],
 });
 
 export const metadata: Metadata = {
   title: "PlanIT Control",
-  description: "Real-time hazard monitoring for utility field crews",
+  description: "The forecast your crew actually needs: a 0-10 hazard score for every job site, now and for the next 24 hours",
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#0b1130",
+  themeColor: "#06080c",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-full bg-page text-ink lg:flex">
+    <html lang="en" className={`${plexSans.variable} ${plexMono.variable} ${bigShoulders.variable} h-full antialiased`}>
+      <body className="min-h-full bg-page text-ink">
         <MeProvider>
-          <Sidebar />
-          <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</main>
+          <TopNav />
+          {children}
         </MeProvider>
       </body>
     </html>
