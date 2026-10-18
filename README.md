@@ -127,8 +127,13 @@ forecast (soil moisture, storm energy) to these.
 | ROC-AUC (0.5 = guessing) | 0.854 | **0.885** |
 | PR-AUC (guessing = the hazard rate) | 0.226 (guessing 0.03) | **0.328** (guessing 0.05) |
 | ...on the same 60 Florida sites | 0.226 | **0.303** |
-| When it said "high", a real hazard day | 16% | **26%** (Florida sites: 25%) |
-| Hazard days it flagged "high" | 54% | **61%** |
+| When it said "high", a real hazard day | 16% | 20% (Florida sites: 18%) |
+| Hazard days it flagged "high" or above | 54% | **76%** (Florida sites: 72%) |
+
+The last two rows are at the dashboard's "high" level, on the national model's new scale: the same as the Real-time
+score's (see [One scale for both scores](#one-scale-for-both-scores)). That scale catches more hazard days and accepts
+more false alarms than the Florida model's did. ROC-AUC and PR-AUC rank days by probability, so the scale doesn't
+change them.
 
 ```mermaid
 ---
@@ -150,10 +155,10 @@ xychart-beta
 |---|---|---|
 | Q1 | Can daily weather tell hazard days from normal ones on years the model never saw? | **Supported.** ROC-AUC 0.885; PR-AUC 0.328 against 0.051 for guessing |
 | Q2 | Does one national model hold up in every region, or does each need its own? | **One model.** ROC-AUC 0.871-0.905 in all five regions; region-only models don't beat it, except slightly in the West |
-| Q3 | Does training on all 50 states help Florida? | **Supported.** Same 60 sites: PR-AUC 0.226 -> 0.303, a "high" is right 25% of the time instead of 16% |
-| Q4 | Do the dashboard levels mean something? | **Supported.** "Extreme" days were hazard days 40% of the time, "low" days 1%; probabilities are calibrated |
+| Q3 | Does training on all 50 states help Florida? | **Supported.** Same 60 sites: PR-AUC 0.226 -> 0.303 |
+| Q4 | Do the dashboard levels mean something, and the same on both scores? | **Supported.** Each Predictive level is as often a real hazard day as the same Real-time level (moderate 4.2% vs 4.3%, extreme 26% vs 21%); "low" 0.5% |
 | Q5 | Do the OSHA / NWS work rules match the model? | **Partly.** Rules win on wind and hurricanes, the model on floods, winter and storms; so we show both |
-| Q6 | Can weather alone see wildfire? | **Not supported.** 24% of fire and dust days flagged; the Hughes Fire was missed |
+| Q6 | Can weather alone see wildfire? | **Not supported.** 37% of fire and dust days flagged; the Hughes Fire was missed |
 
 **These are not blind tests.** We chose the features, the hazard event types and the test cases after seeing the
 Florida results, with all three years in view. The XGBoost settings were never tuned (one fixed set, in `train.py`).
@@ -194,9 +199,13 @@ scored by a model trained on the other years.
 These are probabilities scored directly, so the XGBoost row is a little higher than the Results table, which scores
 the 0-10 dashboard score (it tops out at 10).
 
-### What the score means
+### One scale for both scores
 
-On the dashboard levels (national model with the OSHA heat floor, all years):
+The Real-time score is hand-set against work rules; the model outputs a probability. To put them on one 0-10 scale,
+we measured how often each Real-time score turned out to be a hazard day (every historical site-day, isotonic fit:
+2.5 → 2.1%, 5 → 6.8%, 7.5 → 13%, 10 → 56%). A Predictive probability then scores as **the Real-time score with the
+same odds**: a Predictive 5 is as likely to be a hazard day as a Real-time 5. The mapping is stored with the model
+(`scale` in its `.meta.json`, `python -m planit.ml.scale`), so retraining refits it.
 
 ```mermaid
 ---
@@ -210,12 +219,30 @@ config:
 xychart-beta
     title "Share of days that were real hazard days, by Predictive level (%)"
     x-axis ["low", "moderate", "high", "extreme"]
-    y-axis "Hazard days (%)" 0 --> 45
-    bar [1.0, 7.7, 14.2, 39.8]
+    y-axis "Hazard days (%)" 0 --> 30
+    bar [0.5, 4.2, 8.2, 25.6]
 ```
 
-70% of days score low, 15% moderate, 11% high and 4% extreme. Calibration: the riskiest tenth of days were predicted at
-27% and turned out 29%.
+| Level | Real-time: real hazard days | Predictive: real hazard days | Predictive: share of all days |
+|---|---|---|---|
+| low (0-2.4) | 1.1% | 0.5% | 57% |
+| moderate (2.5-4.9) | 4.3% | 4.2% | 20% |
+| high (5-7.4) | 7.4% | 8.2% | 10% |
+| extreme (7.5-10) | 21.4% | 25.6% | 12% |
+
+Same odds per level, but Predictive picks out more high-odds days than the rules can, so it says "extreme" on 12% of
+days against Real-time's 4%, mostly in summer. On top of the model, per hour:
+
+- **NWS warning floor:** while a warning is in force, Predictive can't be below that warning's Real-time severity
+  (Wind Advisory 4.5, Heat Advisory 5, Blizzard Warning 9, lightning or a Tornado Warning 10). Frost and freeze
+  alerts stay low (1-1.5).
+- **OSHA heat floor:** a heat index of 103°F or more keeps it at least 5, and 115°F or more at least 7.5.
+- Both floors apply hour by hour, using each warning's end time and each hour's forecast heat, so the forecast goes
+  back down when the warning ends or the heat breaks.
+
+The rescale made the Predictive score more cautious: at "high or above" it catches 76% of hazard days (61% before),
+and 1 flag in 5 is a real hazard day (1 in 4 before). The probabilities themselves are unchanged and still calibrated:
+the riskiest tenth of days were predicted at 27% and turned out 29%.
 
 ### One national model, or one per region?
 
@@ -239,14 +266,14 @@ where fire, dust and dry air matter most, is the one to re-check with more histo
 
 | Hazard (NOAA event types) | Days | Predictive | Real-time rules |
 |---|---|---|---|
-| Heat | 626 | 86% | 63% |
-| Tropical (hurricane, tropical storm, surge) | 349 | 86% | **96%** |
-| Winter (winter storm, heavy snow, blizzard, ice) | 611 | **72%** | 54% |
-| Flood (flash flood, flood, heavy rain) | 1,969 | **67%** | 46% |
-| Wind (strong, high wind) | 317 | 66% | **92%** |
-| Storm (thunderstorm wind, hail, lightning, tornado) | 3,550 | **62%** | 51% |
-| Cold (cold, extreme cold / wind chill) | 177 | 51% | 44% |
-| Fire / dust (wildfire, dust storm) | 169 | 24% | 32% |
+| Heat | 626 | **92%** | 63% |
+| Tropical (hurricane, tropical storm, surge) | 349 | 93% | **96%** |
+| Winter (winter storm, heavy snow, blizzard, ice) | 611 | **82%** | 54% |
+| Flood (flash flood, flood, heavy rain) | 1,969 | **80%** | 46% |
+| Wind (strong, high wind) | 317 | 80% | **92%** |
+| Storm (thunderstorm wind, hail, lightning, tornado) | 3,550 | **77%** | 51% |
+| Cold (cold, extreme cold / wind chill) | 177 | **66%** | 44% |
+| Fire / dust (wildfire, dust storm) | 169 | **37%** | 32% |
 
 In this test the rules only see daily weather history. Live, they also get NWS warnings, lightning and storm energy.
 
@@ -261,11 +288,11 @@ and snow depth 2% each. The national features (snowfall, wind chill, location) r
 | Hurricane Idalia, Suwannee River (2023-08-30) | high | 10.0 ✓ | 10.0 ✓ |
 | Hurricane Helene, Crystal River (2024-09-26) | high | 10.0 ✓ | 10.0 ✓ |
 | Hurricane Milton landfall, Tampa (2024-10-09) | high | 10.0 ✓ | 10.0 ✓ |
-| Arctic outbreak, Coal Creek, ND (2024-01-14) | high | 7.6 ✓ | 5.3 ✓ |
-| Gulf Coast snowstorm, New Orleans (2025-01-21) | high | 8.2 ✓ | 6.0 ✓ |
-| Calm January day, Tampa (2024-01-15) | low | 0.5 ✓ | 0.5 ✓ |
-| Mild spring day, Diablo Canyon, CA (2024-05-01) | low | 0.1 ✓ | 4.9 ✗ |
-| Hughes Fire, Castaic, CA (2025-01-22) | high | 0.5 ✗ | 6.3 ✓ |
+| Arctic outbreak, Coal Creek, ND (2024-01-14) | high | 9.3 ✓ | 5.3 ✓ |
+| Gulf Coast snowstorm, New Orleans (2025-01-21) | high | 8.9 ✓ | 6.0 ✓ |
+| Calm January day, Tampa (2024-01-15) | low | 1.0 ✓ | 0.5 ✓ |
+| Mild spring day, Diablo Canyon, CA (2024-05-01) | low | 0.0 ✓ | 4.9 ✗ |
+| Hughes Fire, Castaic, CA (2025-01-22) | high | 1.1 ✗ | 6.3 ✓ |
 
 ## The app
 
@@ -284,8 +311,8 @@ the API and the worker, and deploys `main` automatically (see [`deploy/README.md
 limits, the NWS wind chill chart (frostbite in 30 min at -18°F), Dense Fog Advisory visibility, rain rate, saturated
 ground, snow (Winter Storm Warning criteria, about 6 in in 24 h or 1 in/h), ice (Ice Storm Warning criteria, ¼ in), and
 about 50 NWS warning types (Tornado Warning 10, Blizzard Warning 9, Wind Advisory 4.5). A site's score is its
-worst hazard plus a little for other serious ones. **Predictive** is the model above, with the OSHA heat floor, NWS
-warnings and lightning on top.
+worst hazard plus a little for other serious ones. **Predictive** is the model above on the same 0-10 scale, with the
+NWS warning, lightning and OSHA heat floors on top, hour by hour.
 
 | Tool | What it does here |
 |---|---|
@@ -310,8 +337,9 @@ warnings and lightning on top.
 - Two years of history outside Florida, three in Florida; one site per small state.
 - NOAA offices log events more or less thoroughly, so labels are uneven; that's why the OSHA heat floor and the rules
   stay on top of the model.
-- One national baseline: stormy regions sit higher most of the time, and quiet ones near 0. A per-region baseline would
-  make a 5 mean "unusual for this site" (a scoring change, not a new model; see the region comparison above).
+- Predictive answers "how likely is a NOAA-recorded hazard day", so on a breezy day that's over lift limits but not
+  severe it stays low while Real-time doesn't. Quiet regions and seasons sit near 0; that's the real odds, on the
+  shared scale.
 - The model can't see fires, smoke or earthquakes; wildfire days are missed unless the wind or an NWS warning flags them.
 
 ## Run it locally
