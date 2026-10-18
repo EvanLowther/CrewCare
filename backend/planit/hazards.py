@@ -39,7 +39,10 @@ Each hazard's severity is linear between anchors:
                       25% 0.6 · 15% 0.85 · 8% 1, wind gusts 15 mph 0 · 25 0.6 · 35 0.85 · 45 1 (max 4.5, about a Red
                       Flag Warning's 4.0)   NWS Red Flag criteria are humidity ~15-25% with gusts ~25-35 mph by region;
                       on 2023-2025 history it flags 5% of site-days and catches 27% of fire/dust days (5x as likely)
-    NWS alerts      by event (NWS_EVENTS), e.g. Tornado Warning 10, Wind Advisory 4.5
+    river flood       sites with an NWS river gauge within 2 mi: river at action stage 5 · flood stage 7.5 · moderate
+                      or major 9; forecast (48 h) to reach action or flood stage 5, moderate or major 7.5; 1 in of rain
+                      in 12 h 5   NWS flood categories (NWPS); 1 in is about where flood watches start
+    NWS alerts     by event (NWS_EVENTS), e.g. Tornado Warning 10, Wind Advisory 4.5
 
 Site score = worst hazard + 0.25 x second + 0.10 x third, capped at 10 (combine()); the second and third only add
 when they're high (>= 5) on their own. Compounding is across kinds of hazard (heat, wind, storms, water): a Wind
@@ -493,6 +496,57 @@ def earthquake(magnitude: float, distance_mi: float, mmi: float) -> Hazard | Non
         action = "Check for loose material at height and in excavations"
     label = f"M{magnitude:.1f} earthquake {distance_mi:.0f} mi away · shaking {mmi_roman(mmi)} (est.)"
     return _hazard("alert_earthquake", piecewise(mmi, QUAKE_ANCHORS), label, action)
+
+
+# --- River flooding ------------------------------------------------------------------------------------------
+
+# NWS flood categories, lowest first. "minor" is the flood stage.
+FLOOD_CATEGORIES = ["no_flooding", "action", "minor", "moderate", "major"]
+CATEGORY_WORDS = {"action": "action stage", "minor": "flood stage", "moderate": "moderate flood stage",
+                  "major": "major flood stage"}
+RIVER_OBSERVED_SEVERITY = {"action": 5.0, "minor": 7.5, "moderate": 9.0, "major": 9.0}
+RIVER_FORECAST_SEVERITY = {"action": 5.0, "minor": 5.0, "moderate": 7.5, "major": 7.5}  # coming, not here yet
+RIVER_RAIN_12H_IN = 1.0  # a night of heavy rain at a river site
+RIVER_RAIN_SEVERITY = 5.0
+
+
+def flood_category(stage_ft: float | None, stages: dict) -> str | None:
+    """The NWS flood category of a river stage, from the gauge's stages {"action", "minor", "moderate", "major"}
+    (feet, None where NWS has none). None when the stage is unknown."""
+    if stage_ft is None:
+        return None
+    category = "no_flooding"
+    for name in FLOOD_CATEGORIES[1:]:
+        if stages.get(name) is not None and stage_ft >= stages[name]:
+            category = name
+    return category
+
+
+def river_flood(river: str, rain_12h_in: float | None, stage_ft: float | None, category: str | None,
+                forecast_stage_ft: float | None, forecast_category: str | None, stages: dict) -> Hazard | None:
+    """Flood risk at a site next to a river gauge: the river now, the NWS forecast for the next 48 h, and the last
+    12 h of rain. The worst of the three sets the severity; the label says which."""
+    options = []  # (severity, label)
+    if category in RIVER_OBSERVED_SEVERITY:
+        at = stages.get(category)
+        options.append((RIVER_OBSERVED_SEVERITY[category],
+                        f"{river} at {stage_ft:.1f} ft · above {CATEGORY_WORDS[category]} ({at:g} ft)"))
+    if forecast_category in RIVER_FORECAST_SEVERITY and (
+            category is None or FLOOD_CATEGORIES.index(forecast_category) > FLOOD_CATEGORIES.index(category)):
+        at = stages.get(forecast_category)
+        options.append((RIVER_FORECAST_SEVERITY[forecast_category],
+                        f"{river} forecast to reach {CATEGORY_WORDS[forecast_category]} ({at:g} ft) within 48 h, "
+                        f"cresting near {forecast_stage_ft:.1f} ft"))
+    if rain_12h_in is not None and rain_12h_in >= RIVER_RAIN_12H_IN:
+        options.append((RIVER_RAIN_SEVERITY, f"{rain_12h_in:.1f} in of rain in 12 h next to the {river} · flood risk"))
+    if not options:
+        return None
+    severity, label = max(options, key=lambda o: o[0])
+    if severity >= 7.5:
+        action = "Move crews and equipment off low ground near the river; never drive through flooded roads"
+    else:
+        action = "Check river access roads and low areas before mobilizing; plan a way out to high ground"
+    return Hazard("alert_flood", severity, label, action)
 
 
 # --- Alerts -------------------------------------------------------------------------------------------------

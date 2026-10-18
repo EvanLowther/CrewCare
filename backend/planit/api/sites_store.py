@@ -36,8 +36,9 @@ _SITE_CHILD_TABLES_SQL = """
     WHERE c.contype = 'f' AND c.confrelid = 'sites'::regclass AND c.confdeltype <> 'c'
       AND left(n.nspname, 12) <> '_timescaledb'
 """
-# Cleared when a site moves, so the worker looks its NWS grid up again (migration 005).
-_NWS_LOOKUP_COLS = ("nws_grid_id", "nws_grid_x", "nws_grid_y", "nws_station", "nws_zone", "nws_county_zone")
+# Cleared when a site moves, so the worker looks its NWS grid and river gauge up again (migrations 005, 012).
+_NWS_LOOKUP_COLS = ("nws_grid_id", "nws_grid_x", "nws_grid_y", "nws_station", "nws_zone", "nws_county_zone",
+                    "usgs_gauge_id", "river_checked_at")  # and its river gauge (012)
 UNKNOWN_STATE = "XX"
 
 

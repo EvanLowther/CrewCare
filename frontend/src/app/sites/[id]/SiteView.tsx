@@ -19,6 +19,7 @@ import {
   TrendingUp,
   TriangleAlert,
   Umbrella,
+  Waves,
   Wind,
   Zap,
   type LucideIcon,
@@ -391,6 +392,8 @@ function SiteDetailView({
           </div>
         </Card>
 
+        {detail.river && <RiverCard river={detail.river} timeZone={tz} />}
+
         <Card>
           <CardHeader title="Hazard index, past 24 h and next 24 h" icon={TrendingUp} subtitle="Solid: scored hours · dashed: forecast" />
           <div className="px-2 pb-4">
@@ -514,6 +517,74 @@ function aqiCategory(aqi: number | null): string {
   if (aqi > 100) return "sensitive groups";
   if (aqi > 50) return "moderate";
   return "good";
+}
+
+type River = NonNullable<SiteDetail["river"]>;
+
+// NWS flood category -> its Real-time severity (backend/planit/hazards.py RIVER_OBSERVED_SEVERITY) and words.
+const RIVER_CATEGORY: Record<string, { severity: number; label: string }> = {
+  no_flooding: { severity: 0, label: "Below action stage" },
+  action: { severity: 5, label: "At action stage" },
+  minor: { severity: 7.5, label: "Above flood stage" },
+  moderate: { severity: 9, label: "Moderate flooding" },
+  major: { severity: 9, label: "Major flooding" },
+};
+
+/** The river gauge next to the site: stage now and the NWS forecast against its flood stages. */
+function RiverCard({ river, timeZone }: { river: River; timeZone: string }) {
+  const cat = RIVER_CATEGORY[river.category ?? ""] ?? null;
+  const level = cat ? levelFor(cat.severity) : null;
+  const marks = [
+    { name: "Action", ft: river.action_stage_ft },
+    { name: "Flood", ft: river.flood_stage_ft },
+    { name: "Moderate", ft: river.moderate_stage_ft },
+    { name: "Major", ft: river.major_stage_ft },
+  ].filter((m): m is { name: string; ft: number } => m.ft != null);
+  const top = Math.max(...marks.map((m) => m.ft), river.stage_ft ?? 0, river.forecast_stage_ft ?? 0) * 1.08 || 1;
+  const pct = (ft: number) => `${Math.min(100, Math.max(0, (ft / top) * 100))}%`;
+  return (
+    <Card>
+      <CardHeader
+        title={`River level: ${river.river ?? river.gauge_name}`}
+        icon={Waves}
+        subtitle={`${river.gauge_name}${river.ts ? ` · ${siteTime(river.ts, timeZone)} site time` : ""} · NWS`}
+      />
+      <div className="flex flex-col gap-3 px-5 pb-5">
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          <span className="text-2xl font-semibold text-ink">
+            {round(river.stage_ft, 1)}
+            <span className="ml-1 text-xs font-normal text-muted">ft</span>
+          </span>
+          {cat && level && (
+            <span className="text-sm font-medium" style={{ color: RISK_TEXT[level] }}>
+              {cat.label}
+            </span>
+          )}
+          {river.forecast_stage_ft != null && (
+            <span className="text-xs text-ink-2">NWS forecast peak in 48 h: {round(river.forecast_stage_ft, 1)} ft</span>
+          )}
+        </div>
+        <div className="relative h-3 rounded-full bg-raised" aria-hidden>
+          {river.stage_ft != null && (
+            <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: pct(river.stage_ft), background: RISK_COLORS[level ?? "low"] }} />
+          )}
+          {river.forecast_stage_ft != null && (
+            <div className="absolute -inset-y-0.75 w-0.5 bg-ink-2" style={{ left: pct(river.forecast_stage_ft) }} title="Forecast peak" />
+          )}
+          {marks.map((m) => (
+            <div key={m.name} className="absolute -inset-y-1 w-px bg-muted" style={{ left: pct(m.ft) }} />
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+          {marks.map((m) => (
+            <span key={m.name}>
+              {m.name} {m.ft} ft
+            </span>
+          ))}
+        </div>
+      </div>
+    </Card>
+  );
 }
 
 function Metric({ icon: Icon, label, value, unit }: { icon: LucideIcon; label: string; value: string; unit: string }) {

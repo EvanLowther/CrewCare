@@ -86,6 +86,21 @@ class AirQuality(BaseModel):
     pm2_5_ugm3: float | None = Field(description="PM2.5, µg/m³")
 
 
+class RiverStatus(BaseModel):
+    """The NWS river gauge within 2 mi of a site (NOAA NWPS) and its latest reading."""
+    gauge_id: str = Field(examples=["BTRL1"])
+    gauge_name: str = Field(examples=["Mississippi River at Baton Rouge"])
+    river: str | None = Field(examples=["Mississippi River"])
+    ts: datetime | None = Field(description="Time of the latest reading")
+    stage_ft: float | None
+    forecast_stage_ft: float | None = Field(description="Highest NWS forecast stage in the next 48 h")
+    category: str | None = Field(description="no_flooding, action, minor (flood stage), moderate or major")
+    action_stage_ft: float | None
+    flood_stage_ft: float | None = Field(description="NWS minor flood stage")
+    moderate_stage_ft: float | None
+    major_stage_ft: float | None
+
+
 # --- Alerts -----------------------------------------------------------------
 
 class Alert(BaseModel):
@@ -170,6 +185,7 @@ class SiteDetail(BaseModel):
     conditions: Conditions | None
     last_24h: Last24h | None
     air_quality: AirQuality | None = Field(default=None, description="Latest air-quality hour, for smoke")
+    river: RiverStatus | None = Field(default=None, description="River gauge within 2 mi, for river sites")
     forecast: list[Conditions] = Field(description="Next 48 hours, hourly")
     alerts: list[Alert] = Field(description="Active alerts for this site")
     reports: list[HazardReport] = Field(description="Active crew reports within 5 miles")
