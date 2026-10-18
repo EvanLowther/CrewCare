@@ -369,14 +369,19 @@ def run_due(now: datetime | None = None) -> int:
     return n
 
 
-def generate_all(now: datetime | None = None) -> int:
-    """Tomorrow's briefing for every site now (the "Generate now" button). Returns the count."""
+def generate_all(now: datetime | None = None, site_ids: list[int] | None = None) -> int:
+    """Tomorrow's briefing now (the "Generate now" button): every site, or only `site_ids` (a manager's sites).
+    Returns the count."""
     now = now or datetime.now(UTC)
     with connection() as conn:
         sites = conn.execute(SITES_SQL).fetchall()
+    if site_ids is not None:
+        wanted = set(site_ids)
+        sites = [s for s in sites if s["id"] in wanted]
     n = _write(build(sites, now))
-    log.info("briefings: generated %d on request", n)
+    log.info("briefings: generated %d on request%s", n, "" if site_ids is None else f" for {len(site_ids)} sites")
     return n
 
 
-jobs.HANDLERS["generate_briefings"] = lambda params: generate_all()
+# params: {} for every site, or {"site_ids": [...]} (the API sends a manager's own sites).
+jobs.HANDLERS["generate_briefings"] = lambda params: generate_all(site_ids=params.get("site_ids"))

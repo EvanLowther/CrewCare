@@ -211,10 +211,11 @@ export interface paths {
         put?: never;
         /**
          * Generate Now
-         * @description Admins only: generate tomorrow's briefings now instead of waiting for 6 PM.
+         * @description Generate tomorrow's briefings now instead of waiting for 6 PM. Admins: every site. Managers: only the sites
+         *     they manage.
          *
-         *     Queued in `job_requests`; the worker picks it up within ~2 s and writes every site's briefing (the worker must be
-         *     running). Poll GET /api/briefings to see them arrive.
+         *     Queued in `job_requests`; the worker picks it up within ~2 s (it must be running). Poll GET /api/briefings to see
+         *     them arrive. Each site's members are notified (once per site and day).
          */
         post: operations["generate_now_api_briefings_generate_post"];
         delete?: never;

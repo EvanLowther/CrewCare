@@ -19,7 +19,7 @@ the sign-in routes). Without it, reads return only public reference sites.
 | POST | `/api/reports` | `HazardReport` (201) | Signed in. `multipart/form-data`, optional `photo` file |
 | GET | `/api/photos/{id}` | image/jpeg | Use `photo_url` from a report (it's signed) |
 | GET | `/api/briefings?for_date=` | `BriefingList` | Defaults to tomorrow |
-| POST | `/api/briefings/generate` | `DemoAck` | Admins. Demo: generate now instead of 6 PM |
+| POST | `/api/briefings/generate` | `DemoAck` | Generate tomorrow's now instead of 6 PM: managers for the sites they manage (409 if none), admins for every site |
 | POST | `/api/demo/lightning-replay` | `DemoAck` | Admins. Demo: storm near a site |
 | GET | `/api/geocode?q=` | `GeocodeList` | Managers. US address search (OpenStreetMap) for placing a new site |
 | GET | `/api/me` | `Me` | Signed-in user and their sites; plus site, member, user and admin routes in AUTH.md |
