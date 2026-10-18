@@ -3,7 +3,7 @@
 from datetime import UTC, datetime, timedelta
 
 from planit.ml.features import FEATURES
-from planit.ml.score import alerts_at, combine, window_features
+from planit.ml.score import alerts_at, combine, smoke_floor, window_features
 
 HOUR = datetime(2026, 8, 1, 15, tzinfo=UTC)
 
@@ -73,3 +73,20 @@ def test_warning_floor_lifts_when_the_warning_ends():
     during = combine(0.3, [], alerts_at([alert], HOUR + timedelta(hours=1)))[0]
     after = combine(0.3, [], alerts_at([alert], HOUR + timedelta(hours=4)))[0]
     assert during == 4.5 and after == 0.3  # the forecast goes back down
+
+
+def test_wildfire_alert_floors_predictive_at_its_rule_severity():
+    fire = {"type": "wildfire", "severity": "danger", "title": "Creek Fire at the site", "all_clear_at": None,
+            "meta": {"source": "nifc", "rule_severity": 9.5, "action": "Evacuate"}}
+    score, factors = combine(0.5, [], alerts_at([fire], HOUR))  # the model can't see fire
+    # The fire takes up the difference: the model's 0.5 + the alert's 9.0 = the 9.5 floor.
+    assert score == 9.5 and factors[0]["key"] == "alert_wildfire" and factors[0]["contribution"] == 9.0
+
+
+def test_smoke_floor_keeps_predictive_at_the_real_time_smoke_severity():
+    rain = [{"key": "rain_24h", "label": "1.0 in of rain in 24 h", "contribution": 1.0}]
+    score, factors = smoke_floor(1.0, rain, 200.0)  # AQI 200: smoke severity 5
+    assert score == 5.0 and factors[0]["key"] == "smoke" and factors[0]["contribution"] == 4.0
+    assert [f["key"] for f in factors] == ["smoke", "rain_24h"]
+    assert smoke_floor(6.0, rain, 200.0) == (6.0, rain)  # already above it
+    assert smoke_floor(1.0, rain, None) == (1.0, rain) and smoke_floor(1.0, rain, 80.0) == (1.0, rain)

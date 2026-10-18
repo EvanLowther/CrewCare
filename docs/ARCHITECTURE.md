@@ -2,6 +2,7 @@
 
 ```
  Open-Meteo   NWS weather + alerts   USGS gauges   Lightning replay   Crew phones
+ (+ air quality)  NIFC fires  USGS quakes                                  │
      │            │             │                 │                        │
      └────────────┴──────┬──────┴─────────────────┘                        │
                          ▼                                                 │
@@ -25,8 +26,11 @@
 **The one rule:** the worker and the API never call each other. They only share the database.
 That lets each person build and test their half alone.
 
-- **Worker** writes `weather`, `nws_weather`, `river_levels`, `lightning_strikes`, `nws_alerts`, `alerts`,
-  `hazard_scores`, `briefings`.
+- **Worker** writes `weather`, `nws_weather`, `air_quality`, `river_levels`, `lightning_strikes`, `nws_alerts`,
+  `alerts`, `hazard_scores`, `briefings`.
+- **Fire, smoke and quake sources** (migration 007): Open-Meteo's air-quality API every 2 h (PM2.5 AQI, ~1,900 more
+  calls a day), NIFC's current wildfires every 15 min and the USGS earthquake feed every 2 min, one national request
+  each. Fires and quakes become `alerts` rows scored when they're raised (`meta.rule_severity`, `meta.action`).
 - **Weather sources:** the NWS API (free, no daily cap) every 30 min for the Real-time score's weather, and one
   national alerts request every 2 min. Open-Meteo every 3 h for soil moisture, CAPE, hourly rain and the ML
   model's inputs (the model is trained on Open-Meteo's archive, so it keeps seeing the same source), ~1,800 of its
@@ -46,10 +50,11 @@ That lets each person build and test their half alone.
 | `weather` | hypertable | worker | Hourly observed + forecast per site. `is_forecast` separates them. Snowfall and snow depth since 004. |
 | `weather_daily` | continuous aggregate | Timescale | Daily max heat, total rain, soil moisture: ML features and "last 24 h". |
 | `nws_weather` | hypertable | worker (`ingest/nws_weather.py`) | NWS station observation + 72 h gridpoint forecast per site: wind chill, WBGT, visibility, ice, thunder chance. Real-time score only. 005; `sites.nws_*` hold each site's grid, station and alert zones. |
+| `air_quality` | hypertable | worker (`ingest/air_quality.py`) | Hourly US AQI, PM2.5 AQI and PM2.5 per site, observed + 2-day forecast (Open-Meteo / CAMS). Smoke in the Real-time score and the Predictive smoke floor. 007. |
 | `river_gauges`, `river_levels` | table, hypertable | worker | USGS stage/flow for flood rules. |
 | `lightning_strikes` | hypertable | worker / replay | Every strike. `source` says replay, simulator or live. |
 | `nws_alerts` | table | worker | Raw NWS alerts matched to sites. |
-| `alerts` | table | worker | **What users see.** One active row per (site, type, dedupe_key). Lightning uses `all_clear_at`. |
+| `alerts` | table | worker | **What users see.** One active row per (site, type, dedupe_key). Lightning uses `all_clear_at`. `meta.source` says who raised it: `nws`, `nifc` (wildfire), `usgs` (earthquake, `meta.ends` 12 h after the quake). Types `air_quality` and `earthquake` since 007. |
 | `hazard_scores` | hypertable | worker (ml/score.py) | 0-10 score, level, top factors, `kind` current/forecast. |
 | `hazard_reports`, `photos` | table | API | Crew reports. Photos stored as resized JPEG bytes. |
 | `briefings` | table | worker | One per site per day, generated 6 PM site-local. |

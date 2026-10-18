@@ -15,6 +15,7 @@ from planit.config import settings
 from planit.db import connection
 from planit.hazards import nws_heat_index
 from planit.models import (
+    AirQuality,
     Alert,
     Conditions,
     HazardReport,
@@ -181,6 +182,12 @@ def get_site(site_id: int, scorer: str | None = None, user: CurrentUser | None =
             (site_id,),
         ).fetchone()
 
+        air = conn.execute(
+            "SELECT ts, us_aqi, us_aqi_pm2_5, pm2_5_ugm3 FROM air_quality WHERE site_id = %s AND NOT is_forecast "
+            "AND ts > now() - interval '6 hours' AND ts <= now() ORDER BY ts DESC LIMIT 1",
+            (site_id,),
+        ).fetchone()
+
         past_day = conn.execute(
             "SELECT precip_in, temp_f, humidity_pct, gust_mph FROM weather "
             "WHERE site_id = %s AND NOT is_forecast AND ts > now() - interval '24 hours' AND ts <= now()",
@@ -221,6 +228,7 @@ def get_site(site_id: int, scorer: str | None = None, user: CurrentUser | None =
         site=_summary(row, user),
         conditions=_conditions(current) if current else None,
         last_24h=_last_24h(past_day),
+        air_quality=AirQuality(**{k: v if k == "ts" else _float(v) for k, v in air.items()}) if air else None,
         forecast=[_conditions(r) for r in forecast],
         alerts=[Alert(**r) for r in alerts],
         reports=[

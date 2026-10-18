@@ -36,6 +36,7 @@ _EVENT_TYPES = [
     ("storm", ("thunderstorm", "tornado", "hurricane", "tropical storm", "storm surge")),
     ("wind", ("wind",)),
     ("wildfire", ("red flag", "fire weather", "fire warning")),
+    ("air_quality", ("air quality", "smoke")),
 ]
 
 
@@ -148,9 +149,10 @@ WHERE (alerts.severity, alerts.title, alerts.message, alerts.meta)
       IS DISTINCT FROM (EXCLUDED.severity, EXCLUDED.title, EXCLUDED.message, EXCLUDED.meta)
 """
 
+# Clears one source's alerts for a site that it no longer lists (wildfire.py and earthquakes.py reuse it).
 CLEAR_GONE = """
 UPDATE alerts SET status = 'cleared', cleared_at = now(), updated_at = now()
-WHERE status = 'active' AND meta->>'source' = 'nws' AND site_id = %s AND NOT (dedupe_key = ANY(%s))
+WHERE status = 'active' AND meta->>'source' = %(source)s AND site_id = %(site_id)s AND NOT (dedupe_key = ANY(%(keep)s))
 """
 
 
@@ -189,7 +191,7 @@ def poll() -> int:
             if rows:
                 cur.executemany(UPSERT_NWS, [r[0] for r in rows])
                 cur.executemany(UPSERT_APP, [r[1] for r in rows])
-            cur.execute(CLEAR_GONE, (site_id, [r[1]["dedupe_key"] for r in rows]))
+            cur.execute(CLEAR_GONE, {"source": "nws", "site_id": site_id, "keep": [r[1]["dedupe_key"] for r in rows]})
             matched += len(rows)
     log.info("nws poll: %d active alerts across %d/%d sites", matched, len(per_site), len(sites))
     return matched

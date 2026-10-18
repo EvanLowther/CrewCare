@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from planit.ml.score import HourInputs, build_inputs, level_for, merge_weather, score_hour
+from planit.ml.score import HourInputs, aqi_at, build_inputs, level_for, merge_weather, score_hour
 
 T0 = datetime(2026, 1, 15, 12, tzinfo=UTC)
 
@@ -138,3 +138,33 @@ def test_build_inputs_windows_heat_index_and_alert_expiry():
     assert x.alerts[0]["nearest_mi"] == 2.5 and x.alerts[1]["nws_event"] == "Wind Advisory"
     assert [a["type"] for a in inputs[now + timedelta(hours=2)].alerts] == ["wind"]  # lightning cleared
     assert inputs[now + timedelta(hours=4)].alerts == []  # advisory ended
+
+
+def test_smoke_enters_the_real_time_score_hour_by_hour():
+    weather = [{"ts": T0 + timedelta(hours=h), "temp_f": 70.0, "humidity_pct": 40.0, "precip_in": 0.0,
+                "precip_prob_pct": 0.0, "soil_moisture": 0.2, "gust_mph": 8.0, "cape_jkg": 0.0, "weather_code": 1}
+               for h in range(3)]
+    air = [{"ts": T0, "us_aqi_pm2_5": 240.0}, {"ts": T0 + timedelta(hours=2), "us_aqi_pm2_5": 90.0}]
+    hours = [T0, T0 + timedelta(hours=1), T0 + timedelta(hours=2)]
+    inputs = build_inputs(weather, [], hours, air)
+    assert [inputs[h].us_aqi_pm2_5 for h in hours] == [240.0, 240.0, 90.0]  # hour 1 has no row: the one before
+    score, factors = score_hour(inputs[T0])
+    assert level_for(score) == "high" and factors[0]["key"] == "smoke" and "N95" in factors[0]["action"]
+    assert score_hour(inputs[hours[2]])[0] < 2.5  # the smoke cleared
+    assert aqi_at([{"ts": T0, "us_aqi_pm2_5": 240.0}], T0 + timedelta(hours=4)) is None  # too old to use
+
+
+def test_wildfire_and_earthquake_alerts_score_at_their_own_severity():
+    fire = {"type": "wildfire", "severity": "warning", "title": "Creek Fire 9 mi away", "all_clear_at": None,
+            "meta": {"source": "nifc", "rule_severity": 5.2, "action": "Set to leave"}}
+    quake = {"type": "earthquake", "severity": "warning", "title": "M6.0 earthquake 4 mi away", "all_clear_at": None,
+             "meta": {"source": "usgs", "rule_severity": 5.9, "action": "Pause crane work",
+                      "ends": (T0 + timedelta(hours=6)).isoformat()}}
+    x = build_inputs([{"ts": T0, "temp_f": 60.0, "humidity_pct": 50.0, "precip_in": 0.0, "precip_prob_pct": 0.0,
+                       "soil_moisture": 0.2, "gust_mph": 5.0, "cape_jkg": 0.0, "weather_code": 0}],
+                     [fire, quake], [T0])[T0]
+    score, factors = score_hour(x)
+    assert score == 7.2  # 5.9 + 0.25 x 5.2: different kinds of hazard compound
+    assert factors[0] == {"key": "alert_earthquake", "label": "M6.0 earthquake 4 mi away", "contribution": 5.9,
+                          "action": "Pause crane work"}
+    assert factors[1]["key"] == "alert_wildfire" and factors[1]["action"] == "Set to leave"
