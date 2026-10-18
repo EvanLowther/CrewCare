@@ -109,8 +109,9 @@ function MapController({
   }, [map]);
 
   // Fit once per set of sites (again when "My sites" / "All sites" changes it), not on every poll. The insets keep
-  // the sites clear of the panels floating over the map.
-  const siteKey = focus ? `focus:${focus.lat},${focus.lng}` : sites.map((s) => s.id).join(",");
+  // the sites clear of the panels floating over the map. Sorted, because the list comes ranked by score: switching
+  // Real-time / Predictive reorders the same sites and must not zoom the map back out.
+  const siteKey = focus ? `focus:${focus.lat},${focus.lng}` : sites.map((s) => s.id).sort((a, b) => a - b).join(",");
   useEffect(() => {
     if (fitted.current === siteKey || !sized) return;
     if (focus) {
@@ -188,13 +189,16 @@ export default function SiteMap({
 
   if (!shown) return null;
   return (
-    // Scroll-wheel zoom off so scrolling the page over the map scrolls the page; +/- and pinch still zoom.
+    // Mouse wheel and two-finger trackpad scroll/pinch zoom while the cursor is over the map, around the cursor.
+    // wheelPxPerZoomLevel: trackpads send many small wheel events, so a higher value keeps a swipe from jumping
+    // several levels at once.
     // Start at the focus when there is one: jumping from zoom 4 leaves stretched zoom-4 label tiles behind.
     <MapContainer
       center={focus ? [focus.lat, focus.lng] : US_CENTER}
       zoom={focus?.zoom ?? 4}
       className="h-full w-full"
-      scrollWheelZoom={false}
+      scrollWheelZoom
+      wheelPxPerZoomLevel={120}
       zoomControl={false}
       zoomSnap={0.5}
     >
