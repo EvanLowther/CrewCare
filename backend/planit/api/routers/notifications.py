@@ -73,7 +73,7 @@ async def stream(request: Request, user: SignedInUser, after: int | None = None)
 @router.get("/push-key", response_model=PushKey)
 def push_key() -> PushKey:
     """The server's public VAPID key for PushManager.subscribe, or null when push isn't set up."""
-    return PushKey(public_key=settings.vapid_public_key)
+    return PushKey(public_key=settings.vapid_public_key or None)  # an empty line in .env counts as unset
 
 
 @router.post("/subscriptions", status_code=204)
