@@ -1,4 +1,5 @@
 # Installed to /etc/caddy/Caddyfile by deploy/bootstrap.sh, with PLANIT_HOST replaced by the real hostname.
+# The site's block must stay first: deploy.sh reads the hostname from the first block of the installed file.
 # Caddy gets and renews the HTTPS certificate on its own. deploy.sh reinstalls it when this file changes.
 #
 # Every deploy restarts the API (and the website when it changed), which takes a few seconds. lb_try_duration makes
@@ -23,4 +24,9 @@ PLANIT_HOST {
 			lb_try_interval 250ms
 		}
 	}
+}
+
+# The address before the Crew Care rename: links already shared keep working and land on the new one.
+planit.207-246-119-236.sslip.io {
+	redir https://PLANIT_HOST{uri} permanent
 }

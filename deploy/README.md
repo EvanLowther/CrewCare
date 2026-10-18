@@ -8,7 +8,7 @@ phone / browser ──HTTPS──▶ Caddy :443 ──/api/*──▶ FastAPI 12
                            planit-worker (weather, alerts, scoring, briefings) ──▶ Tiger
 ```
 
-- **Site:** `https://planit.<server-ip-with-dashes>.sslip.io` (free hostname; swap for a real domain in the Caddyfile).
+- **Site:** `https://crewcare.<server-ip-with-dashes>.sslip.io` (free hostname; swap for a real domain in the Caddyfile).
 - **Updates:** `planit-deploy.timer` checks GitHub `main` every minute and runs `deploy.sh` when it changed:
   Python packages if `pyproject.toml` changed, migrations if `db/migrations/` changed, and a website rebuild if
   `frontend/` changed. The new build is made beside the live one and swapped in only if it succeeds.
@@ -20,7 +20,7 @@ phone / browser ──HTTPS──▶ Caddy :443 ──/api/*──▶ FastAPI 12
 ## First-time setup
 
 1. Create the server in Vultr with the `planit-mac` SSH key. Note its IPv4.
-2. `scp deploy/bootstrap.sh root@<ip>:` then `ssh root@<ip> bash bootstrap.sh planit.<ip-with-dashes>.sslip.io`.
+2. `scp deploy/bootstrap.sh root@<ip>:` then `ssh root@<ip> bash bootstrap.sh crewcare.<ip-with-dashes>.sslip.io`.
    The first run prints a deploy key: add it to the repo as **read-only**
    (`gh repo deploy-key add key.pub --title planit-server`), then run bootstrap again.
 3. `ssh -t root@<ip> nano /opt/planit/.env`: paste the Tiger connection string and Gemini key.
