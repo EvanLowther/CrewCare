@@ -57,7 +57,13 @@ def test_demo_buttons_are_admin_only():
     replay = {"site_id": 9001}
     assert client.post("/api/demo/lightning-replay", json=replay, headers=as_("manager")).status_code == 403
     assert client.post("/api/demo/lightning-replay", json=replay, headers=as_("admin")).status_code == 200
+
+
+def test_managers_and_admins_can_generate_briefings_now():
+    assert client.post("/api/briefings/generate").status_code == 401
     assert client.post("/api/briefings/generate", headers=as_("crew")).status_code == 403
+    assert client.post("/api/briefings/generate", headers=as_("manager")).status_code == 200
+    assert client.post("/api/briefings/generate", headers=as_("admin")).status_code == 200
 
 
 def test_admin_pages_are_admin_only():

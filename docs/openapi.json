@@ -738,7 +738,7 @@
           "briefings"
         ],
         "summary": "Generate Now",
-        "description": "Admins only: generate tomorrow's briefings now instead of waiting for 6 PM.\n\nQueued in `job_requests`; the worker picks it up within ~2 s and writes every site's briefing (the worker must be\nrunning). Poll GET /api/briefings to see them arrive.",
+        "description": "Generate tomorrow's briefings now instead of waiting for 6 PM. Admins: every site. Managers: only the sites\nthey manage.\n\nQueued in `job_requests`; the worker picks it up within ~2 s (it must be running). Poll GET /api/briefings to see\nthem arrive. Each site's members are notified (once per site and day).",
         "operationId": "generate_now_api_briefings_generate_post",
         "responses": {
           "200": {
