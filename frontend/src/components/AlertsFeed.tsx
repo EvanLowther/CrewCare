@@ -9,17 +9,24 @@ import { relativeTime } from "@/lib/format";
 import { useNow } from "@/lib/useNow";
 import { EmptyState, SeverityBadge } from "./ui";
 
+function NoAlerts() {
+  return <EmptyState icon={BellOff} title="No active alerts" detail="NWS warnings, nearby wildfires and felt earthquakes show up here within a few minutes." />;
+}
+
 /** Table of alerts, most severe first. Rows link to the site page. */
 export function AlertsFeed({ alerts, limit }: { alerts: Alert[]; limit?: number }) {
+  // The clock is only read once there are alerts: the empty page is prerendered, where Date.now() isn't allowed.
+  return alerts.length === 0 ? <NoAlerts /> : <AlertsTable alerts={alerts} limit={limit} />;
+}
+
+function AlertsTable({ alerts, limit }: { alerts: Alert[]; limit?: number }) {
   const now = useNow(15_000);
   const sorted = alerts.filter((a) => inForce(a, now)).sort(
     (a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] || b.started_at.localeCompare(a.started_at),
   );
   const shown = limit ? sorted.slice(0, limit) : sorted;
 
-  if (shown.length === 0) {
-    return <EmptyState icon={BellOff} title="No active alerts" detail="NWS warnings, nearby wildfires and felt earthquakes show up here within a few minutes." />;
-  }
+  if (shown.length === 0) return <NoAlerts />;
 
   return (
     <div className="overflow-x-auto">
