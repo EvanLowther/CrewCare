@@ -67,6 +67,8 @@
 - `job_requests` so demo buttons reach the worker through the database (#14)
 - New or moved sites get set up at once (`site_setup` job): NWS grid and zones, 5 days of Open-Meteo history,
   air quality, alerts and both scores within about a minute; the national model needs no retraining for them
+- Fire weather rule (dry air x wind after 3 dry days, up to 4.5) in both scorers; Predictive spreads calm days below
+  1.0 by the model's odds instead of scoring a quarter of all days exactly 0
 
 **App (Person B)**
 - Real sites, site detail, alerts and reports queries (#4)

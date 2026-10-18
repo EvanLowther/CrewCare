@@ -3,7 +3,7 @@
 from datetime import UTC, datetime, timedelta
 
 from planit.ml.features import FEATURES
-from planit.ml.score import alerts_at, combine, smoke_floor, window_features
+from planit.ml.score import HourInputs, alerts_at, combine, fire_weather_floor, smoke_floor, window_features
 
 HOUR = datetime(2026, 8, 1, 15, tzinfo=UTC)
 
@@ -90,3 +90,11 @@ def test_smoke_floor_keeps_predictive_at_the_real_time_smoke_severity():
     assert [f["key"] for f in factors] == ["smoke", "rain_24h"]
     assert smoke_floor(6.0, rain, 200.0) == (6.0, rain)  # already above it
     assert smoke_floor(1.0, rain, None) == (1.0, rain) and smoke_floor(1.0, rain, 80.0) == (1.0, rain)
+
+
+def test_fire_weather_floor_keeps_predictive_off_0_on_dry_windy_days():
+    dry_windy = HourInputs(humidity_pct=15.0, gust_mph=35.0, rain_72h_in=0.0, snow_24h_in=0.0)
+    score, factors = fire_weather_floor(0.4, [], dry_windy)  # the model calls it calm
+    assert score == 3.8 and factors[0]["key"] == "fire_weather" and "No hot work" in factors[0]["action"]
+    wet = HourInputs(humidity_pct=15.0, gust_mph=35.0, rain_72h_in=0.5)
+    assert fire_weather_floor(0.4, [], wet) == (0.4, []) and fire_weather_floor(0.4, [], None) == (0.4, [])

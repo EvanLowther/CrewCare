@@ -35,7 +35,11 @@ Each hazard's severity is linear between anchors:
                       (there is no published rule); the edge is estimated from the acres
     earthquake        shaking at the site (MMI): IV 1 · V 3 · VI 5 · VII 7.5 · VIII 9 · IX 10   Atkinson & Wald
                       (2007) intensity prediction equation; USGS: damage begins at VI, considerable at VII
-    NWS alerts       by event (NWS_EVENTS), e.g. Tornado Warning 10, Wind Advisory 4.5
+    fire weather      dry air x wind, after 3 days without rain or snow: 4.5 x sqrt(dry x wind), dry humidity 35% 0 ·
+                      25% 0.6 · 15% 0.85 · 8% 1, wind gusts 15 mph 0 · 25 0.6 · 35 0.85 · 45 1 (max 4.5, about a Red
+                      Flag Warning's 4.0)   NWS Red Flag criteria are humidity ~15-25% with gusts ~25-35 mph by region;
+                      on 2023-2025 history it flags 5% of site-days and catches 27% of fire/dust days (5x as likely)
+    NWS alerts      by event (NWS_EVENTS), e.g. Tornado Warning 10, Wind Advisory 4.5
 
 Site score = worst hazard + 0.25 x second + 0.10 x third, capped at 10 (combine()); the second and third only add
 when they're high (>= 5) on their own. Compounding is across kinds of hazard (heat, wind, storms, water): a Wind
@@ -410,6 +414,35 @@ def wildfire(name: str, distance_mi: float, acres: float | None, contained_pct: 
     return _hazard("alert_wildfire", severity, f"{title} {where}{size_label}{pct}", action)
 
 
+# Fire weather: dry air and wind together spread a spark from hot work, a dragging chain or a hot exhaust into dry
+# grass. NWS issues Red Flag Warnings at roughly 15-25% humidity with 25-35 mph gusts, depending on the region; this
+# scores the same combination on a curve, but only after 3 days with less than 0.1 in of rain and no snow in 24 h.
+FIRE_DRY_ANCHORS = [(8.0, 1.0), (15.0, 0.85), (25.0, 0.6), (35.0, 0.0)]  # min humidity % -> dryness
+FIRE_WIND_ANCHORS = [(15.0, 0.0), (25.0, 0.6), (35.0, 0.85), (45.0, 1.0)]  # gusts mph -> wind
+FIRE_WEATHER_MAX = 4.5  # moderate at most, like a Red Flag Warning (NWS_EVENTS: 4.0)
+FIRE_WET_RAIN_72H_IN = 0.1  # this much rain in 3 days wets the fuels
+
+
+def fire_weather(humidity_pct: float | None, gust_mph: float | None, rain_72h_in: float | None,
+                 snow_24h_in: float | None) -> Hazard | None:
+    if humidity_pct is None or gust_mph is None or rain_72h_in is None:  # no rain history: can't call it dry
+        return None
+    if rain_72h_in >= FIRE_WET_RAIN_72H_IN or (snow_24h_in or 0.0) > 0:
+        return None
+    dry, wind = piecewise(humidity_pct, FIRE_DRY_ANCHORS), piecewise(gust_mph, FIRE_WIND_ANCHORS)
+    if dry == 0 or wind == 0:
+        return None
+    severity = FIRE_WEATHER_MAX * math.sqrt(dry * wind)
+    red_flag = humidity_pct <= 15 and gust_mph >= 25
+    label = (f"Fire weather: humidity {round(humidity_pct)}%, gusts {round(gust_mph)} mph"
+             + (" · near Red Flag criteria" if red_flag else ""))
+    if severity >= 2.5:
+        action = "No hot work (welding, cutting, grinding) without a fire watch and extinguisher; park off dry grass"
+    else:
+        action = "Keep extinguishers on hot-work jobs; watch for sparks in dry grass"
+    return _hazard("fire_weather", severity, label, action)
+
+
 # Atkinson & Wald (2007), "Did You Feel It?" intensity data, Seismological Research Letters 78(3), Table 1:
 # MMI = c1 + c2 (M-6) + c3 (M-6)^2 + c4 log R + c5 R + c6 B + c7 M log R, R = sqrt(D^2 + h^2) (km),
 # B = 0 within Rt, log(R / Rt) beyond. D is the distance to the fault, about the hypocentral distance for small and
@@ -568,7 +601,7 @@ KINDS = {
     # Snow and ice come from the same winter storm.
     "snow": "winter", "ice": "winter",
     # A Red Flag Warning and a fire nearby are one fire danger; smoke counts apart (it travels hundreds of miles).
-    "alert_wildfire": "fire", "smoke": "air", "alert_air_quality": "air",
+    "alert_wildfire": "fire", "fire_weather": "fire", "smoke": "air", "alert_air_quality": "air",
     "alert_earthquake": "earthquake",
 }
 

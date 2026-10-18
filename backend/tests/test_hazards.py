@@ -207,6 +207,24 @@ def test_alerts_scored_when_raised_keep_their_severity_and_kind():
     assert H.KINDS["smoke"] == H.KINDS["alert_air_quality"] == "air"
 
 
+def test_fire_weather_needs_dry_air_wind_and_dry_fuels():
+    red_flag_like = H.fire_weather(15, 35, 0.0, 0.0)
+    assert red_flag_like.severity == pytest.approx(3.8, abs=0.05)
+    assert red_flag_like.label == "Fire weather: humidity 15%, gusts 35 mph · near Red Flag criteria"
+    assert "No hot work" in red_flag_like.action and H.KINDS["fire_weather"] == "fire"
+    assert H.fire_weather(25, 25, 0.0, None).severity == pytest.approx(2.7)
+    assert H.fire_weather(5, 60, 0.0, 0.0).severity == H.FIRE_WEATHER_MAX  # moderate at most
+    assert H.fire_weather(30, 20, 0.0, 0.0).severity < 2.5  # breezy and fairly dry: low, with a light action
+    for humid, gust, rain, snow in [(40, 40, 0.0, 0.0), (10, 12, 0.0, 0.0), (10, 40, 0.2, 0.0), (10, 40, 0.0, 1.0),
+                                    (10, 40, None, 0.0), (None, 40, 0.0, 0.0)]:
+        assert H.fire_weather(humid, gust, rain, snow) is None  # humid, calm, wet, snowy or unknown
+
+
+def test_fire_weather_and_a_red_flag_warning_are_one_fire_danger():
+    red_flag = H.alert({"type": "wildfire", "severity": "warning", "title": "x", "nws_event": "Red Flag Warning"})
+    assert H.combine([red_flag, H.fire_weather(15, 35, 0.0, 0.0)])[0] == 4.0  # the warning's 4.0, counted once
+
+
 def test_miles_between():
     assert H.miles_between(25.435, -80.331, 25.435, -80.331) == 0
     assert H.miles_between(34.05, -118.25, 37.77, -122.42) == pytest.approx(347, abs=3)  # LA to San Francisco
