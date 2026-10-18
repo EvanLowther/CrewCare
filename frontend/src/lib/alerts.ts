@@ -1,6 +1,8 @@
 import {
+  Activity,
   CloudLightning,
   Flame,
+  Haze,
   MapPin,
   ThermometerSun,
   TriangleAlert,
@@ -22,6 +24,8 @@ export const ALERT_EMOJI: Record<AlertType, string> = {
   storm: "⛈️",
   wind: "💨",
   wildfire: "🔥",
+  air_quality: "🌫️",
+  earthquake: "🌐",
   crew_report: "📍",
   nws: "⚠️",
 };
@@ -33,6 +37,8 @@ export const ALERT_ICONS: Record<AlertType, LucideIcon> = {
   storm: CloudLightning,
   wind: Wind,
   wildfire: Flame,
+  air_quality: Haze,
+  earthquake: Activity,
   crew_report: MapPin,
   nws: TriangleAlert,
 };
@@ -44,6 +50,8 @@ export const ALERT_LABELS: Record<AlertType, string> = {
   storm: "Severe storm",
   wind: "High wind",
   wildfire: "Wildfire",
+  air_quality: "Smoke / air quality",
+  earthquake: "Earthquake",
   crew_report: "Crew report",
   nws: "NWS alert",
 };

@@ -47,6 +47,8 @@ def test_event_types():
     assert alert_type_for("Hurricane Warning") == "storm"
     assert alert_type_for("Wind Advisory") == "wind"
     assert alert_type_for("Red Flag Warning") == "wildfire"
+    assert alert_type_for("Air Quality Alert") == "air_quality"
+    assert alert_type_for("Dense Smoke Advisory") == "air_quality"
     assert alert_type_for("Dense Fog Advisory") == "nws"
 
 

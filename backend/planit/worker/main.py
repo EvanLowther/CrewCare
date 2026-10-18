@@ -16,7 +16,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from planit.ml import score
 from planit.worker import jobs
 from planit.worker.briefing import generate
-from planit.worker.ingest import nws, nws_weather, open_meteo, usgs
+from planit.worker.ingest import air_quality, earthquakes, nws, nws_weather, open_meteo, usgs, wildfire
 from planit.worker.rules import flood, lightning
 
 log = logging.getLogger("planit.worker")
@@ -27,6 +27,9 @@ JOBS = {
     "open_meteo": (open_meteo.poll, 10800),
     "nws_weather": (nws_weather.poll, 1800),  # Real-time weather: NWS forecast + station observations, no daily cap
     "nws": (nws.poll, 120),  # one national alerts request
+    "air_quality": (air_quality.poll, 7200),  # smoke: PM2.5 AQI, ~1,900 Open-Meteo calls a day
+    "wildfire": (wildfire.poll, 900),  # one national NIFC request
+    "earthquakes": (earthquakes.poll, 120),  # one USGS feed request
     "usgs": (usgs.poll, 900),
     "lightning": (lightning.evaluate, 15),
     "flood": (flood.evaluate, 900),

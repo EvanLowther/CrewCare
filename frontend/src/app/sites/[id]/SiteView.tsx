@@ -8,6 +8,7 @@ import {
   CloudRain,
   CloudSun,
   Droplets,
+  Haze,
   Layers,
   Lock,
   MapPin,
@@ -97,7 +98,8 @@ function SiteDetailView({
   model: Scorer;
   onModelChange: (next: Scorer) => void;
 }) {
-  const { site, conditions, last_24h: last24, forecast, alerts, reports, risk_history: history } = detail;
+  const { site, conditions, last_24h: last24, air_quality: air, forecast, alerts, reports, risk_history: history } = detail;
+  const smokeAqi = air?.us_aqi_pm2_5 ?? null;
   const tz = site.timezone;
   const lightning = alerts.find((a) => a.type === "lightning" && a.all_clear_at);
   const risk = site.risk;
@@ -369,7 +371,7 @@ function SiteDetailView({
             icon={CloudSun}
             subtitle={conditions ? `As of ${siteTime(conditions.ts, tz)} local time` : "No weather reading yet"}
           />
-          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-b-2xl border-t border-line bg-line sm:grid-cols-4 xl:grid-cols-8">
+          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-b-2xl border-t border-line bg-line sm:grid-cols-3 xl:grid-cols-9">
             <Metric icon={ThermometerSun} label="Heat index" value={round(conditions?.heat_index_f)} unit="°F" />
             <Metric icon={ThermometerSun} label="Temperature" value={round(conditions?.temp_f)} unit="°F" />
             <Metric icon={Droplets} label="Humidity" value={round(conditions?.humidity_pct)} unit="%" />
@@ -378,6 +380,7 @@ function SiteDetailView({
             <Metric icon={Umbrella} label="Rain chance" value={round(conditions?.precip_prob_pct)} unit="%" />
             <Metric icon={Layers} label="Soil moisture" value={conditions?.soil_moisture == null ? "–" : Math.round(conditions.soil_moisture * 100).toString()} unit="%" />
             <Metric icon={Zap} label="Storm energy" value={conditions?.cape_jkg == null ? "–" : Math.round(conditions.cape_jkg).toLocaleString()} unit="J/kg" />
+            <Metric icon={Haze} label="Air quality (smoke)" value={round(smokeAqi)} unit={`AQI · ${aqiCategory(smokeAqi)}`} />
           </div>
         </Card>
 
@@ -492,6 +495,17 @@ function QuietRow({ icon, title, detail }: { icon: React.ReactNode; title: strin
       </span>
     </div>
   );
+}
+
+/** EPA AQI category (PM2.5); the Real-time score counts smoke from 101 and Cal/OSHA requires N95s from 151. */
+function aqiCategory(aqi: number | null): string {
+  if (aqi == null) return "";
+  if (aqi > 300) return "hazardous";
+  if (aqi > 200) return "very unhealthy";
+  if (aqi > 150) return "unhealthy";
+  if (aqi > 100) return "sensitive groups";
+  if (aqi > 50) return "moderate";
+  return "good";
 }
 
 function Metric({ icon: Icon, label, value, unit }: { icon: LucideIcon; label: string; value: string; unit: string }) {
