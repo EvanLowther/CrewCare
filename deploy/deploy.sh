@@ -37,7 +37,7 @@ fi
 if grep -q '^deploy/Caddyfile' <<<"$changed"; then
   host=$(awk '!/^[#[:space:]]/ && /\{$/ {print $1; exit}' /etc/caddy/Caddyfile)
   log "updating Caddy for $host"
-  sed "s/^PLANIT_HOST /$host /" "$APP/deploy/Caddyfile" > /etc/caddy/Caddyfile.new
+  sed "s/PLANIT_HOST/$host/g" "$APP/deploy/Caddyfile" > /etc/caddy/Caddyfile.new
   if caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile.new >/dev/null 2>&1; then
     mv /etc/caddy/Caddyfile.new /etc/caddy/Caddyfile
     systemctl reload caddy
